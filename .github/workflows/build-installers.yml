@@ -2,12 +2,20 @@ name: Build Installers
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Draft release tag used for the generated installers
+        required: true
+        default: v0.1.0-test
   push:
     tags:
       - v*
 
 permissions:
-  contents: read
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
 
 concurrency:
   group: installers-${{ github.ref }}
@@ -27,13 +35,11 @@ jobs:
             args: --bundles nsis
             rust_targets: ""
             cache_key: windows-x64
-            artifact_name: Neloa-Windows-x64-[bundle]
           - name: macOS Universal
             os: macos-latest
             args: --target universal-apple-darwin --bundles dmg
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
             cache_key: macos-universal
-            artifact_name: Neloa-macOS-universal-[bundle]
 
     steps:
       - name: Check out repository
@@ -70,8 +76,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: ${{ matrix.artifact_name }}
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Neloa ${{ env.RELEASE_TAG }}
+          releaseBody: Automated unsigned test builds for Windows, macOS, and Android. These packages are intended for real-device validation.
+          releaseDraft: true
+          prerelease: true
 
   android:
     name: Android ARM64 debug APK
@@ -128,5 +137,8 @@ jobs:
         with:
           mobile: android
           args: --debug --target aarch64 --apk --ci
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: Neloa-Android-arm64-[bundle]
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Neloa ${{ env.RELEASE_TAG }}
+          releaseBody: Automated unsigned test builds for Windows, macOS, and Android. These packages are intended for real-device validation.
+          releaseDraft: true
+          prerelease: true
