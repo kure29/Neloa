@@ -1,0 +1,129 @@
+/*
+ * Neloa design tokens — "paper & ink".
+ *
+ * Warm neutral surfaces, an ink-black primary, and a single copper accent used
+ * only where something genuinely needs to be noticed. No gradients, no glows.
+ *
+ * Every colour exists as one variable name with a light and a dark value, so
+ * component rules never branch on the colour scheme. The primary button is
+ * `background: var(--ink); color: var(--paper-0)`, which inverts on its own.
+ *
+ * Contrast against --paper-0 / --paper-1 (WCAG AA body text needs 4.5:1):
+ *   light  ink 16.1  ink-2 7.4  ink-3 5.0  copper 4.6  ok 5.0  warn 5.3  danger 6.3
+ *   dark   ink 16.3  ink-2 7.4  ink-3 4.8  copper 7.1  ok 7.4  warn 8.0  danger 6.5
+ */
+
+:root {
+  /* Surfaces, lightest to most recessed. */
+  --paper-0: #fbfaf8;
+  --paper-1: #ffffff;
+  --paper-2: #f3f1ec;
+  --paper-3: #eae7e0;
+
+  --line: #e5e1d9;
+  --line-strong: #d6d1c6;
+
+  /* Text, primary to tertiary. */
+  --ink: #1a1714;
+  --ink-2: #57514a;
+  --ink-3: #736c60;
+
+  --copper: #b4562a;
+  --copper-soft: #faf0e9;
+
+  --ok: #2f7a4f;
+  --ok-soft: #edf6f0;
+  --warn: #9a5a0b;
+  --warn-soft: #fbf3e6;
+  --danger: #b3261e;
+  --danger-soft: #fdf0ee;
+
+  --elev-1: 0 1px 2px rgba(26, 23, 20, 0.04);
+  --elev-2: 0 6px 20px rgba(26, 23, 20, 0.09);
+  --elev-3: 0 24px 60px rgba(26, 23, 20, 0.22);
+  --scrim: rgba(26, 23, 20, 0.28);
+
+  /* Type. Three weights only: 400, 500, 600. */
+  --text-micro: 11px;
+  --text-small: 12px;
+  --text-body: 13px;
+  --text-subhead: 15px;
+  --text-title: 20px;
+  --text-display: 32px;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+    "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+
+  /* Spacing. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 40px;
+
+  /* Radii. Identical on both desktop platforms; --frame-radius is the one
+     exception, since the outer window edge is OS chrome. */
+  --frame-radius: 12px;
+  --r-card: 10px;
+  --r-control: 8px;
+  --r-pill: 999px;
+
+  --control-h: 36px;
+  --row-h: 56px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur: 200ms;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-0: #14120f;
+    --paper-1: #1c1a16;
+    --paper-2: #23201b;
+    --paper-3: #2c2822;
+
+    --line: #302c25;
+    --line-strong: #3e392f;
+
+    --ink: #f2efe9;
+    --ink-2: #a9a296;
+    --ink-3: #8f877a;
+
+    --copper: #e08b5c;
+    --copper-soft: #2a1e16;
+
+    --ok: #5fb483;
+    --ok-soft: #17261d;
+    --warn: #d9a036;
+    --warn-soft: #2a2113;
+    --danger: #e8776b;
+    --danger-soft: #2c1a18;
+
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --elev-2: 0 6px 20px rgba(0, 0, 0, 0.42);
+    --elev-3: 0 24px 60px rgba(0, 0, 0, 0.6);
+    --scrim: rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Touch targets and reading distance both want a step up. */
+.shell-mobile {
+  --text-micro: 12px;
+  --text-small: 13px;
+  --text-body: 15px;
+  --text-subhead: 17px;
+  --text-title: 22px;
+  --text-display: 34px;
+
+  --control-h: 46px;
+  --row-h: 60px;
+  --r-card: 12px;
+  --r-control: 10px;
+}

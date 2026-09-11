@@ -1,0 +1,191 @@
+/*
+ * Mobile-only chrome.
+ *
+ * No window controls, because there is no window. A safe-area header replaces
+ * the title bar and a bottom tab bar replaces the tab strip; the views and
+ * every component inside them are the ones the desktop uses.
+ */
+
+.shell-mobile {
+  --header-h: calc(52px + env(safe-area-inset-top, 0px));
+  --tabbar-h: calc(58px + env(safe-area-inset-bottom, 0px));
+  border-radius: 0;
+}
+
+/* ---------- header ---------- */
+
+.mobile-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  height: var(--header-h);
+  padding: env(safe-area-inset-top, 0px) var(--s4) 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-0);
+}
+
+.mobile-header .row-body strong {
+  font-size: var(--text-subhead);
+  font-weight: 600;
+}
+
+.mobile-header .row-body span {
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+/* ---------- tab bar ---------- */
+
+.tabbar {
+  display: flex;
+  flex: none;
+  height: var(--tabbar-h);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--line);
+  background: var(--paper-0);
+}
+
+.tabbar-item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.tabbar-item.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ---------- layout ---------- */
+
+.shell-mobile .page {
+  gap: var(--s2);
+  padding: var(--s2) var(--s4) var(--s7);
+}
+
+.shell-mobile .radar-view {
+  padding: var(--s3) var(--s4) var(--s4);
+}
+
+.shell-mobile .radar-stage {
+  min-height: 320px;
+}
+
+.shell-mobile .peer-node {
+  width: 84px;
+  min-height: 44px;
+  padding: var(--s1);
+}
+
+.shell-mobile .section-title {
+  padding: var(--s4) 0 var(--s1);
+}
+
+/* Keep compact visuals while giving every settings action a full touch target. */
+.shell-mobile .row-action,
+.shell-mobile .btn-sm {
+  min-height: 44px;
+}
+
+.shell-mobile .row-action {
+  padding-inline: var(--s2);
+  margin-inline-end: calc(var(--s2) * -1);
+}
+
+.shell-mobile .switch {
+  height: 44px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.shell-mobile .switch::before {
+  position: absolute;
+  inset: 7px 0;
+  content: "";
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--paper-2);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.shell-mobile .switch.on {
+  border-color: transparent;
+  background: transparent;
+}
+
+.shell-mobile .switch.on::before {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.shell-mobile .switch-knob {
+  top: 10px;
+  left: 3px;
+}
+
+/* Three columns is unreadable at phone widths; stack them instead. */
+.shell-mobile .policy-grid {
+  grid-template-columns: 1fr;
+}
+
+.shell-mobile .policy-tile + .policy-tile {
+  border-left: 0;
+  border-top: 1px solid var(--line);
+}
+
+.shell-mobile .send-dock {
+  grid-template-columns: 1fr;
+}
+
+.shell-mobile .dock-send {
+  width: 100%;
+}
+
+/* ---------- overlays ---------- */
+
+/*
+ * The tray sits under the header rather than above the tab bar, so it never
+ * covers the send dock or the primary action.
+ */
+.shell-mobile .transfer-tray {
+  position: fixed;
+  top: calc(var(--header-h) + var(--s2));
+  right: var(--s3);
+  bottom: auto;
+  left: var(--s3);
+  width: auto;
+}
+
+.shell-mobile .toast {
+  bottom: calc(var(--tabbar-h) + var(--s3));
+}
+
+.scrim-bottom {
+  align-items: end;
+  padding: 0;
+}
+
+.scrim-bottom .sheet {
+  width: 100%;
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding-bottom: calc(var(--s6) + env(safe-area-inset-bottom, 0px));
+  border-width: 1px 0 0;
+  border-radius: 20px 20px 0 0;
+  animation: sheet-up var(--dur) var(--ease);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(16px);
+  }
+}

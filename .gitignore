@@ -1,0 +1,30 @@
+node_modules/
+dist/
+src-tauri/target/
+releases/
+.DS_Store
+*.log
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Signing identities and private release material
+*.p12
+*.pfx
+*.mobileprovision
+*.cer
+*.key
+*.jks
+*.keystore
+key.properties
+keystore.properties
+
+# Generated install packages belong in GitHub Releases, not Git history
+*.apk
+*.ipa
+*.dmg
+*.msi
+*.msix
+*.appx
