@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="288" viewBox="0 0 1600 720">
+  <defs>
+    <symbol id="original" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="120" fill="#1A1714"/>
+      <circle cx="256" cy="256" r="152" fill="none" stroke="#FBFAF8" stroke-opacity=".12" stroke-width="14"/>
+      <circle cx="256" cy="256" r="94" fill="none" stroke="#FBFAF8" stroke-opacity=".22" stroke-width="14"/>
+      <path d="M165 348V164h42l99 113V164h41v184h-38L207 231v117h-42Z" fill="#FBFAF8"/>
+      <circle cx="368" cy="148" r="15" fill="#B4562A"/>
+    </symbol>
+    <symbol id="cut" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="120" fill="#1A1714"/>
+      <circle cx="256" cy="256" r="152" fill="none" stroke="#FBFAF8" stroke-opacity=".12" stroke-width="14"/>
+      <circle cx="256" cy="256" r="94" fill="none" stroke="#FBFAF8" stroke-opacity=".22" stroke-width="14"/>
+      <path d="M160 184l20-20h36l90 105V164h46v164l-20 20h-32l-94-109v109h-46V184Z" fill="#FBFAF8"/>
+      <circle cx="368" cy="148" r="15" fill="#B4562A"/>
+    </symbol>
+    <symbol id="route" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="120" fill="#1A1714"/>
+      <circle cx="256" cy="256" r="152" fill="none" stroke="#FBFAF8" stroke-opacity=".12" stroke-width="14"/>
+      <circle cx="256" cy="256" r="94" fill="none" stroke="#FBFAF8" stroke-opacity=".22" stroke-width="14"/>
+      <path d="M174 340V172l164 168V172" fill="none" stroke="#FBFAF8" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="368" cy="148" r="15" fill="#B4562A"/>
+    </symbol>
+  </defs>
+
+  <rect width="1600" height="720" fill="#FBFAF8"/>
+  <text x="80" y="54" fill="#1A1714" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="28" font-weight="600">N 字形方案</text>
+
+  <use href="#original" x="80" y="84" width="400" height="400"/>
+  <use href="#cut" x="600" y="84" width="400" height="400"/>
+  <use href="#route" x="1120" y="84" width="400" height="400"/>
+
+  <g fill="#1A1714" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="middle">
+    <text x="280" y="532" font-size="30" font-weight="600">原版 N</text>
+    <text x="800" y="532" font-size="30" font-weight="600">切角 N</text>
+    <text x="1320" y="532" font-size="30" font-weight="600">路径 N</text>
+  </g>
+  <g fill="#736C60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="middle">
+    <text x="280" y="568" font-size="20">清楚，但更像普通字体</text>
+    <text x="800" y="568" font-size="20">克制定制，保留稳定轮廓</text>
+    <text x="1320" y="568" font-size="20">连续传输路径，个性最强</text>
+  </g>
+
+  <line x1="80" y1="610" x2="1520" y2="610" stroke="#E5E1D9" stroke-width="2"/>
+  <g fill="#736C60" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18">
+    <text x="80" y="657">小尺寸</text>
+  </g>
+  <use href="#original" x="206" y="626" width="48" height="48"/>
+  <use href="#original" x="270" y="638" width="24" height="24"/>
+  <use href="#cut" x="726" y="626" width="48" height="48"/>
+  <use href="#cut" x="790" y="638" width="24" height="24"/>
+  <use href="#route" x="1246" y="626" width="48" height="48"/>
+  <use href="#route" x="1310" y="638" width="24" height="24"/>
+</svg>

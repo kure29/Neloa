@@ -61,7 +61,7 @@ const EMPTY_CLIPBOARD: ClipboardSnapshot = {
 };
 const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   generatedAtMs: 0,
-  appVersion: "0.1.0",
+  appVersion: "0.1.1",
   platform: "macos",
   protocolVersion: 1,
   minProtocolVersion: 1,

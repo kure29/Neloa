@@ -73,7 +73,7 @@ Local build artifacts are written to `releases/`, which is intentionally exclude
 
 The `CI` workflow runs on every push to `main`, every pull request, and on demand. It installs dependencies from the lockfiles, builds the React frontend, checks Rust formatting, runs Clippy with warnings denied, and executes the Rust library tests.
 
-The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. Manual runs ask for a test release tag, defaulting to `v0.1.0-test`. A successful run creates or updates a draft prerelease with downloadable assets:
+The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. Manual runs ask for a test release tag, defaulting to `v0.1.1-test`. A successful run creates or updates a draft prerelease with downloadable assets:
 
 - an unsigned Windows x64 NSIS installer;
 - a universal Intel/Apple Silicon macOS DMG with an ad-hoc signature, but without notarization;
