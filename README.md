@@ -73,13 +73,13 @@ Local build artifacts are written to `releases/`, which is intentionally exclude
 
 The `CI` workflow runs on every push to `main`, every pull request, and on demand. It installs dependencies from the lockfiles, builds the React frontend, checks Rust formatting, runs Clippy with warnings denied, and executes the Rust library tests.
 
-The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. A successful run provides downloadable workflow artifacts:
+The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. Manual runs ask for a test release tag, defaulting to `v0.1.0-test`. A successful run creates or updates a draft prerelease with downloadable assets:
 
 - an unsigned Windows x64 NSIS installer;
 - a universal Intel/Apple Silicon macOS DMG with an ad-hoc signature, but without notarization;
 - an ARM64 Android debug APK signed with the temporary debug identity for real-device testing.
 
-These test builds do not require repository secrets. iOS and production signing are intentionally excluded until the Apple, Android, and Windows release credentials are configured as GitHub Actions secrets. Build artifacts belong in Actions or GitHub Releases and must not be committed to the repository.
+These test builds do not require repository secrets. Draft releases are used instead of Actions artifacts so the large Android package does not consume the account's limited Actions/Packages artifact allowance. iOS and production signing are intentionally excluded until the Apple, Android, and Windows release credentials are configured as GitHub Actions secrets. Build artifacts belong in GitHub Releases and must not be committed to the repository.
 
 ## Clipboard behavior
 
