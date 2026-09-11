@@ -1,0 +1,49 @@
+[package]
+name = "neloa"
+version = "0.1.0"
+description = "Local-first encrypted file and clipboard transfer"
+authors = ["Neloa contributors"]
+edition = "2021"
+
+[lib]
+name = "neloa_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+hex = "0.4.3"
+hostname = "0.4.1"
+mdns-sd = "0.21.2"
+parking_lot = "0.12.4"
+quinn = { version = "0.11.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+rcgen = "0.14.5"
+rustls = { version = "0.23.34", default-features = false, features = ["std", "ring"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.11.0"
+snow = "0.10.0"
+tauri = { version = "2.11.5", features = [] }
+tauri-plugin-clipboard-manager = "2.3.3"
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-fs = "2.5.2"
+tokio = { version = "1.47", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
+uuid = { version = "1.18", features = ["v4"] }
+x25519-dalek = { version = "3.0.0-pre.3", features = ["getrandom", "static_secrets"] }
+zeroize = "1.8.1"
+percent-encoding = "2.3.2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+keyring = "4.2.0"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-native-keyring-store = "1.0.0"
+keyring-core = "1.0.0"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
+keyring-core = "1.0.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"

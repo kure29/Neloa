@@ -1,0 +1,470 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		297D5835B83182D9F76BA15F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 08775FF8654A096383765D2D /* assets */; };
+		42CE085737BEDD5DDEF5CABA /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 08B19EBC408C0DBC5C4DCBCA /* libapp.a */; };
+		4A28E44A8DDC2875122F09D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1CA08295938C84F7EA4FD9F /* Assets.xcassets */; };
+		65CA935547393B2858D9AE73 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 07C819A164B527A6018E1BE0 /* WebKit.framework */; };
+		8446FD0E150E194E634733D2 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1696E5EE891C6FCF600227EC /* Security.framework */; };
+		BE0D781A49C9D639384E1FB9 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2619D72A7774449F42CBD0DF /* main.mm */; };
+		D5CDE1EC0CA977B99324C1CD /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 790F40D6657A73D8CE1FC5C8 /* UIKit.framework */; };
+		DD833F31C245B619446FF25D /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DDF64747019E54DD310EF0A7 /* Metal.framework */; };
+		E1673B9525E993C6459E39BB /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F2FAE633EC7F359F308FB4E5 /* CoreGraphics.framework */; };
+		ECA0C0B8C9AB671D3C3DEE07 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */; };
+		ECB881196122F2BAE8060B31 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C60048FD41933377B17FFD1 /* QuartzCore.framework */; };
+		F2C2BC0A2AA4EB0E7957575C /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 5CBAD8BE36AC177E30250A5C /* LaunchScreen.storyboard */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		07C819A164B527A6018E1BE0 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		08775FF8654A096383765D2D /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		08B19EBC408C0DBC5C4DCBCA /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		094C049DD9DE44D08DC4F961 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		1696E5EE891C6FCF600227EC /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		25B42F4B54B7CE9813F7E42D /* neloa_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = neloa_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2619D72A7774449F42CBD0DF /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		30BB9AAAD46A0313609D6C5D /* trust.rs */ = {isa = PBXFileReference; path = trust.rs; sourceTree = "<group>"; };
+		5C60048FD41933377B17FFD1 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		5CBAD8BE36AC177E30250A5C /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		790F40D6657A73D8CE1FC5C8 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		897A1DDD73EDB1FB80F643D7 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		A38537066C0730DF354DFA74 /* network.rs */ = {isa = PBXFileReference; path = network.rs; sourceTree = "<group>"; };
+		BF9A2CDF19D84A651A2BAD0F /* clipboard.rs */ = {isa = PBXFileReference; path = clipboard.rs; sourceTree = "<group>"; };
+		DDD4D467DA8D7AD167369104 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		DDF64747019E54DD310EF0A7 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		DF12B892245B29E9C7A95D31 /* identity.rs */ = {isa = PBXFileReference; path = identity.rs; sourceTree = "<group>"; };
+		E04BEA057FB4E68B118AB124 /* neloa_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = neloa_iOS.entitlements; sourceTree = "<group>"; };
+		F1CA08295938C84F7EA4FD9F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F2FAE633EC7F359F308FB4E5 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		F6D7AEDB0BA966F0CE02BDF4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FAAAF760C1EAD57971C40CD2 /* model.rs */ = {isa = PBXFileReference; path = model.rs; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8689F743059F354B274C7A8A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				42CE085737BEDD5DDEF5CABA /* libapp.a in Frameworks */,
+				E1673B9525E993C6459E39BB /* CoreGraphics.framework in Frameworks */,
+				DD833F31C245B619446FF25D /* Metal.framework in Frameworks */,
+				ECA0C0B8C9AB671D3C3DEE07 /* MetalKit.framework in Frameworks */,
+				ECB881196122F2BAE8060B31 /* QuartzCore.framework in Frameworks */,
+				8446FD0E150E194E634733D2 /* Security.framework in Frameworks */,
+				D5CDE1EC0CA977B99324C1CD /* UIKit.framework in Frameworks */,
+				65CA935547393B2858D9AE73 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1F77879505EF6ED91C49D962 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F2FAE633EC7F359F308FB4E5 /* CoreGraphics.framework */,
+				08B19EBC408C0DBC5C4DCBCA /* libapp.a */,
+				DDF64747019E54DD310EF0A7 /* Metal.framework */,
+				6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */,
+				5C60048FD41933377B17FFD1 /* QuartzCore.framework */,
+				1696E5EE891C6FCF600227EC /* Security.framework */,
+				790F40D6657A73D8CE1FC5C8 /* UIKit.framework */,
+				07C819A164B527A6018E1BE0 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		22D55D4F14E9539F36F8A356 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		3EA2AE80CA2ACD63026D826D = {
+			isa = PBXGroup;
+			children = (
+				08775FF8654A096383765D2D /* assets */,
+				F1CA08295938C84F7EA4FD9F /* Assets.xcassets */,
+				5CBAD8BE36AC177E30250A5C /* LaunchScreen.storyboard */,
+				22D55D4F14E9539F36F8A356 /* Externals */,
+				BC6B94B1BEB5F2F5B8EC4006 /* neloa_iOS */,
+				9EC57A6B21BC7783F0B6F7A1 /* Sources */,
+				E81410EAAF8A3F5C33546E24 /* src */,
+				1F77879505EF6ED91C49D962 /* Frameworks */,
+				BB9650A469B172F239A6BF16 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		521806C73DA3C64AF628A088 /* neloa */ = {
+			isa = PBXGroup;
+			children = (
+				2619D72A7774449F42CBD0DF /* main.mm */,
+				A3D5050F4673026C5CF0EB21 /* bindings */,
+			);
+			path = neloa;
+			sourceTree = "<group>";
+		};
+		9EC57A6B21BC7783F0B6F7A1 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				521806C73DA3C64AF628A088 /* neloa */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A3D5050F4673026C5CF0EB21 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				DDD4D467DA8D7AD167369104 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		BB9650A469B172F239A6BF16 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				25B42F4B54B7CE9813F7E42D /* neloa_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BC6B94B1BEB5F2F5B8EC4006 /* neloa_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				F6D7AEDB0BA966F0CE02BDF4 /* Info.plist */,
+				E04BEA057FB4E68B118AB124 /* neloa_iOS.entitlements */,
+			);
+			path = neloa_iOS;
+			sourceTree = "<group>";
+		};
+		E81410EAAF8A3F5C33546E24 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				BF9A2CDF19D84A651A2BAD0F /* clipboard.rs */,
+				DF12B892245B29E9C7A95D31 /* identity.rs */,
+				094C049DD9DE44D08DC4F961 /* lib.rs */,
+				897A1DDD73EDB1FB80F643D7 /* main.rs */,
+				FAAAF760C1EAD57971C40CD2 /* model.rs */,
+				A38537066C0730DF354DFA74 /* network.rs */,
+				30BB9AAAD46A0313609D6C5D /* trust.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		73219EABF3F0FF26AADC7B73 /* neloa_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A57232F621366DCC689E4BD8 /* Build configuration list for PBXNativeTarget "neloa_iOS" */;
+			buildPhases = (
+				976E60E2F40AE9A861D1FC4B /* Build Rust Code */,
+				586DE124A596AB0FD1BBBBD4 /* Sources */,
+				64EC93BAE03C0F29A54A730C /* Resources */,
+				8689F743059F354B274C7A8A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = neloa_iOS;
+			packageProductDependencies = (
+			);
+			productName = neloa_iOS;
+			productReference = 25B42F4B54B7CE9813F7E42D /* neloa_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3DA0F7E8BF3E542A6D50994F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 58D1DE1A5CF1AF858CC85917 /* Build configuration list for PBXProject "neloa" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3EA2AE80CA2ACD63026D826D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BB9650A469B172F239A6BF16 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				73219EABF3F0FF26AADC7B73 /* neloa_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		64EC93BAE03C0F29A54A730C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4A28E44A8DDC2875122F09D1 /* Assets.xcassets in Resources */,
+				F2C2BC0A2AA4EB0E7957575C /* LaunchScreen.storyboard in Resources */,
+				297D5835B83182D9F76BA15F /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		976E60E2F40AE9A861D1FC4B /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm --prefix ../../.. run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		586DE124A596AB0FD1BBBBD4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE0D781A49C9D639384E1FB9 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		48A483BBCD49AF43667E9F07 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		8217D2DC93ACB9112375AE2D /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = neloa_iOS/neloa_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = neloa_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = app.neloa.desktop;
+				PRODUCT_NAME = Neloa;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		A7B44F6DEDC565F67ABC8346 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		F1A72992A0CBDBAD770003B2 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = neloa_iOS/neloa_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = neloa_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = app.neloa.desktop;
+				PRODUCT_NAME = Neloa;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		58D1DE1A5CF1AF858CC85917 /* Build configuration list for PBXProject "neloa" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				48A483BBCD49AF43667E9F07 /* debug */,
+				A7B44F6DEDC565F67ABC8346 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		A57232F621366DCC689E4BD8 /* Build configuration list for PBXNativeTarget "neloa_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8217D2DC93ACB9112375AE2D /* debug */,
+				F1A72992A0CBDBAD770003B2 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3DA0F7E8BF3E542A6D50994F /* Project object */;
+}

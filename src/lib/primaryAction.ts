@@ -1,0 +1,54 @@
+import type { PeerDevice, SelectedFile } from "../types";
+import { peerIsCompatible } from "./format";
+
+export interface PrimaryAction {
+  label: string;
+  disabled: boolean;
+  /** One line under the composer explaining what the button will do, or why it can't. */
+  hint: string;
+  tone: "neutral" | "warn" | "ok";
+}
+
+/**
+ * The send button has seven distinct states. Resolving them in one place keeps
+ * the label, the disabled flag and the explanatory line from drifting apart.
+ */
+export function resolvePrimaryAction(input: {
+  peer: PeerDevice | null;
+  trusted: boolean;
+  file: SelectedFile | null;
+  busyPairing: boolean;
+  busyFile: boolean;
+}): PrimaryAction {
+  const { peer, trusted, file, busyPairing, busyFile } = input;
+
+  if (busyPairing) {
+    return { label: "建立通道…", disabled: true, hint: "正在与对方协商加密会话", tone: "neutral" };
+  }
+  if (busyFile) {
+    return { label: "准备中…", disabled: true, hint: "正在准备文件", tone: "neutral" };
+  }
+  if (!peer) {
+    return { label: "发送", disabled: true, hint: "先在雷达中选择一台设备", tone: "neutral" };
+  }
+  if (!peerIsCompatible(peer)) {
+    return {
+      label: "版本不兼容",
+      disabled: true,
+      hint: `${peer.name} 的协议版本不兼容，请更新对方的 Neloa`,
+      tone: "warn",
+    };
+  }
+  if (!file) {
+    return { label: "发送", disabled: true, hint: `选择要发给 ${peer.name} 的文件`, tone: "neutral" };
+  }
+  if (!trusted) {
+    return {
+      label: "先配对",
+      disabled: false,
+      hint: `首次连接 ${peer.name}，完成六位数字核对后即可发送`,
+      tone: "warn",
+    };
+  }
+  return { label: "发送", disabled: false, hint: `已与 ${peer.name} 配对，端到端加密`, tone: "ok" };
+}

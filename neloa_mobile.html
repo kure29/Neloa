@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Neloa</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --text: #0f172a;
+      --text-sub: #64748b;
+      --border: #e2e8f0;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* 极简顶栏 */
+    header {
+      padding-top: var(--safe-top);
+      height: calc(48px + var(--safe-top));
+      padding-left: 18px;
+      padding-right: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      z-index: 20;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .brand-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+
+    /* 主视区 */
+    main {
+      flex: 1;
+      position: relative;
+      overflow-y: auto;
+    }
+
+    .page {
+      display: none;
+      height: 100%;
+      flex-direction: column;
+    }
+    .page.active { display: flex; }
+
+    /* 雷达画布 */
+    .radar-container {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(37, 99, 235, 0.12);
+      pointer-events: none;
+    }
+
+    .pulse {
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0) 70%);
+      animation: sweep 3s infinite ease-out;
+      pointer-events: none;
+    }
+
+    @keyframes sweep {
+      0% { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+
+    /* 中心设备 */
+    .center-node {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .center-box {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+
+    /* 动态对端设备 */
+    .peer-node {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: transform 0.2s;
+    }
+
+    .peer-node:active { transform: scale(0.92); }
+
+    .peer-box {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: #fff;
+      border: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+      position: relative;
+    }
+
+    .peer-node.selected .peer-box {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+    }
+
+    .peer-dot {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      border: 2px solid #fff;
+    }
+
+    .node-label {
+      margin-top: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    /* 底部操作区（文件/文本） */
+    .send-dock {
+      margin: 8px 14px 10px 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      z-index: 10;
+    }
+
+    .file-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f8fafc;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px dashed #cbd5e1;
+      overflow: hidden;
+    }
+
+    .file-box:active { background: #f1f5f9; }
+
+    .file-txt {
+      font-size: 0.78rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+
+    .btn-send {
+      padding: 8px 14px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .btn-send:active { opacity: 0.85; }
+
+    /* 列表与设置通用页 */
+    .page-inner {
+      padding: 16px;
+    }
+
+    .page-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .card-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .setting-group {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid #f8fafc;
+      font-size: 0.85rem;
+    }
+    .setting-row:last-child { border-bottom: none; }
+
+    /* Switch */
+    .switch { position: relative; display: inline-block; width: 38px; height: 22px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: #cbd5e1;
+      border-radius: 22px; transition: 0.2s;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: 0.2s;
+    }
+    input:checked + .slider { background: var(--primary); }
+    input:checked + .slider:before { transform: translateX(16px); }
+
+    /* 低栏（常驻底部 Navigation） */
+    .bottom-bar {
+      height: calc(52px + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      background: #ffffff;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 30;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.68rem;
+      color: var(--text-sub);
+      background: none;
+      border: none;
+      padding: 4px 16px;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* 浮层与弹窗 */
+    .modal-wrap {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 320px;
+      background: #fff;
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      margin: 12px 0 8px 0;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.1s linear;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: calc(64px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0f172a;
+      color: #fff;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.2s;
+      z-index: 200;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, -4px); }
+  </style>
+</head>
+<body>
+
+  <!-- 极简顶栏：无多余按键 -->
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-logo">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/></svg>
+      </div>
+      <span class="brand-title">Neloa</span>
+    </div>
+    <div class="status-pill" onclick="rescan()">
+      <span class="dot"></span>
+      <span>附近 4 台</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Tab 1: 雷达直传 -->
+    <div class="page active" id="view-radar">
+      <div class="radar-container" id="radarArea">
+        <div class="ring" style="width:160px;height:160px;"></div>
+        <div class="ring" style="width:280px;height:280px;"></div>
+        <div class="pulse"></div>
+
+        <!-- 中心本机 -->
+        <div class="center-node">
+          <div class="center-box">📱</div>
+          <span class="node-label">我的手机</span>
+        </div>
+
+        <!-- 动态设备挂载区 -->
+        <div id="peersBox" style="position:absolute;inset:0;pointer-events:none;"></div>
+      </div>
+
+      <!-- 底部操作坞 -->
+      <div class="send-dock">
+        <input type="file" id="realFile" style="display:none" onchange="onFile(this)" />
+        <div class="file-box" onclick="document.getElementById('realFile').click()">
+          <svg width="14" height="14" fill="none" stroke="#2563eb" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="file-txt" id="fileTxt">选取相片 / 文件...</span>
+        </div>
+        <button class="btn-send" id="sendBtn" onclick="doSend()">发送</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: 传输记录 -->
+    <div class="page" id="view-history">
+      <div class="page-inner">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span class="page-title" style="margin-bottom:0;">传输历史</span>
+          <span style="font-size:0.75rem;color:var(--text-sub);" onclick="clearLogs()">清空</span>
+        </div>
+        <div id="logList"></div>
+      </div>
+    </div>
+
+    <!-- Tab 3: 偏好设置 -->
+    <div class="page" id="view-settings">
+      <div class="page-inner">
+        <div class="page-title">偏好设置</div>
+        <div class="setting-group">
+          <div class="setting-row">
+            <span>本机名称</span>
+            <span style="color:var(--text-sub);" onclick="renameMe()">我的手机 ›</span>
+          </div>
+          <div class="setting-row">
+            <span>雷达可见状态</span>
+            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <span>自动接收白名单</span>
+            <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 纯正低栏导航 (Bottom Bar) -->
+  <nav class="bottom-bar">
+    <button class="tab-btn active" onclick="tab('radar')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/></svg>
+      <span>雷达</span>
+    </button>
+    <button class="tab-btn" onclick="tab('history')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg>
+      <span>记录</span>
+    </button>
+    <button class="tab-btn" onclick="tab('settings')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+
+  <!-- 传输流浮层 -->
+  <div class="modal-wrap" id="transModal">
+    <div class="modal-card" style="text-align:center;">
+      <div style="font-size:0.88rem;font-weight:700;" id="transTitle">正在传输...</div>
+      <div class="progress-track"><div class="progress-fill" id="fillBar"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-sub);">
+        <span id="pct">0%</span>
+        <span>45.2 MB/s</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let peers = [
+      { id: 1, name: 'MacBook M3', icon: '💻' },
+      { id: 2, name: 'Pixel 8', icon: '📱' },
+      { id: 3, name: 'Ubuntu Node', icon: '🐧' },
+      { id: 4, name: 'iPad Air', icon: '📟' }
+    ];
+    let selPeer = peers[0];
+    let selFile = null;
+    let logs = [
+      { id: 1, name: 'Vacation.zip', size: '145 MB', peer: 'iPad Air', time: '10分钟前' }
+    ];
+
+    function renderPeers() {
+      const box = document.getElementById('peersBox');
+      box.innerHTML = '';
+      const r = 115; // 手机端适配半径
+
+      peers.forEach((p, i) => {
+        const ang = (i / peers.length) * 2 * Math.PI - (Math.PI / 2);
+        const x = Math.round(r * Math.cos(ang));
+        const y = Math.round(r * Math.sin(ang));
+        const isSel = selPeer && selPeer.id === p.id;
+
+        const node = document.createElement('div');
+        node.className = `peer-node ${isSel ? 'selected' : ''}`;
+        node.style.pointerEvents = 'auto';
+        node.style.left = `calc(50% + ${x}px - 26px)`;
+        node.style.top = `calc(50% + ${y}px - 26px)`;
+
+        node.innerHTML = `
+          <div class="peer-box">${p.icon}<div class="peer-dot"></div></div>
+          <span class="node-label">${p.name}</span>
+        `;
+        node.onclick = () => {
+          selPeer = p;
+          renderPeers();
+          updateSendBtn();
+        };
+        box.appendChild(node);
+      });
+      updateSendBtn();
+    }
+
+    function updateSendBtn() {
+      document.getElementById('sendBtn').innerText = `发送至 ${selPeer ? selPeer.name.split(' ')[0] : '目标'}`;
+    }
+
+    function tab(name) {
+      document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+      document.getElementById('view-' + name).classList.add('active');
+
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['radar','history','settings'][i] === name);
+      });
+
+      if (name === 'history') renderLogs();
+    }
+
+    function onFile(input) {
+      if (input.files && input.files[0]) {
+        selFile = input.files[0];
+        document.getElementById('fileTxt').innerText = selFile.name;
+        msg('已选择文件');
+      }
+    }
+
+    function doSend() {
+      const fname = selFile ? selFile.name : '演示文档.pdf';
+      const m = document.getElementById('transModal');
+      const bar = document.getElementById('fillBar');
+      const pct = document.getElementById('pct');
+
+      document.getElementById('transTitle').innerText = `发送至 ${selPeer.name}`;
+      m.style.display = 'flex';
+      bar.style.width = '0%';
+
+      let p = 0;
+      const t = setInterval(() => {
+        p += 6;
+        bar.style.width = p + '%';
+        pct.innerText = p + '%';
+        if (p >= 100) {
+          clearInterval(t);
+          setTimeout(() => {
+            m.style.display = 'none';
+            msg('发送完成');
+            logs.unshift({
+              id: Date.now(),
+              name: fname,
+              size: selFile ? (selFile.size/1024/1024).toFixed(1) + ' MB' : '12.4 MB',
+              peer: selPeer.name,
+              time: '刚刚'
+            });
+            selFile = null;
+            document.getElementById('fileTxt').innerText = '选取相片 / 文件...';
+          }, 200);
+        }
+      }, 40);
+    }
+
+    function renderLogs() {
+      const box = document.getElementById('logList');
+      if (logs.length === 0) {
+        box.innerHTML = '<div style="text-align:center;color:var(--text-sub);padding:30px 0;font-size:0.8rem;">暂无记录</div>';
+        return;
+      }
+      box.innerHTML = logs.map(l => `
+        <div class="card-item">
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;">${l.name}</div>
+            <div style="font-size:0.7rem;color:var(--text-sub);margin-top:2px;">${l.peer} · ${l.size} · ${l.time}</div>
+          </div>
+          <span style="font-size:0.75rem;color:var(--primary);" onclick="msg('已调起预览')">打开</span>
+        </div>
+      `).join('');
+    }
+
+    function clearLogs() {
+      logs = [];
+      renderLogs();
+      msg('记录已清空');
+    }
+
+    function rescan() {
+      msg('正在扫描新设备...');
+      renderPeers();
+    }
+
+    function renameMe() {
+      const n = prompt('输入设备名称：', '我的手机');
+      if (n) {
+        document.querySelector('.center-node .node-label').innerText = n;
+        msg('已修改为 ' + n);
+      }
+    }
+
+    function msg(t) {
+      const el = document.getElementById('toast');
+      el.innerText = t;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1600);
+    }
+
+    renderPeers();
+  </script>
+</body>
+</html>
