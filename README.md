@@ -1,5 +1,7 @@
 # Neloa
 
+[![CI](https://github.com/kure29/Neloa/actions/workflows/ci.yml/badge.svg)](https://github.com/kure29/Neloa/actions/workflows/ci.yml)
+
 Neloa is a local-first application for transferring files and clipboard text between nearby devices. Native clients are being developed for macOS, Windows, Android, and iOS.
 
 ## Status
@@ -66,6 +68,18 @@ A Windows NSIS installer must be compiled on Windows. Run `./packaging/create-wi
 Development packages are currently unsigned. macOS Gatekeeper and Windows SmartScreen may show an unknown-publisher warning until release signing and notarization are configured.
 
 Local build artifacts are written to `releases/`, which is intentionally excluded from Git history; distributable binaries should be attached to GitHub Releases. The current workspace contains an ARM64 Android debug APK. The iOS project is at `src-tauri/gen/apple/neloa.xcodeproj`; an IPA cannot be produced without full Xcode and Apple signing. See `MOBILE_BUILD.md` for installation, rebuild commands, platform limitations, and the real-device acceptance checklist.
+
+## GitHub Actions
+
+The `CI` workflow runs on every push to `main`, every pull request, and on demand. It installs dependencies from the lockfiles, builds the React frontend, checks Rust formatting, runs Clippy with warnings denied, and executes the Rust library tests.
+
+The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. A successful run provides downloadable workflow artifacts:
+
+- an unsigned Windows x64 NSIS installer;
+- a universal Intel/Apple Silicon macOS DMG with an ad-hoc signature, but without notarization;
+- an ARM64 Android debug APK signed with the temporary debug identity for real-device testing.
+
+These test builds do not require repository secrets. iOS and production signing are intentionally excluded until the Apple, Android, and Windows release credentials are configured as GitHub Actions secrets. Build artifacts belong in Actions or GitHub Releases and must not be committed to the repository.
 
 ## Clipboard behavior
 
