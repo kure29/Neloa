@@ -39,15 +39,20 @@ export function resolvePrimaryAction(input: {
       tone: "warn",
     };
   }
-  if (!file) {
-    return { label: "发送", disabled: true, hint: `选择要发给 ${peer.name} 的文件`, tone: "neutral" };
-  }
   if (!trusted) {
     return {
-      label: "先配对",
+      label: "配对",
       disabled: false,
-      hint: `首次连接 ${peer.name}，完成六位数字核对后即可发送`,
+      hint: `先与 ${peer.name} 核对六位数字，配对后再选择文件`,
       tone: "warn",
+    };
+  }
+  if (!file) {
+    return {
+      label: "选择文件",
+      disabled: false,
+      hint: `已与 ${peer.name} 配对，下一步选择要发送的文件`,
+      tone: "ok",
     };
   }
   return { label: "发送", disabled: false, hint: `已与 ${peer.name} 配对，端到端加密`, tone: "ok" };
