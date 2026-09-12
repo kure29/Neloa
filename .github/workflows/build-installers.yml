@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Draft release tag used for the generated installers
         required: true
-        default: v0.1.1-test
+        default: v0.1.2-test
   push:
     tags:
       - v*
