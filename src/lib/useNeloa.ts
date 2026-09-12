@@ -61,7 +61,7 @@ const EMPTY_CLIPBOARD: ClipboardSnapshot = {
 };
 const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   generatedAtMs: 0,
-  appVersion: "0.1.3",
+  appVersion: "0.1.5",
   platform: "macos",
   protocolVersion: 1,
   minProtocolVersion: 1,
@@ -333,9 +333,13 @@ export function useNeloa() {
       showToast(primaryAction.hint);
       return;
     }
-    if (!selectedPeer || !selectedFile) return;
+    if (!selectedPeer) return;
     if (!selectedPeerTrusted) {
       void startPairing(selectedPeer.id);
+      return;
+    }
+    if (!selectedFile) {
+      void pickFile();
       return;
     }
     void beginFileTransfer(selectedPeer.id, selectedFile.path, selectedFile.name, selectedFile.size);
@@ -345,6 +349,7 @@ export function useNeloa() {
     selectedFile,
     selectedPeerTrusted,
     startPairing,
+    pickFile,
     beginFileTransfer,
     showToast,
   ]);

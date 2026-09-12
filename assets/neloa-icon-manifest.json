@@ -1,0 +1,7 @@
+{
+  "default": "neloa-icon.svg",
+  "android_bg": "neloa-icon-android-background.svg",
+  "android_fg": "neloa-icon-android-foreground.svg",
+  "android_fg_scale": 100,
+  "android_monochrome": "neloa-icon-android-monochrome.svg"
+}

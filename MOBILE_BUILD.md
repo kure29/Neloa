@@ -4,7 +4,7 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | GitHub Release 中的 ARM64 / x86_64 独立 APK | 0.1.2 的 React、Rust ARM64、Kotlin、资源与 APK 构建已通过 | 0.1.3 Actions 双 ABI 构建、Android 真机与 MuMu x86_64 安装、局域网发现、双向传输、前台剪贴板 |
+| Android | GitHub Release 中的 ARM64 / x86_64 独立 APK | 0.1.4 的 ARM64 / x86_64 APK 已在 MuMu Android 12 启动通过 | 0.1.5 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
 | iOS | `src-tauri/gen/apple/neloa.xcodeproj` | 工程已生成；本地网络说明、Bonjour 服务与 entitlement 的 plist 语法已检查 | Xcode 编译、签名、iPhone 安装及运行时行为 |
 
 Android APK 是便于内部测试的分架构 debug 包：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。它们使用调试签名，未针对体积优化，也不能作为应用商店发行包。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
@@ -26,13 +26,13 @@ Android APK 是便于内部测试的分架构 debug 包：ARM64 用于主流安�
 最方便的方式是把 APK 发送到手机，允许当前文件管理器“安装未知应用”，然后点 APK 安装。也可以打开 USB 调试后运行：
 
 ```bash
-adb install -r Neloa_0.1.3_arm64.apk
+adb install -r Neloa_0.1.5_arm64.apk
 ```
 
-0.1.3 APK 构建完成后可在下载目录校验 SHA-256：
+0.1.5 APK 构建完成后可在下载目录校验 SHA-256：
 
 ```bash
-shasum -a 256 Neloa_0.1.3_arm64.apk
+shasum -a 256 Neloa_0.1.5_arm64.apk
 ```
 
 如需在这台 Mac 上重新构建：
