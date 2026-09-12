@@ -1,6 +1,6 @@
 # 在 Windows 上生成 Neloa 安装程序
 
-解压 `Neloa-Windows-Source-0.1.2.zip` 后，双击 `build-windows.bat`。脚本会安装项目依赖并生成当前用户安装模式的 NSIS `.exe`。
+解压 `Neloa-Windows-Source-0.1.3.zip` 后，双击 `build-windows.bat`。脚本会安装项目依赖并生成当前用户安装模式的 NSIS `.exe`。
 
 ## 第一次构建前需要安装
 
@@ -16,7 +16,7 @@ Windows 10 1803 及更高版本通常已经包含 WebView2；如果系统缺失�
 构建成功后，安装程序位于：
 
 ```text
-src-tauri\target\release\bundle\nsis\Neloa_0.1.2_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Neloa_0.1.3_x64-setup.exe
 ```
 
 最终文件名可能随 Tauri 版本略有不同，以该目录内的 `.exe` 为准。安装包生成后，可以删除 `node_modules` 和 `src-tauri\target` 回收空间。
