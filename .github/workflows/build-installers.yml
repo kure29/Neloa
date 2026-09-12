@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Draft release tag used for the generated installers
         required: true
-        default: v0.1.2-test
+        default: v0.1.3-test
   push:
     tags:
       - v*
@@ -78,14 +78,26 @@ jobs:
           args: ${{ matrix.args }}
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: Automated unsigned test builds for Windows, macOS, and Android. These packages are intended for real-device validation.
+          releaseBody: Automated unsigned test builds for Windows and macOS plus ABI-specific Android debug APKs. These packages are intended for real-device validation.
           releaseDraft: true
           prerelease: true
 
   android:
-    name: Android ARM64 debug APK
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android ARM64 debug APK
+            tauri_target: aarch64
+            rust_target: aarch64-linux-android
+            cache_key: android-aarch64
+          - name: Android x86_64 debug APK
+            tauri_target: x86_64
+            rust_target: x86_64-linux-android
+            cache_key: android-x86_64
     env:
       NDK_VERSION: 28.2.13676358
 
@@ -119,13 +131,13 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: ${{ matrix.rust_target }}
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
-          shared-key: android-aarch64
+          shared-key: ${{ matrix.cache_key }}
 
       - name: Install frontend dependencies
         run: npm ci
@@ -136,9 +148,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           mobile: android
-          args: --debug --target aarch64 --apk --ci
+          args: --debug --target ${{ matrix.tauri_target }} --split-per-abi --apk --ci
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: Automated unsigned test builds for Windows, macOS, and Android. These packages are intended for real-device validation.
+          releaseBody: Automated unsigned test builds for Windows and macOS plus ABI-specific Android debug APKs. These packages are intended for real-device validation.
           releaseDraft: true
           prerelease: true

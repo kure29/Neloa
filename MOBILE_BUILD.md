@@ -4,10 +4,10 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | `releases/Neloa-Android-arm64-debug-0.1.2.apk` | 0.1.1 的 React、Rust ARM64、Kotlin、资源与 APK 构建已通过 | 0.1.2 Actions 构建、Android 真机安装、局域网发现、双向传输、前台剪贴板 |
+| Android | GitHub Release 中的 ARM64 / x86_64 独立 APK | 0.1.2 的 React、Rust ARM64、Kotlin、资源与 APK 构建已通过 | 0.1.3 Actions 双 ABI 构建、Android 真机与 MuMu x86_64 安装、局域网发现、双向传输、前台剪贴板 |
 | iOS | `src-tauri/gen/apple/neloa.xcodeproj` | 工程已生成；本地网络说明、Bonjour 服务与 entitlement 的 plist 语法已检查 | Xcode 编译、签名、iPhone 安装及运行时行为 |
 
-Android APK 是便于内部测试的 ARM64 debug 包，使用调试签名，未针对体积优化，也不能作为应用商店发行包。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
+Android APK 是便于内部测试的分架构 debug 包：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。它们使用调试签名，未针对体积优化，也不能作为应用商店发行包。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
 
 ## 已接入的移动端能力
 
@@ -21,18 +21,18 @@ Android APK 是便于内部测试的 ARM64 debug 包，使用调试签名，未�
 
 ## Android 真机安装
 
-要求：ARM64 手机或平板、Android 7.0（API 24）或更新版本。
+要求：ARM64 手机或平板，或 x86_64 模拟器；Android 7.0（API 24）或更新版本。
 
 最方便的方式是把 APK 发送到手机，允许当前文件管理器“安装未知应用”，然后点 APK 安装。也可以打开 USB 调试后运行：
 
 ```bash
-adb install -r releases/Neloa-Android-arm64-debug-0.1.2.apk
+adb install -r Neloa_0.1.3_arm64-v8a.apk
 ```
 
-0.1.2 APK 构建完成后可在下载目录校验 SHA-256：
+0.1.3 APK 构建完成后可在下载目录校验 SHA-256：
 
 ```bash
-shasum -a 256 releases/Neloa-Android-arm64-debug-0.1.2.apk
+shasum -a 256 Neloa_0.1.3_arm64-v8a.apk
 ```
 
 如需在这台 Mac 上重新构建：
@@ -43,7 +43,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 export NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 export ANDROID_NDK_HOME="$NDK_HOME"
 export RUSTC=/Users/example/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc
-npm run tauri -- android build --debug --target aarch64 --apk --ci
+npm run tauri -- android build --debug --target aarch64 x86_64 --split-per-abi --apk --ci
 ```
 
 输出位于：

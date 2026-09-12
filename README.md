@@ -28,7 +28,7 @@ The repository currently contains an executable LAN transfer milestone:
 - an in-app LAN diagnostics center covering QUIC, mDNS, device identity, peer capabilities, clipboard readiness, and platform-specific firewall guidance;
 - one-click copying of a sanitized diagnostic report without IP addresses, full device IDs, public keys, file paths, or clipboard content.
 
-The Android ARM64 debug APK has been built locally and structurally verified. The iOS Xcode project, local-network declarations, and signing entitlement are generated, but an iOS binary still requires full Xcode, an Apple development team, and real-device validation. Pairing throttling, settings migration, signed release packaging, and cross-device acceptance testing remain product milestones.
+The Android ARM64 debug APK has been built locally and structurally verified, while GitHub Actions also produces an x86_64 APK for emulator testing. The iOS Xcode project, local-network declarations, and signing entitlement are generated, but an iOS binary still requires full Xcode, an Apple development team, and real-device validation. Pairing throttling, settings migration, signed release packaging, and cross-device acceptance testing remain product milestones.
 
 ## Run locally
 
@@ -67,17 +67,17 @@ A Windows NSIS installer must be compiled on Windows. Run `./packaging/create-wi
 
 Development packages are currently unsigned. macOS Gatekeeper and Windows SmartScreen may show an unknown-publisher warning until release signing and notarization are configured.
 
-Local build artifacts are written to `releases/`, which is intentionally excluded from Git history; distributable binaries should be attached to GitHub Releases. The current workspace contains an ARM64 Android debug APK. The iOS project is at `src-tauri/gen/apple/neloa.xcodeproj`; an IPA cannot be produced without full Xcode and Apple signing. See `MOBILE_BUILD.md` for installation, rebuild commands, platform limitations, and the real-device acceptance checklist.
+Local build artifacts are written to `releases/`, which is intentionally excluded from Git history; distributable binaries should be attached to GitHub Releases. Android test releases provide separate ARM64 and x86_64 debug APKs. The iOS project is at `src-tauri/gen/apple/neloa.xcodeproj`; an IPA cannot be produced without full Xcode and Apple signing. See `MOBILE_BUILD.md` for installation, rebuild commands, platform limitations, and the real-device acceptance checklist.
 
 ## GitHub Actions
 
 The `CI` workflow runs on every push to `main`, every pull request, and on demand. It installs dependencies from the lockfiles, builds the React frontend, checks Rust formatting, runs Clippy with warnings denied, and executes the Rust library tests.
 
-The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. Manual runs ask for a test release tag, defaulting to `v0.1.2-test`. A successful run creates or updates a draft prerelease with downloadable assets:
+The `Build Installers` workflow runs on demand from the repository's **Actions** tab and whenever a `v*` tag is pushed. Manual runs ask for a test release tag, defaulting to `v0.1.3-test`. A successful run creates or updates a draft prerelease with downloadable assets:
 
 - an unsigned Windows x64 NSIS installer;
 - a universal Intel/Apple Silicon macOS DMG with an ad-hoc signature, but without notarization;
-- an ARM64 Android debug APK signed with the temporary debug identity for real-device testing.
+- separate ARM64 and x86_64 Android debug APKs signed with temporary debug identities for real-device and emulator testing.
 
 These test builds do not require repository secrets. Draft releases are used instead of Actions artifacts so the large Android package does not consume the account's limited Actions/Packages artifact allowance. iOS and production signing are intentionally excluded until the Apple, Android, and Windows release credentials are configured as GitHub Actions secrets. Build artifacts belong in GitHub Releases and must not be committed to the repository.
 
