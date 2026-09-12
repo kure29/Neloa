@@ -22,8 +22,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare-release:
+    name: Prepare draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure draft prerelease exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Neloa $RELEASE_TAG" \
+              --notes "Automated unsigned test builds for Windows and macOS plus ABI-specific Android debug APKs. These packages are intended for real-device validation." \
+              --draft \
+              --prerelease
+          fi
+
   desktop:
     name: ${{ matrix.name }}
+    needs: prepare-release
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
@@ -84,6 +104,7 @@ jobs:
 
   android:
     name: ${{ matrix.name }}
+    needs: prepare-release
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:

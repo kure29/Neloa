@@ -26,13 +26,13 @@ Android APK 是便于内部测试的分架构 debug 包：ARM64 用于主流安�
 最方便的方式是把 APK 发送到手机，允许当前文件管理器“安装未知应用”，然后点 APK 安装。也可以打开 USB 调试后运行：
 
 ```bash
-adb install -r Neloa_0.1.3_arm64-v8a.apk
+adb install -r Neloa_0.1.3_arm64.apk
 ```
 
 0.1.3 APK 构建完成后可在下载目录校验 SHA-256：
 
 ```bash
-shasum -a 256 Neloa_0.1.3_arm64-v8a.apk
+shasum -a 256 Neloa_0.1.3_arm64.apk
 ```
 
 如需在这台 Mac 上重新构建：
