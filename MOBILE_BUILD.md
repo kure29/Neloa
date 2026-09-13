@@ -4,7 +4,7 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 0.1.5 的 ARM64 / x86_64 Debug APK 已完成结构核验 | 0.1.6 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
+| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 0.1.6 的双架构、版本、永久签名、图标和校验和已完成包内核验 | 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
 | iOS | `src-tauri/gen/apple/neloa.xcodeproj` | 工程已生成；本地网络说明、Bonjour 服务与 entitlement 的 plist 语法已检查 | Xcode 编译、签名、iPhone 安装及运行时行为 |
 
 Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。0.1.6 起由项目自己的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
@@ -112,7 +112,7 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
 
 ## 已知的发布前事项
 
-- Android Release APK 已配置符号剥离与体积优化；实际大小和覆盖安装仍需用 0.1.6 构建产物验证。
+- Android 0.1.6 Release APK 已验证：ARM64 约 10.6 MB、x86_64 约 11.6 MB，均使用同一永久证书；首次从旧 Debug 签名迁移仍需卸载重装。
 - iOS 多播 entitlement 需要 Apple 批准；若不希望申请，后续应把 iOS 发现层改成原生 Network.framework Bonjour 适配器。
 - 移动系统不允许把剪贴板同步做成与桌面端完全相同的无限后台轮询。后续可增加“回到前台自动检查”和用户主动粘贴入口。
 - 当前应用标识沿用 `app.neloa.desktop`，为保持桌面端已有数据与配对身份没有在本轮更改；首次公开发布前应统一决定最终 bundle/application ID。
