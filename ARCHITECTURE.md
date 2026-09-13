@@ -80,11 +80,3 @@ The future relay transport must implement the same transport interface as the LA
 2. Hardening: pairing throttling, trust-store/settings migration, diagnostic error categorization, and platform firewall/lifecycle handling.
 3. Packaging: signed `.dmg`/`.app`, Windows MSIX or NSIS, Android release signing, and iOS/TestFlight distribution.
 4. Relay: reuse the same Noise identity and application envelopes over a relay transport without trusting the relay.
-
-## Design references
-
-The original files remain unchanged at the repository root:
-
-- `neloa_macbook.html`
-- `neloa_windows.html`
-- `neloa_mobile.html`
