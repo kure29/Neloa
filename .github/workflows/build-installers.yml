@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Draft release tag used for the generated installers
         required: true
-        default: v0.1.5-test
+        default: v0.1.6-test
   push:
     tags:
       - v*
@@ -36,7 +36,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "Neloa $RELEASE_TAG" \
-              --notes "Automated unsigned test builds for Windows and macOS plus ABI-specific Android debug APKs. These packages are intended for real-device validation." \
+              --notes "Automated unsigned desktop test builds plus signed, ABI-specific Android release APKs. These packages are intended for real-device validation." \
               --draft \
               --prerelease
           fi
@@ -98,7 +98,7 @@ jobs:
           args: ${{ matrix.args }}
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: Automated unsigned test builds for Windows and macOS plus ABI-specific Android debug APKs. These packages are intended for real-device validation.
+          releaseBody: Automated unsigned desktop test builds plus signed, ABI-specific Android release APKs. These packages are intended for real-device validation.
           releaseDraft: true
           prerelease: true
 
@@ -111,11 +111,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Android ARM64 debug APK
+          - name: Android ARM64 release APK
             tauri_target: aarch64
             rust_target: aarch64-linux-android
             cache_key: android-aarch64
-          - name: Android x86_64 debug APK
+          - name: Android x86_64 release APK
             tauri_target: x86_64
             rust_target: x86_64-linux-android
             cache_key: android-x86_64
@@ -163,15 +163,35 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Prepare Android release signing
+        id: android-signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" || -z "$KEYSTORE_PASSWORD" ]]; then
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 or ANDROID_KEYSTORE_PASSWORD repository secret. Run scripts/setup-android-signing.sh first."
+            exit 1
+          fi
+          signing_dir="$RUNNER_TEMP/neloa-android-signing"
+          mkdir -p "$signing_dir"
+          keystore_path="$signing_dir/neloa-release.p12"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          echo "keystore_path=$keystore_path" >> "$GITHUB_OUTPUT"
+
       - name: Build Android APK
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.android-signing.outputs.keystore_path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         with:
           mobile: android
-          args: --debug --target ${{ matrix.tauri_target }} --split-per-abi --apk --ci
+          args: --target ${{ matrix.tauri_target }} --split-per-abi --apk --ci
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: Automated unsigned test builds for Windows and macOS plus ABI-specific Android debug APKs. These packages are intended for real-device validation.
+          releaseBody: Automated unsigned desktop test builds plus signed, ABI-specific Android release APKs. These packages are intended for real-device validation.
           releaseDraft: true
           prerelease: true

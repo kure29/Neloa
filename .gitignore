@@ -16,6 +16,7 @@ releases/
 *.mobileprovision
 *.cer
 *.key
+*.pem
 *.jks
 *.keystore
 key.properties

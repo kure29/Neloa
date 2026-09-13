@@ -4,10 +4,10 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | GitHub Release 中的 ARM64 / x86_64 独立 APK | 0.1.4 的 ARM64 / x86_64 APK 已在 MuMu Android 12 启动通过 | 0.1.5 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
+| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 0.1.5 的 ARM64 / x86_64 Debug APK 已完成结构核验 | 0.1.6 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
 | iOS | `src-tauri/gen/apple/neloa.xcodeproj` | 工程已生成；本地网络说明、Bonjour 服务与 entitlement 的 plist 语法已检查 | Xcode 编译、签名、iPhone 安装及运行时行为 |
 
-Android APK 是便于内部测试的分架构 debug 包：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。它们使用调试签名，未针对体积优化，也不能作为应用商店发行包。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
+Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。0.1.6 起由项目自己的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
 
 ## 已接入的移动端能力
 
@@ -26,14 +26,28 @@ Android APK 是便于内部测试的分架构 debug 包：ARM64 用于主流安�
 最方便的方式是把 APK 发送到手机，允许当前文件管理器“安装未知应用”，然后点 APK 安装。也可以打开 USB 调试后运行：
 
 ```bash
-adb install -r Neloa_0.1.5_arm64.apk
+adb install -r Neloa_0.1.6_arm64.apk
 ```
 
-0.1.5 APK 构建完成后可在下载目录校验 SHA-256：
+0.1.6 APK 构建完成后可在下载目录校验 SHA-256：
 
 ```bash
-shasum -a 256 Neloa_0.1.5_arm64.apk
+shasum -a 256 Neloa_0.1.6_arm64.apk
 ```
+
+## Android Release 签名
+
+首次配置只运行一次：
+
+```bash
+./scripts/setup-android-signing.sh
+```
+
+脚本会隐藏密码输入，在 `~/Documents/Neloa-signing/neloa-release.p12` 创建别名为 `neloa` 的独立 Android 密钥，并把密钥的 Base64 与密码写入仓库的 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD` GitHub Actions Secrets。密钥及密码不会写入 Git 历史。
+
+必须同时备份 `.p12` 文件和密码。后续所有更新都要使用同一个密钥；丢失后无法覆盖升级已经安装的应用。要换一个保管目录，可在运行脚本前设置 `NELOA_SIGNING_DIR`。
+
+配置完成后，从 GitHub Actions 手动运行 `Build Installers`，填写新的发布标签。工作流会在临时目录解码密钥、生成签名 Release APK，并在任务结束时随运行器销毁临时文件。
 
 如需在这台 Mac 上重新构建：
 
@@ -43,13 +57,17 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 export NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 export ANDROID_NDK_HOME="$NDK_HOME"
 export RUSTC=/Users/yuki/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc
-npm run tauri -- android build --debug --target aarch64 x86_64 --split-per-abi --apk --ci
+export ANDROID_KEYSTORE_PATH="$HOME/Documents/Neloa-signing/neloa-release.p12"
+read -s ANDROID_KEYSTORE_PASSWORD
+export ANDROID_KEYSTORE_PASSWORD
+npm run tauri -- android build --target aarch64 x86_64 --split-per-abi --apk --ci
+unset ANDROID_KEYSTORE_PASSWORD
 ```
 
 输出位于：
 
 ```text
-src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
 ```
 
 ## iOS 真机构建
@@ -94,7 +112,7 @@ src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.
 
 ## 已知的发布前事项
 
-- Android debug APK 约 209 MB，主要是未优化的 Rust 调试符号；正式 release 构建会显著缩小，但必须配置自己的签名密钥。
+- Android Release APK 已配置符号剥离与体积优化；实际大小和覆盖安装仍需用 0.1.6 构建产物验证。
 - iOS 多播 entitlement 需要 Apple 批准；若不希望申请，后续应把 iOS 发现层改成原生 Network.framework Bonjour 适配器。
 - 移动系统不允许把剪贴板同步做成与桌面端完全相同的无限后台轮询。后续可增加“回到前台自动检查”和用户主动粘贴入口。
 - 当前应用标识沿用 `app.neloa.desktop`，为保持桌面端已有数据与配对身份没有在本轮更改；首次公开发布前应统一决定最终 bundle/application ID。
