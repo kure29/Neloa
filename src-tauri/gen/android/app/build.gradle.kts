@@ -13,6 +13,11 @@ val tauriProperties = Properties().apply {
     }
 }
 
+val androidReleaseStorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+val androidReleaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+val hasAndroidReleaseSigning =
+    !androidReleaseStorePath.isNullOrBlank() && !androidReleaseStorePassword.isNullOrBlank()
+
 android {
     compileSdk = 36
     namespace = "app.neloa.desktop"
@@ -23,6 +28,17 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (hasAndroidReleaseSigning) {
+            create("release") {
+                storeFile = file(androidReleaseStorePath!!)
+                storePassword = androidReleaseStorePassword!!
+                keyAlias = "neloa"
+                keyPassword = androidReleaseStorePassword
+                storeType = "PKCS12"
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +53,9 @@ android {
             }
         }
         getByName("release") {
+            if (hasAndroidReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
