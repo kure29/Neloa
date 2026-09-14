@@ -52,6 +52,8 @@ function Row({
 
 export function SettingsView({ app }: { app: NeloaState }) {
   const { security, clipboard, relay, diagnostics, discovery, lastClipboardEvent } = app;
+  const [deviceName, setDeviceName] = useState(app.local?.name ?? "");
+  const [deviceNameError, setDeviceNameError] = useState("");
   const [relayEnabled, setRelayEnabled] = useState(relay.enabled);
   const [relayUrl, setRelayUrl] = useState(relay.url);
   const [relayToken, setRelayToken] = useState("");
@@ -61,9 +63,33 @@ export function SettingsView({ app }: { app: NeloaState }) {
   ).length;
 
   useEffect(() => {
+    setDeviceName(app.local?.name ?? "");
+  }, [app.local?.name]);
+
+  useEffect(() => {
     setRelayEnabled(relay.enabled);
     setRelayUrl(relay.url);
   }, [relay.enabled, relay.url]);
+
+  const submitDeviceName = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = deviceName.trim();
+    setDeviceNameError("");
+    if (!normalized) {
+      setDeviceNameError("设备名称不能为空");
+      return;
+    }
+    if ([...normalized].length > 32) {
+      setDeviceNameError("设备名称最多 32 个字符");
+      return;
+    }
+    try {
+      const device = await app.configureDeviceName(normalized);
+      setDeviceName(device.name);
+    } catch (error) {
+      setDeviceNameError(String(error).replace(/^Error:\s*/, ""));
+    }
+  };
 
   const submitRelay = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -176,9 +202,43 @@ export function SettingsView({ app }: { app: NeloaState }) {
         </summary>
 
         <div className="advanced-panel">
-          <Row title="设备名称" description="附近设备会看到这个名称">
-            <span className="row-value">{app.local?.name ?? "读取中…"}</span>
-          </Row>
+          <form
+            className="device-name-config"
+            aria-busy={app.busyAction === "deviceName"}
+            onSubmit={(event) => void submitDeviceName(event)}
+          >
+            <label className="setting-field device-name-field">
+              <span>设备名称</span>
+              <input
+                value={deviceName}
+                autoComplete="off"
+                maxLength={32}
+                placeholder="例如：Yuki 的 iPhone"
+                required
+                aria-describedby="device-name-hint"
+                aria-invalid={Boolean(deviceNameError)}
+                onChange={(event) => {
+                  setDeviceName(event.target.value);
+                  setDeviceNameError("");
+                }}
+              />
+              <small id="device-name-hint">附近设备和自建中继会看到这个名称，最多 32 个字符。</small>
+              {deviceNameError && (
+                <small className="setting-field-error" role="alert">{deviceNameError}</small>
+              )}
+            </label>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                app.busyAction === "deviceName"
+                || !app.local
+                || deviceName.trim() === app.local.name
+              }
+            >
+              {app.busyAction === "deviceName" ? "保存中…" : "保存名称"}
+            </Button>
+          </form>
           <Row
             title="设备身份"
             description={<code className="selectable">{security.network.identityFingerprint}</code>}

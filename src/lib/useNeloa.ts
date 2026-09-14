@@ -20,6 +20,7 @@ import {
   onFileOffer,
   onFileTransferProgress,
   onFileTransferResult,
+  onLocalDeviceChanged,
   onNetworkError,
   onPairingRequest,
   onPairingResult,
@@ -31,6 +32,7 @@ import {
   previewPlatform,
   revokeTrustedDevice,
   setClipboardEnabled,
+  setDeviceName,
   setRelayConfig,
   startFileTransfer,
 } from "../bridge";
@@ -50,7 +52,7 @@ import { fileTransferRecord, transferRecord } from "./format";
 import { resolvePrimaryAction } from "./primaryAction";
 
 export type ViewName = "radar" | "history" | "settings";
-export type BusyAction = "pair" | "file" | "clipboard" | "relay" | "diagnostics" | null;
+export type BusyAction = "pair" | "file" | "clipboard" | "deviceName" | "relay" | "diagnostics" | null;
 
 const EMPTY_DISCOVERY: DiscoverySnapshot = { active: false, error: null, peers: [] };
 const EMPTY_SECURITY: SecuritySnapshot = {
@@ -184,6 +186,9 @@ export function useNeloa() {
       });
 
     const listeners = [
+      onLocalDeviceChanged((device) => {
+        if (!disposed) setLocal(device);
+      }),
       onPeersChanged((snapshot) => {
         if (!disposed) setDiscovery(snapshot);
       }),
@@ -497,6 +502,22 @@ export function useNeloa() {
     }
   }, [refreshDiagnostics, showToast]);
 
+  const configureDeviceName = useCallback(async (name: string) => {
+    setBusyAction("deviceName");
+    try {
+      const device = await setDeviceName(name);
+      setLocal(device);
+      showToast("设备名称已更新");
+      void refreshDiagnostics();
+      return device;
+    } catch (error) {
+      showToast(String(error));
+      throw error;
+    } finally {
+      setBusyAction(null);
+    }
+  }, [refreshDiagnostics, showToast]);
+
   const copyDiagnostics = useCallback(async () => {
     setBusyAction("diagnostics");
     try {
@@ -560,6 +581,7 @@ export function useNeloa() {
     copyDiagnostics,
     revoke,
     toggleClipboard,
+    configureDeviceName,
     configureRelay,
   };
 }

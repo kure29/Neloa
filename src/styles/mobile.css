@@ -166,6 +166,14 @@
   grid-template-columns: 1fr;
 }
 
+.shell-mobile .device-name-config {
+  grid-template-columns: 1fr;
+}
+
+.shell-mobile .device-name-config .btn {
+  width: 100%;
+}
+
 .shell-mobile .setting-field input {
   font-size: 16px;
 }
