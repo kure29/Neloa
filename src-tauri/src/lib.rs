@@ -1,12 +1,23 @@
 use std::{
     collections::HashMap,
     fs,
-    path::PathBuf,
-    sync::Arc,
-    thread,
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(not(target_os = "ios"))]
+use std::thread;
+#[cfg(target_os = "ios")]
+use std::{
+    ffi::{CStr, CString},
+    sync::OnceLock,
+};
+
+#[cfg(not(target_os = "ios"))]
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 use parking_lot::RwLock;
 use percent_encoding::percent_decode_str;
@@ -32,15 +43,35 @@ use model::{
 use network::NetworkHandle;
 use trust::TrustStore;
 
+#[cfg(not(target_os = "ios"))]
 const SERVICE_TYPE: &str = "_neloa._udp.local.";
 const SERVICE_PORT: u16 = 48_631;
+#[cfg(not(mobile))]
+const LEGACY_IDENTIFIER: &str = "app.neloa.desktop";
+#[cfg(not(mobile))]
+const PERSISTENT_DATA_FILES: [&str; 3] = ["device-id", "trusted-devices.json", "settings.json"];
 
 struct DiscoveryState {
+    #[cfg(not(target_os = "ios"))]
     daemon: Option<ServiceDaemon>,
     peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     error: Arc<RwLock<Option<String>>>,
-    advertising: bool,
-    browsing: bool,
+    advertising: Arc<AtomicBool>,
+    browsing: Arc<AtomicBool>,
+}
+
+impl DiscoveryState {
+    fn is_active(&self) -> bool {
+        #[cfg(not(target_os = "ios"))]
+        let backend_ready = self.daemon.is_some();
+        #[cfg(target_os = "ios")]
+        let backend_ready = true;
+
+        backend_ready
+            && self.advertising.load(Ordering::Relaxed)
+            && self.browsing.load(Ordering::Relaxed)
+            && self.error.read().is_none()
+    }
 }
 
 struct AppState {
@@ -65,6 +96,49 @@ fn unix_millis() -> u128 {
         .unwrap_or_default()
 }
 
+#[cfg(not(mobile))]
+fn migrate_legacy_data_files(legacy_dir: &Path, current_dir: &Path) -> Result<(), String> {
+    if legacy_dir == current_dir || !legacy_dir.is_dir() {
+        return Ok(());
+    }
+
+    let files_to_copy = PERSISTENT_DATA_FILES
+        .iter()
+        .filter(|name| {
+            let source = legacy_dir.join(name);
+            let destination = current_dir.join(name);
+            source.is_file() && !destination.exists()
+        })
+        .collect::<Vec<_>>();
+    if files_to_copy.is_empty() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(current_dir)
+        .map_err(|error| format!("无法创建新版应用数据目录：{error}"))?;
+    for name in files_to_copy {
+        let source = legacy_dir.join(name);
+        let destination = current_dir.join(name);
+        fs::copy(&source, &destination)
+            .map_err(|error| format!("无法迁移旧版数据文件 {}：{error}", source.display()))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(mobile))]
+fn migrate_legacy_app_data(app: &tauri::AppHandle) -> Result<(), String> {
+    let legacy_dir = app
+        .path()
+        .data_dir()
+        .map_err(|error| format!("无法定位旧版应用数据目录：{error}"))?
+        .join(LEGACY_IDENTIFIER);
+    let current_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("无法定位新版应用数据目录：{error}"))?;
+    migrate_legacy_data_files(&legacy_dir, &current_dir)
+}
+
 fn platform_name() -> String {
     if cfg!(target_os = "windows") {
         "windows".into()
@@ -79,6 +153,7 @@ fn platform_name() -> String {
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 fn safe_host_label(name: &str) -> String {
     let label: String = name
         .chars()
@@ -120,6 +195,9 @@ fn load_or_create_device_id(app: &tauri::AppHandle) -> String {
 }
 
 fn local_device(app: &tauri::AppHandle) -> LocalDevice {
+    #[cfg(target_os = "ios")]
+    let hostname = "iPhone".to_string();
+    #[cfg(not(target_os = "ios"))]
     let hostname = hostname::get()
         .ok()
         .and_then(|name| name.into_string().ok())
@@ -148,9 +226,12 @@ fn snapshot_from(
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState {
     let peers = Arc::new(RwLock::new(HashMap::new()));
     let error = Arc::new(RwLock::new(None));
+    let advertising_state = Arc::new(AtomicBool::new(false));
+    let browsing_state = Arc::new(AtomicBool::new(false));
 
     let daemon = match ServiceDaemon::new() {
         Ok(daemon) => daemon,
@@ -160,8 +241,8 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                 daemon: None,
                 peers,
                 error,
-                advertising: false,
-                browsing: false,
+                advertising: advertising_state,
+                browsing: browsing_state,
             };
         }
     };
@@ -200,6 +281,7 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
             false
         }
     };
+    advertising_state.store(advertising, Ordering::Relaxed);
 
     let browsing = match daemon.browse(SERVICE_TYPE) {
         Ok(receiver) => {
@@ -286,14 +368,243 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
             false
         }
     };
+    browsing_state.store(browsing, Ordering::Relaxed);
 
     DiscoveryState {
         daemon: Some(daemon),
         peers,
         error,
-        advertising,
-        browsing,
+        advertising: advertising_state,
+        browsing: browsing_state,
     }
+}
+
+#[cfg(target_os = "ios")]
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IosDiscoveryConfig<'a> {
+    service_type: &'a str,
+    port: u16,
+    id: &'a str,
+    name: &'a str,
+    platform: &'a str,
+    version: &'a str,
+    protocol_version: u16,
+    min_protocol_version: u16,
+    capabilities: String,
+}
+
+#[cfg(target_os = "ios")]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IosDiscoveredPeer {
+    id: String,
+    name: String,
+    platform: String,
+    version: String,
+    #[serde(default)]
+    protocol_version: u16,
+    #[serde(default)]
+    min_protocol_version: u16,
+    #[serde(default)]
+    capabilities: Vec<String>,
+    addresses: Vec<String>,
+    port: u16,
+    service_fullname: String,
+}
+
+#[cfg(target_os = "ios")]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IosDiscoveryStatus {
+    advertising: bool,
+    browsing: bool,
+    error: Option<String>,
+}
+
+#[cfg(target_os = "ios")]
+struct IosDiscoveryContext {
+    app: tauri::AppHandle,
+    local_id: String,
+    peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
+    error: Arc<RwLock<Option<String>>>,
+    advertising: Arc<AtomicBool>,
+    browsing: Arc<AtomicBool>,
+}
+
+#[cfg(target_os = "ios")]
+static IOS_DISCOVERY: OnceLock<IosDiscoveryContext> = OnceLock::new();
+
+#[cfg(target_os = "ios")]
+type IosDiscoveryStart = unsafe extern "C" fn(*const std::ffi::c_char) -> i32;
+
+#[cfg(target_os = "ios")]
+fn ios_discovery_start(config_json: &CString) -> Result<(), String> {
+    const START_SYMBOL: &[u8] = b"neloa_ios_discovery_start\0";
+    // The Swift adapter is linked into the application after Cargo produces
+    // the Rust dynamic library, so resolve its entry point when the app runs.
+    let pointer = unsafe {
+        libc::dlsym(
+            libc::RTLD_DEFAULT,
+            START_SYMBOL.as_ptr().cast::<std::ffi::c_char>(),
+        )
+    };
+    if pointer.is_null() {
+        return Err("找不到 iOS Bonjour 适配层".into());
+    }
+    let start: IosDiscoveryStart = unsafe { std::mem::transmute(pointer) };
+    let result = unsafe { start(config_json.as_ptr()) };
+    (result == 0)
+        .then_some(())
+        .ok_or_else(|| "无法启动 iOS Bonjour 适配层".to_string())
+}
+
+#[cfg(target_os = "ios")]
+fn ios_callback_json(pointer: *const std::ffi::c_char) -> Result<String, String> {
+    if pointer.is_null() {
+        return Err("iOS Bonjour 回调返回了空数据".into());
+    }
+    // Swift keeps the temporary C string alive until this callback returns.
+    unsafe { CStr::from_ptr(pointer) }
+        .to_str()
+        .map(str::to_owned)
+        .map_err(|error| format!("iOS Bonjour 回调不是有效 UTF-8：{error}"))
+}
+
+#[cfg(target_os = "ios")]
+fn emit_ios_discovery_snapshot(context: &IosDiscoveryContext) {
+    let active = context.advertising.load(Ordering::Relaxed)
+        && context.browsing.load(Ordering::Relaxed)
+        && context.error.read().is_none();
+    let snapshot = snapshot_from(&context.peers, &context.error, active);
+    let _ = context.app.emit("peers-changed", snapshot);
+}
+
+#[cfg(target_os = "ios")]
+#[no_mangle]
+pub extern "C" fn neloa_ios_discovery_peer_upsert(peer_json: *const std::ffi::c_char) {
+    let Some(context) = IOS_DISCOVERY.get() else {
+        return;
+    };
+    let result = ios_callback_json(peer_json).and_then(|json| {
+        serde_json::from_str::<IosDiscoveredPeer>(&json).map_err(|error| error.to_string())
+    });
+    match result {
+        Ok(peer) if !peer.id.is_empty() && peer.id != context.local_id => {
+            let peer = PeerDevice {
+                id: peer.id.clone(),
+                name: peer.name,
+                platform: peer.platform,
+                version: peer.version,
+                protocol_version: peer.protocol_version,
+                min_protocol_version: peer.min_protocol_version,
+                capabilities: peer.capabilities,
+                addresses: peer.addresses,
+                port: peer.port,
+                last_seen_ms: unix_millis(),
+                service_fullname: peer.service_fullname,
+            };
+            context.peers.write().insert(peer.id.clone(), peer);
+            emit_ios_discovery_snapshot(context);
+        }
+        Ok(_) => {}
+        Err(problem) => {
+            *context.error.write() = Some(format!("无法解析 Bonjour 设备信息：{problem}"));
+            emit_ios_discovery_snapshot(context);
+        }
+    }
+}
+
+#[cfg(target_os = "ios")]
+#[no_mangle]
+pub extern "C" fn neloa_ios_discovery_peer_remove(fullname: *const std::ffi::c_char) {
+    let Some(context) = IOS_DISCOVERY.get() else {
+        return;
+    };
+    let Ok(fullname) = ios_callback_json(fullname) else {
+        return;
+    };
+    let before = context.peers.read().len();
+    context
+        .peers
+        .write()
+        .retain(|_, peer| peer.service_fullname != fullname);
+    if context.peers.read().len() != before {
+        emit_ios_discovery_snapshot(context);
+    }
+}
+
+#[cfg(target_os = "ios")]
+#[no_mangle]
+pub extern "C" fn neloa_ios_discovery_status(status_json: *const std::ffi::c_char) {
+    let Some(context) = IOS_DISCOVERY.get() else {
+        return;
+    };
+    let result = ios_callback_json(status_json).and_then(|json| {
+        serde_json::from_str::<IosDiscoveryStatus>(&json).map_err(|error| error.to_string())
+    });
+    match result {
+        Ok(status) => {
+            context
+                .advertising
+                .store(status.advertising, Ordering::Relaxed);
+            context.browsing.store(status.browsing, Ordering::Relaxed);
+            *context.error.write() = status.error;
+        }
+        Err(problem) => {
+            *context.error.write() = Some(format!("无法读取 Bonjour 状态：{problem}"));
+        }
+    }
+    emit_ios_discovery_snapshot(context);
+}
+
+#[cfg(target_os = "ios")]
+fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState {
+    let peers = Arc::new(RwLock::new(HashMap::new()));
+    let error = Arc::new(RwLock::new(None));
+    let advertising = Arc::new(AtomicBool::new(false));
+    let browsing = Arc::new(AtomicBool::new(false));
+    let config = IosDiscoveryConfig {
+        service_type: "_neloa._udp",
+        port: SERVICE_PORT,
+        id: &local.id,
+        name: &local.name,
+        platform: &local.platform,
+        version: &local.version,
+        protocol_version: PROTOCOL_VERSION,
+        min_protocol_version: MIN_PROTOCOL_VERSION,
+        capabilities: CAPABILITIES.join(","),
+    };
+
+    let state = DiscoveryState {
+        peers: Arc::clone(&peers),
+        error: Arc::clone(&error),
+        advertising: Arc::clone(&advertising),
+        browsing: Arc::clone(&browsing),
+    };
+    if IOS_DISCOVERY
+        .set(IosDiscoveryContext {
+            app,
+            local_id: local.id.clone(),
+            peers,
+            error: Arc::clone(&error),
+            advertising,
+            browsing,
+        })
+        .is_err()
+    {
+        *error.write() = Some("iOS Bonjour 发现服务已经启动".into());
+        return state;
+    }
+
+    let start_result = serde_json::to_string(&config)
+        .map_err(|problem| format!("无法生成 Bonjour 配置：{problem}"))
+        .and_then(|json| CString::new(json).map_err(|problem| problem.to_string()))
+        .and_then(|json| ios_discovery_start(&json));
+    if let Err(problem) = start_result {
+        *error.write() = Some(problem);
+    }
+    state
 }
 
 #[tauri::command]
@@ -306,7 +617,7 @@ fn get_discovery_snapshot(state: tauri::State<'_, AppState>) -> DiscoverySnapsho
     snapshot_from(
         &state.discovery.peers,
         &state.discovery.error,
-        state.discovery.daemon.is_some() && state.discovery.advertising && state.discovery.browsing,
+        state.discovery.is_active(),
     )
 }
 
@@ -368,24 +679,40 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
             guidance: Some("关闭占用端口的程序，或检查系统防火墙权限".into()),
         }
     };
-    let discovery_check =
-        if state.discovery.advertising && state.discovery.browsing && discovery_error.is_none() {
-            DiagnosticCheck {
-                id: "discovery".into(),
-                label: "mDNS 自动发现".into(),
-                state: "ok".into(),
-                detail: format!("广播与扫描正常 · 发现 {} 台设备", peers.len()),
-                guidance: None,
+    let discovery_check = if state.discovery.is_active() {
+        DiagnosticCheck {
+            id: "discovery".into(),
+            label: if cfg!(target_os = "ios") {
+                "Bonjour 自动发现"
+            } else {
+                "mDNS 自动发现"
             }
-        } else {
-            DiagnosticCheck {
-                id: "discovery".into(),
-                label: "mDNS 自动发现".into(),
-                state: "error".into(),
-                detail: discovery_error.unwrap_or_else(|| "广播或扫描未能启动".into()),
-                guidance: Some("确认两端位于同一局域网，且未启用客户端隔离".into()),
+            .into(),
+            state: "ok".into(),
+            detail: format!("广播与扫描正常 · 发现 {} 台设备", peers.len()),
+            guidance: None,
+        }
+    } else {
+        DiagnosticCheck {
+            id: "discovery".into(),
+            label: if cfg!(target_os = "ios") {
+                "Bonjour 自动发现"
+            } else {
+                "mDNS 自动发现"
             }
-        };
+            .into(),
+            state: "error".into(),
+            detail: discovery_error.unwrap_or_else(|| "广播或扫描未能启动".into()),
+            guidance: Some(
+                if cfg!(target_os = "ios") {
+                    "请在系统设置中允许 Neloa 访问本地网络，并确认两端位于同一局域网"
+                } else {
+                    "确认两端位于同一局域网，且未启用客户端隔离"
+                }
+                .into(),
+            ),
+        }
+    };
     let identity_check = DiagnosticCheck {
         id: "identity".into(),
         label: "设备加密身份".into(),
@@ -430,6 +757,8 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
 
     let firewall_guidance = if state.local.platform == "windows" {
         "在 Windows Defender 防火墙中允许 Neloa 访问“专用网络”；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。"
+    } else if state.local.platform == "ios" {
+        "请在系统设置中允许 Neloa 访问本地网络；文件传输使用 UDP 48631，设备发现使用系统 Bonjour。"
     } else {
         "若 macOS 弹出网络访问提示，请允许 Neloa 接收入站连接；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。"
     };
@@ -510,8 +839,8 @@ privacy=No IP addresses, full device IDs, public keys, file paths, or clipboard 
         network.port,
         network.error.is_some(),
         network.identity_fingerprint != "不可用",
-        state.discovery.advertising,
-        state.discovery.browsing,
+        state.discovery.advertising.load(Ordering::Relaxed),
+        state.discovery.browsing.load(Ordering::Relaxed),
         discovery_error,
         snapshot.peers.len(),
         state.trust.list().len(),
@@ -809,6 +1138,78 @@ fn inspect_file(app: tauri::AppHandle, path: String) -> Result<SelectedFile, Str
     inspect_selected_file(&app, &path)
 }
 
+/// Set once a tray icon is actually live. The Windows and Linux close button
+/// hides the window so discovery keeps running in the background; without a
+/// tray that window is unreachable and the process can only be killed from the
+/// task manager, so hiding is only offered when there is a way back.
+#[cfg(all(desktop, not(target_os = "macos")))]
+static TRAY_READY: AtomicBool = AtomicBool::new(false);
+
+#[cfg(all(desktop, not(target_os = "macos")))]
+fn reveal_main_window(app: &tauri::AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let _ = window.show();
+    let _ = window.unminimize();
+    let _ = window.set_focus();
+}
+
+/// Left click reveals the window; the menu is the explicit way out, since a
+/// hidden window leaves no other affordance to quit.
+#[cfg(all(desktop, not(target_os = "macos")))]
+fn install_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::{
+        menu::{Menu, MenuItem, PredefinedMenuItem},
+        tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    };
+
+    let show = MenuItem::with_id(app, "show", "显示 Neloa", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出 Neloa", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &PredefinedMenuItem::separator(app)?, &quit])?;
+
+    let mut tray = TrayIconBuilder::with_id("main")
+        .tooltip("Neloa")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => reveal_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                reveal_main_window(tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+
+    tray.build(app)?;
+    Ok(())
+}
+
+/// Hiding the window is only recoverable while a tray icon is live. macOS has
+/// no tray here and no close button that hides, so it minimises instead.
+#[cfg(desktop)]
+fn hiding_is_recoverable() -> bool {
+    #[cfg(not(target_os = "macos"))]
+    {
+        TRAY_READY.load(Ordering::Relaxed)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        false
+    }
+}
+
 #[tauri::command]
 #[cfg(desktop)]
 fn window_action(window: WebviewWindow, action: &str) -> Result<(), String> {
@@ -824,7 +1225,13 @@ fn window_action(window: WebviewWindow, action: &str) -> Result<(), String> {
                 window.maximize()
             }
         }
-        "hide" => window.hide(),
+        "hide" => {
+            if hiding_is_recoverable() {
+                window.hide()
+            } else {
+                window.minimize()
+            }
+        }
         "close" => window.close(),
         _ => return Err(format!("未知窗口操作：{action}")),
     };
@@ -844,6 +1251,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            #[cfg(not(mobile))]
+            migrate_legacy_app_data(app.handle())?;
+
             let local = local_device(app.handle());
             let app_data_dir = app
                 .path()
@@ -865,6 +1275,17 @@ pub fn run() {
             };
             let discovery = start_discovery(app.handle().clone(), &local);
             clipboard.configure(network.clone(), Arc::clone(&discovery.peers), trust.clone())?;
+
+            // Non-fatal: without it the close button falls back to minimising,
+            // which is worse but still recoverable.
+            #[cfg(all(desktop, not(target_os = "macos")))]
+            match install_tray(app.handle()) {
+                Ok(()) => TRAY_READY.store(true, Ordering::Relaxed),
+                Err(error) => {
+                    eprintln!("托盘图标不可用，关闭按钮将改为最小化：{error}");
+                }
+            }
+
             app.manage(AppState {
                 local,
                 discovery,
@@ -894,4 +1315,56 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("Neloa failed to start");
+}
+
+#[cfg(all(test, not(mobile)))]
+mod app_data_migration_tests {
+    use super::migrate_legacy_data_files;
+    use std::fs;
+
+    #[test]
+    fn copies_only_persistent_files_from_legacy_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let legacy = root.path().join("legacy");
+        let current = root.path().join("current");
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(legacy.join("device-id"), "device-123").unwrap();
+        fs::write(legacy.join("trusted-devices.json"), "[]").unwrap();
+        fs::write(legacy.join("settings.json"), "{}").unwrap();
+        fs::write(legacy.join("temporary-file"), "ignore me").unwrap();
+
+        migrate_legacy_data_files(&legacy, &current).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(current.join("device-id")).unwrap(),
+            "device-123"
+        );
+        assert_eq!(
+            fs::read_to_string(current.join("trusted-devices.json")).unwrap(),
+            "[]"
+        );
+        assert_eq!(
+            fs::read_to_string(current.join("settings.json")).unwrap(),
+            "{}"
+        );
+        assert!(!current.join("temporary-file").exists());
+    }
+
+    #[test]
+    fn never_overwrites_current_data() {
+        let root = tempfile::tempdir().unwrap();
+        let legacy = root.path().join("legacy");
+        let current = root.path().join("current");
+        fs::create_dir_all(&legacy).unwrap();
+        fs::create_dir_all(&current).unwrap();
+        fs::write(legacy.join("device-id"), "old-device").unwrap();
+        fs::write(current.join("device-id"), "current-device").unwrap();
+
+        migrate_legacy_data_files(&legacy, &current).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(current.join("device-id")).unwrap(),
+            "current-device"
+        );
+    }
 }

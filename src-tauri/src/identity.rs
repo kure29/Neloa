@@ -7,6 +7,9 @@ use keyring_core::{Entry, Error as KeyringError};
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
+// Keep this internal keyring namespace stable when the public bundle ID changes,
+// so the existing Noise identity can still be read. Filesystem-backed device,
+// trust, and settings data are migrated separately during desktop startup.
 const KEYRING_SERVICE: &str = "app.neloa.desktop";
 const KEYRING_ACCOUNT: &str = "noise-static-key-v1";
 
@@ -90,7 +93,7 @@ fn initialize_mobile_keyring() -> Result<(), String> {
     static INITIALIZED: OnceLock<Result<(), String>> = OnceLock::new();
     INITIALIZED
         .get_or_init(|| {
-            let store = apple_native_keyring_store::keychain::Store::new()
+            let store = apple_native_keyring_store::protected::Store::new()
                 .map_err(|error| format!("无法连接 iOS Keychain：{error}"))?;
             keyring_core::set_default_store(store);
             Ok(())

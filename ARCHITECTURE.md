@@ -7,7 +7,7 @@ Neloa is local-first. Every client should remain useful without an account or an
 - One React interface and one design system for every platform. `DesktopShell` and `MobileShell` share `views/` and `ui/`; macOS and Windows differ only in window controls, system font stack, and frame radius. Colour comes from a single set of CSS custom properties with a light and a dark value, so component rules never branch on the colour scheme.
 - Tauri 2 desktop and mobile shells, with generated Android and iOS native projects.
 - Stable X25519 device identity stored in the native OS credential store: Keychain, Credential Manager, Android Keystore, or iOS Keychain.
-- `_neloa._udp.local.` mDNS advertising and discovery.
+- `_neloa._udp.local.` service advertising and discovery: `mdns-sd` on desktop/Android and an Apple Bonjour adapter on iOS.
 - Live peer updates from Rust to the interface.
 - Simultaneous QUIC client/server endpoint on UDP port `48631`.
 - Noise XX handshake over every QUIC stream.
@@ -51,6 +51,8 @@ QUIC uses a per-launch self-signed certificate only as a reliable encrypted data
 
 The Noise static private key is stored under the application service name in macOS Keychain, Windows Credential Manager, Android Keystore-backed storage, or iOS Keychain. `trusted-devices.json` contains only peer public keys, fingerprints, device metadata, and timestamps.
 
+Desktop builds retain the original credential-store service name when the public application identifier changes. On first launch under `com.kure29.neloa`, Neloa copies a missing `device-id`, trust store, and clipboard settings from the legacy `app.neloa.desktop` data directory without overwriting any data already created by the new version. Mobile operating systems treat the new bundle/application ID as a separate sandbox, so mobile upgrades still require a fresh install and pairing.
+
 During first pairing, both devices compare a six-digit value derived from the same Noise handshake transcript. Trust is committed only after both sides explicitly accept. Later sessions must match both the discovered device ID and the stored Noise public key.
 
 Every Noise handshake carries the sender's current and minimum supported protocol versions plus its feature capabilities. Version ranges must overlap, malformed ranges fail closed, and the capability required by the session purpose must be present. A peer that omits these fields is treated as legacy protocol `0` and receives an actionable incompatibility error instead of entering pairing or transfer flows.
@@ -59,7 +61,7 @@ Before sending file data, the sender hashes the source and offers its sanitized 
 
 Clipboard synchronization is fail-closed and disabled by default. Enabling it records the current clipboard as a local baseline without transmitting it. Subsequent text updates receive UUIDs, are checked for size and strong credential markers, and are sent only to currently discovered trusted peers. Remote updates are acknowledged only after the OS clipboard write succeeds. Received content becomes the new local baseline, preventing it from being sent back; CRLF, CR, and LF are canonicalized for comparison across Windows and macOS. Events retain only peer, direction, byte count, status, and time—not clipboard text.
 
-Android requires `CHANGE_WIFI_MULTICAST_STATE` plus a held `WifiManager.MulticastLock` while the Activity is alive so mDNS packets are delivered reliably. iOS declares the `_neloa._udp` Bonjour service, local-network usage text, and `com.apple.developer.networking.multicast`; that restricted entitlement must be approved for the signing team before raw multicast discovery can work on a physical device.
+Android requires `CHANGE_WIFI_MULTICAST_STATE` plus a held `WifiManager.MulticastLock` while the Activity is alive so mDNS packets are delivered reliably. iOS does not open a raw multicast socket: `NWBrowser` browses `_neloa._udp`, while `NetService` publishes and resolves the Bonjour service that points at the existing Rust QUIC listener on UDP 48631. Swift forwards resolved IPv4 addresses and TXT metadata to the shared Rust peer store. This path uses the declared Bonjour service and local-network privacy prompt without the restricted multicast entitlement.
 
 ## Planned boundaries
 
@@ -69,7 +71,7 @@ React UI
 Application services
   -> discovery | pairing | transfer | clipboard | history
 Platform adapters
-  -> mDNS | QUIC | filesystem | system clipboard | secure key store
+  -> mDNS/Bonjour | QUIC | filesystem | system clipboard | secure key store
 ```
 
 The future relay transport must implement the same transport interface as the LAN QUIC transport. Pairing, transfer envelopes, hashes, and clipboard event IDs must stay independent of how peers are reached.

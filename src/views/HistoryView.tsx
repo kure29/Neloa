@@ -2,7 +2,7 @@ import { TRANSFER_STATUS_LABELS } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
 import type { TransferRecord } from "../types";
 import { Icon } from "../ui/icons";
-import { Badge, Button, EmptyState, SectionTitle, cx } from "../ui/kit";
+import { Badge, Button, EmptyState, IconButton, SectionTitle, cx } from "../ui/kit";
 
 function statusTone(record: TransferRecord) {
   if (record.kind !== "file" || !record.status) return "ok" as const;
@@ -17,6 +17,12 @@ export function HistoryView({ app }: { app: NeloaState }) {
       <SectionTitle
         title="传输记录"
         meta={app.history.length > 0 ? `${app.history.length} 条` : undefined}
+        action={app.history.length > 0 ? (
+          <Button variant="ghost" size="sm" onClick={app.clearHistory}>
+            <Icon name="trash" size={14} />
+            清空
+          </Button>
+        ) : undefined}
       />
 
       {app.history.length === 0 ? (
@@ -56,6 +62,12 @@ export function HistoryView({ app }: { app: NeloaState }) {
                       ? TRANSFER_STATUS_LABELS[record.status]
                       : "已加密"}
                   </Badge>
+                  <IconButton
+                    icon="trash"
+                    className="record-delete"
+                    label={`删除 ${record.name} 的记录`}
+                    onClick={() => app.removeHistoryRecord(record.id)}
+                  />
                 </div>
               </li>
             );

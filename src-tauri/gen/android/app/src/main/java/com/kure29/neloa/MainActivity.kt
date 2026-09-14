@@ -1,4 +1,4 @@
-package app.neloa.desktop
+package com.kure29.neloa
 
 import android.content.Context
 import android.net.wifi.WifiManager

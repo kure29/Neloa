@@ -108,7 +108,7 @@ function previewDevice(): LocalDevice {
     id: "preview-device",
     name: names[platform],
     platform,
-    version: "0.1.6-preview",
+    version: "0.1.8-preview",
   };
 }
 
@@ -129,7 +129,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
               id: "preview-mac",
               name: "MacBook Pro M3",
               platform: "macos",
-              version: "0.1.6",
+              version: "0.1.8",
               protocolVersion: 1,
               minProtocolVersion: 1,
               capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],
@@ -141,7 +141,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
               id: "preview-windows",
               name: "Surface Laptop",
               platform: "windows",
-              version: "0.1.6",
+              version: "0.1.8",
               protocolVersion: 1,
               minProtocolVersion: 1,
               capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		297D5835B83182D9F76BA15F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 08775FF8654A096383765D2D /* assets */; };
 		42CE085737BEDD5DDEF5CABA /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 08B19EBC408C0DBC5C4DCBCA /* libapp.a */; };
+		443A5B06C39D1E51880E84D1 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 688876C87D839AAEED1A3BB8 /* Network.framework */; };
 		4A28E44A8DDC2875122F09D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1CA08295938C84F7EA4FD9F /* Assets.xcassets */; };
 		65CA935547393B2858D9AE73 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 07C819A164B527A6018E1BE0 /* WebKit.framework */; };
 		8446FD0E150E194E634733D2 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1696E5EE891C6FCF600227EC /* Security.framework */; };
@@ -19,6 +20,7 @@
 		ECA0C0B8C9AB671D3C3DEE07 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */; };
 		ECB881196122F2BAE8060B31 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C60048FD41933377B17FFD1 /* QuartzCore.framework */; };
 		F2C2BC0A2AA4EB0E7957575C /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 5CBAD8BE36AC177E30250A5C /* LaunchScreen.storyboard */; };
+		F2D42A28E4F23E9E39E04ECA /* BonjourDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA53C8CA80A34E3FBD46B85A /* BonjourDiscovery.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,11 +34,14 @@
 		30BB9AAAD46A0313609D6C5D /* trust.rs */ = {isa = PBXFileReference; path = trust.rs; sourceTree = "<group>"; };
 		5C60048FD41933377B17FFD1 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		5CBAD8BE36AC177E30250A5C /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		688876C87D839AAEED1A3BB8 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
 		6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		790F40D6657A73D8CE1FC5C8 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		897A1DDD73EDB1FB80F643D7 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
 		A38537066C0730DF354DFA74 /* network.rs */ = {isa = PBXFileReference; path = network.rs; sourceTree = "<group>"; };
+		A65E757DA1F1BA84D90FBF93 /* BonjourBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BonjourBridge.h; sourceTree = "<group>"; };
 		BF9A2CDF19D84A651A2BAD0F /* clipboard.rs */ = {isa = PBXFileReference; path = clipboard.rs; sourceTree = "<group>"; };
+		CA53C8CA80A34E3FBD46B85A /* BonjourDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourDiscovery.swift; sourceTree = "<group>"; };
 		DDD4D467DA8D7AD167369104 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		DDF64747019E54DD310EF0A7 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		DF12B892245B29E9C7A95D31 /* identity.rs */ = {isa = PBXFileReference; path = identity.rs; sourceTree = "<group>"; };
@@ -56,6 +61,7 @@
 				E1673B9525E993C6459E39BB /* CoreGraphics.framework in Frameworks */,
 				DD833F31C245B619446FF25D /* Metal.framework in Frameworks */,
 				ECA0C0B8C9AB671D3C3DEE07 /* MetalKit.framework in Frameworks */,
+				443A5B06C39D1E51880E84D1 /* Network.framework in Frameworks */,
 				ECB881196122F2BAE8060B31 /* QuartzCore.framework in Frameworks */,
 				8446FD0E150E194E634733D2 /* Security.framework in Frameworks */,
 				D5CDE1EC0CA977B99324C1CD /* UIKit.framework in Frameworks */,
@@ -73,6 +79,7 @@
 				08B19EBC408C0DBC5C4DCBCA /* libapp.a */,
 				DDF64747019E54DD310EF0A7 /* Metal.framework */,
 				6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */,
+				688876C87D839AAEED1A3BB8 /* Network.framework */,
 				5C60048FD41933377B17FFD1 /* QuartzCore.framework */,
 				1696E5EE891C6FCF600227EC /* Security.framework */,
 				790F40D6657A73D8CE1FC5C8 /* UIKit.framework */,
@@ -106,6 +113,8 @@
 		521806C73DA3C64AF628A088 /* neloa */ = {
 			isa = PBXGroup;
 			children = (
+				A65E757DA1F1BA84D90FBF93 /* BonjourBridge.h */,
+				CA53C8CA80A34E3FBD46B85A /* BonjourDiscovery.swift */,
 				2619D72A7774449F42CBD0DF /* main.mm */,
 				A3D5050F4673026C5CF0EB21 /* bindings */,
 			);
@@ -255,6 +264,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F2D42A28E4F23E9E39E04ECA /* BonjourDiscovery.swift in Sources */,
 				BE0D781A49C9D639384E1FB9 /* main.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -348,9 +358,10 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.neloa.desktop;
-				PRODUCT_NAME = Neloa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kure29.neloa;
+				PRODUCT_NAME = "Neloa";
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/Sources/neloa/BonjourBridge.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
 			};
@@ -435,9 +446,10 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.neloa.desktop;
-				PRODUCT_NAME = Neloa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kure29.neloa;
+				PRODUCT_NAME = "Neloa";
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/Sources/neloa/BonjourBridge.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
 			};

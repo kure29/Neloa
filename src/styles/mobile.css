@@ -57,7 +57,13 @@
   background: transparent;
   color: var(--ink-3);
   font-size: var(--text-micro);
-  transition: color var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+
+/* Dimming on press works on the active tab too, where a colour change would
+   not — and there is no hover here to fall back on. */
+.tabbar-item:active {
+  opacity: 0.5;
 }
 
 .tabbar-item.active {
@@ -92,7 +98,8 @@
 
 /* Keep compact visuals while giving every settings action a full touch target. */
 .shell-mobile .row-action,
-.shell-mobile .btn-sm {
+.shell-mobile .btn-sm,
+.shell-mobile .record-delete {
   min-height: 44px;
 }
 
@@ -132,14 +139,36 @@
   left: 3px;
 }
 
-/* Three columns is unreadable at phone widths; stack them instead. */
-.shell-mobile .policy-grid {
-  grid-template-columns: 1fr;
+
+.shell-mobile .record-delete {
+  width: 44px;
 }
 
-.shell-mobile .policy-tile + .policy-tile {
-  border-left: 0;
-  border-top: 1px solid var(--line);
+.shell-mobile .record {
+  gap: var(--s2);
+  padding-inline: var(--s3);
+}
+
+.shell-mobile .record-actions {
+  gap: var(--s1);
+}
+
+.shell-mobile .advanced-settings > summary {
+  min-height: 64px;
+}
+
+.shell-mobile .advanced-actions {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.shell-mobile .advanced-actions .section-buttons {
+  width: 100%;
+  margin-left: 0;
+}
+
+.shell-mobile .advanced-actions .btn {
+  flex: 1;
 }
 
 .shell-mobile .send-dock {
