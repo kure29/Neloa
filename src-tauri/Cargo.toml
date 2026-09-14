@@ -1,6 +1,6 @@
 [package]
 name = "neloa"
-version = "0.1.8"
+version = "0.1.9"
 description = "Local-first encrypted file and clipboard transfer"
 authors = ["Neloa contributors"]
 edition = "2021"
