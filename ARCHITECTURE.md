@@ -78,7 +78,7 @@ The future relay transport must implement the same transport interface as the LA
 
 ## Next milestones
 
-1. Mobile acceptance: Android/iOS real-device discovery, pairing, file transfer, lifecycle, and foreground clipboard validation.
-2. Hardening: pairing throttling, trust-store/settings migration, diagnostic error categorization, and platform firewall/lifecycle handling.
-3. Packaging: signed `.dmg`/`.app`, Windows MSIX or NSIS, Android release signing, and iOS/TestFlight distribution.
-4. Relay: reuse the same Noise identity and application envelopes over a relay transport without trusting the relay.
+1. Relay foundation: separate the authenticated application protocol from LAN QUIC streams, then add an online-only self-hosted relay that cannot decrypt payloads.
+2. Mobile acceptance: complete Android real-device validation and expand iOS coverage across network changes, long transfers, lifecycle, and foreground clipboard behavior.
+3. Hardening: pairing throttling, diagnostic error categorization, migration regression coverage, and platform firewall/lifecycle handling.
+4. Packaging: signed `.dmg`/`.app`, Windows MSIX or NSIS, Android release signing, and iOS/TestFlight distribution.
