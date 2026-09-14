@@ -27,6 +27,7 @@ keystore.properties
 *.apk
 *.ipa
 *.dmg
+*.exe
 *.msi
 *.msix
 *.appx
