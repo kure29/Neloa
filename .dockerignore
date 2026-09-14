@@ -1,0 +1,14 @@
+.git
+.github
+.DS_Store
+node_modules
+dist
+target
+releases
+src-tauri
+*.apk
+*.ipa
+*.dmg
+*.msi
+*.msix
+*.appx

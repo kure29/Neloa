@@ -1,0 +1,20 @@
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: relay/Dockerfile
+    restart: unless-stopped
+    environment:
+      NELOA_RELAY_BIND: 0.0.0.0:8787
+      NELOA_RELAY_TOKEN: ${NELOA_RELAY_TOKEN:?set NELOA_RELAY_TOKEN in relay/.env}
+      NELOA_RELAY_MAX_DEVICES: ${NELOA_RELAY_MAX_DEVICES:-64}
+      RUST_LOG: ${RUST_LOG:-neloa_relay=info}
+    ports:
+      - "127.0.0.1:${NELOA_RELAY_PORT:-8787}:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
