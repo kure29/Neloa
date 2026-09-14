@@ -73,7 +73,14 @@ export function RadarView({ app }: { app: NeloaState }) {
             const active = peer.id === app.selectedPeerId;
             const trusted = app.trustedIds.has(peer.id);
             const compatible = peerIsCompatible(peer);
-            const status = !compatible ? "版本不兼容" : trusted ? "已配对" : "未配对";
+            const relayOnly = peer.relayAvailable && peer.addresses.length === 0;
+            const status = !compatible
+              ? "版本不兼容"
+              : trusted
+                ? relayOnly
+                  ? "已配对 · 中继"
+                  : "已配对"
+                : "未配对";
 
             return (
               <button

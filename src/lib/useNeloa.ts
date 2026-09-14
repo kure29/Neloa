@@ -12,6 +12,7 @@ import {
   getDiagnosticsSnapshot,
   getDiscoverySnapshot,
   getLocalDevice,
+  getRelaySnapshot,
   getSecuritySnapshot,
   isDesktopRuntime,
   onClipboardSettingsChanged,
@@ -23,12 +24,14 @@ import {
   onPairingRequest,
   onPairingResult,
   onPeersChanged,
+  onRelayStatusChanged,
   onShellChange,
   onTestMessageReceived,
   onTrustedDevicesChanged,
   previewPlatform,
   revokeTrustedDevice,
   setClipboardEnabled,
+  setRelayConfig,
   startFileTransfer,
 } from "../bridge";
 import type {
@@ -38,6 +41,7 @@ import type {
   DiscoverySnapshot,
   FileOffer,
   FileTransferProgress,
+  RelaySnapshot,
   SecuritySnapshot,
   TransferRecord,
   TrustedDevice,
@@ -46,7 +50,7 @@ import { fileTransferRecord, transferRecord } from "./format";
 import { resolvePrimaryAction } from "./primaryAction";
 
 export type ViewName = "radar" | "history" | "settings";
-export type BusyAction = "pair" | "file" | "clipboard" | "diagnostics" | null;
+export type BusyAction = "pair" | "file" | "clipboard" | "relay" | "diagnostics" | null;
 
 const EMPTY_DISCOVERY: DiscoverySnapshot = { active: false, error: null, peers: [] };
 const EMPTY_SECURITY: SecuritySnapshot = {
@@ -58,6 +62,14 @@ const EMPTY_CLIPBOARD: ClipboardSnapshot = {
   maxBytes: 8 * 1024,
   protectSensitive: true,
   pollIntervalMs: 450,
+};
+const EMPTY_RELAY: RelaySnapshot = {
+  enabled: false,
+  url: "",
+  hasToken: false,
+  connected: false,
+  onlineDevices: 0,
+  error: null,
 };
 const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   generatedAtMs: 0,
@@ -83,6 +95,7 @@ export function useNeloa() {
   const [discovery, setDiscovery] = useState(EMPTY_DISCOVERY);
   const [security, setSecurity] = useState(EMPTY_SECURITY);
   const [clipboard, setClipboard] = useState(EMPTY_CLIPBOARD);
+  const [relay, setRelay] = useState(EMPTY_RELAY);
   const [diagnostics, setDiagnostics] = useState(EMPTY_DIAGNOSTICS);
   const [lastClipboardEvent, setLastClipboardEvent] = useState<ClipboardSyncEvent | null>(null);
   const [view, setView] = useState<ViewName>("radar");
@@ -146,15 +159,24 @@ export function useNeloa() {
       getDiscoverySnapshot(),
       getSecuritySnapshot(),
       getClipboardSnapshot(),
+      getRelaySnapshot(),
       getDiagnosticsSnapshot(),
     ])
-      .then(([device, snapshot, securitySnapshot, clipboardSnapshot, diagnosticsSnapshot]) => {
+      .then(([
+        device,
+        snapshot,
+        securitySnapshot,
+        clipboardSnapshot,
+        relaySnapshot,
+        diagnosticsSnapshot,
+      ]) => {
         if (disposed) return;
         setLocal(device);
         setPlatform(device.platform);
         setDiscovery(snapshot);
         setSecurity(securitySnapshot);
         setClipboard(clipboardSnapshot);
+        setRelay(relaySnapshot);
         setDiagnostics(diagnosticsSnapshot);
       })
       .catch((error) => {
@@ -164,6 +186,11 @@ export function useNeloa() {
     const listeners = [
       onPeersChanged((snapshot) => {
         if (!disposed) setDiscovery(snapshot);
+      }),
+      onRelayStatusChanged((snapshot) => {
+        if (disposed) return;
+        setRelay(snapshot);
+        void refreshDiscovery();
       }),
       onPairingRequest((request) => {
         if (!disposed) {
@@ -235,7 +262,7 @@ export function useNeloa() {
       cleanups.forEach((stop) => stop());
       window.clearTimeout(toastTimer.current);
     };
-  }, [refreshSecurity, showToast]);
+  }, [refreshDiscovery, refreshSecurity, showToast]);
 
   useEffect(() => {
     if (view === "settings") void refreshDiagnostics();
@@ -455,6 +482,21 @@ export function useNeloa() {
     }
   }, [clipboard.enabled, showToast]);
 
+  const configureRelay = useCallback(async (enabled: boolean, url: string, token: string) => {
+    setBusyAction("relay");
+    try {
+      const snapshot = await setRelayConfig(enabled, url, token);
+      setRelay(snapshot);
+      showToast(enabled ? "中继设置已保存，正在连接…" : "中继已关闭，继续使用局域网直连");
+      void refreshDiagnostics();
+    } catch (error) {
+      showToast(String(error));
+      throw error;
+    } finally {
+      setBusyAction(null);
+    }
+  }, [refreshDiagnostics, showToast]);
+
   const copyDiagnostics = useCallback(async () => {
     setBusyAction("diagnostics");
     try {
@@ -468,11 +510,13 @@ export function useNeloa() {
   }, [showToast]);
 
   const deviceName = local?.name ?? "读取设备…";
-  const statusLabel = discovery.error
-    ? "发现服务异常"
-    : discovery.active
-      ? `${discovery.peers.length} 台设备在线`
-      : "正在启动";
+  const statusLabel = relay.connected
+    ? `${discovery.peers.length} 台设备在线 · 中继已连接`
+    : discovery.error
+      ? "发现服务异常"
+      : discovery.active
+        ? `${discovery.peers.length} 台设备在线`
+        : "正在启动";
 
   return {
     platform,
@@ -483,6 +527,7 @@ export function useNeloa() {
     discovery,
     security,
     clipboard,
+    relay,
     diagnostics,
     lastClipboardEvent,
     view,
@@ -515,6 +560,7 @@ export function useNeloa() {
     copyDiagnostics,
     revoke,
     toggleClipboard,
+    configureRelay,
   };
 }
 

@@ -63,6 +63,7 @@ export function Switch({
 }) {
   return (
     <button
+      type="button"
       className={cx("switch", checked && "on")}
       role="switch"
       aria-checked={checked}

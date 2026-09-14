@@ -15,6 +15,7 @@ import type {
   PairingRequest,
   PairingResult,
   Platform,
+  RelaySnapshot,
   SecuritySnapshot,
   SelectedFile,
   Shell,
@@ -29,6 +30,14 @@ export const isDesktopRuntime = "__TAURI_INTERNALS__" in window;
 
 let previewTrustedDevices: TrustedDevice[] = [];
 let previewClipboardEnabled = false;
+let previewRelay: RelaySnapshot = {
+  enabled: false,
+  url: "",
+  hasToken: false,
+  connected: false,
+  onlineDevices: 0,
+  error: null,
+};
 const previewPairings = new Map<string, PairingRequest>();
 const previewTransferTimers = new Map<string, number[]>();
 const previewTransferDetails = new Map<string, Omit<FileTransferResult, "status" | "message" | "sha256" | "atMs">>();
@@ -136,6 +145,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
               addresses: ["192.168.1.18"],
               port: 48631,
               lastSeenMs: Date.now(),
+              relayAvailable: false,
             }
           : {
               id: "preview-windows",
@@ -148,6 +158,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
               addresses: ["192.168.1.23"],
               port: 48631,
               lastSeenMs: Date.now(),
+              relayAvailable: false,
             },
       ],
     };
@@ -175,6 +186,38 @@ export async function getSecuritySnapshot(): Promise<SecuritySnapshot> {
   }
   return invoke<SecuritySnapshot>("get_security_snapshot");
 }
+
+export async function getRelaySnapshot(): Promise<RelaySnapshot> {
+  if (!isDesktopRuntime) return { ...previewRelay };
+  return invoke<RelaySnapshot>("get_relay_snapshot");
+}
+
+export async function setRelayConfig(
+  enabled: boolean,
+  url: string,
+  token: string,
+): Promise<RelaySnapshot> {
+  if (!isDesktopRuntime) {
+    previewRelay = {
+      enabled,
+      url: url.trim(),
+      hasToken: previewRelay.hasToken || token.length > 0,
+      connected: enabled,
+      onlineDevices: enabled ? previewTrustedDevices.length : 0,
+      error: null,
+    };
+    emitPreview("relay-status-changed", previewRelay);
+    return { ...previewRelay };
+  }
+  return invoke<RelaySnapshot>("set_relay_config", {
+    enabled,
+    url,
+    token: token.length > 0 ? token : null,
+  });
+}
+
+export const onRelayStatusChanged = (callback: (snapshot: RelaySnapshot) => void) =>
+  onAppEvent("relay-status-changed", callback);
 
 function previewClipboardSnapshot(): ClipboardSnapshot {
   return {
@@ -214,11 +257,12 @@ export async function setClipboardEnabled(enabled: boolean): Promise<ClipboardSn
 
 export async function getDiagnosticsSnapshot(): Promise<DiagnosticsSnapshot> {
   if (isDesktopRuntime) return invoke<DiagnosticsSnapshot>("get_diagnostics_snapshot");
-  const [device, discovery, security, clipboard] = await Promise.all([
+  const [device, discovery, security, clipboard, relay] = await Promise.all([
     getLocalDevice(),
     getDiscoverySnapshot(),
     getSecuritySnapshot(),
     getClipboardSnapshot(),
+    getRelaySnapshot(),
   ]);
   const incompatible = discovery.peers.filter((peer) => (
     peer.minProtocolVersion < 1
@@ -270,6 +314,17 @@ export async function getDiagnosticsSnapshot(): Promise<DiagnosticsSnapshot> {
         state: clipboard.enabled ? "ok" : "idle",
         detail: clipboard.enabled ? "已监听新复制的纯文本 · 上限 8192 字节" : "服务已加载 · 自动同步当前关闭",
         guidance: null,
+      },
+      {
+        id: "relay",
+        label: "自建中继",
+        state: relay.connected ? "ok" : relay.enabled && relay.error ? "warning" : "idle",
+        detail: relay.connected
+          ? `已连接 · ${relay.onlineDevices} 台已配对设备在线`
+          : relay.error ?? "未启用 · 局域网传输不受影响",
+        guidance: relay.enabled && !relay.connected
+          ? "确认中继地址、令牌和 TLS 证书有效"
+          : null,
       },
     ],
     peers: discovery.peers.map((peer) => ({

@@ -28,6 +28,8 @@ Neloa is local-first. Every client should remain useful without an account or an
 - Protocol range and capability negotiation in discovery and authenticated handshakes.
 - Explicit rejection of legacy, malformed, or feature-incompatible peers before application data is accepted.
 - A local diagnostics snapshot and sanitized copyable report for QUIC, mDNS, identity, clipboard, peer capability, and firewall checks.
+- An optional self-hosted relay client with persistent authenticated WebSocket connections, trusted-device presence, and bounded virtual streams.
+- LAN-first transport selection: QUIC is attempted whenever a local address exists, then the relay is used only as a fallback for an already trusted online device.
 
 Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and `capabilities=discovery,pairing,noise-xx,test-message,file-transfer,clipboard-text`. The same protocol range and capability list is authenticated inside the Noise XX handshake; mDNS values are presentation and early-filtering hints only.
 
@@ -47,7 +49,9 @@ src/
 
 ## Security boundary
 
-QUIC uses a per-launch self-signed certificate only as a reliable encrypted datagram transport. It is not treated as the long-term device identity. All application payloads are wrapped by Noise XX, and no plaintext application message may be written directly to a QUIC stream.
+QUIC uses a per-launch self-signed certificate only as a reliable encrypted datagram transport. It is not treated as the long-term device identity. The optional relay exposes each tunnel as the same bidirectional byte-stream interface. All application payloads are wrapped by Noise XX, and no plaintext application message may be written directly to either transport.
+
+Remote relay URLs must use `wss://`; plaintext `ws://` is accepted only for a loopback development server. The shared access token is stored in the native OS credential store, while `relay-settings.json` contains only the enable flag and public URL. Relay presence is filtered to devices already present in the local trust store. Even if the server sends forged device metadata, the subsequent Noise handshake must still match the pinned peer public key before application data is accepted.
 
 The Noise static private key is stored under the application service name in macOS Keychain, Windows Credential Manager, Android Keystore-backed storage, or iOS Keychain. `trusted-devices.json` contains only peer public keys, fingerprints, device metadata, and timestamps.
 
@@ -74,18 +78,19 @@ Platform adapters
   -> mDNS/Bonjour | QUIC | filesystem | system clipboard | secure key store
 ```
 
-The future relay transport must implement the same transport interface as the LAN QUIC transport. Pairing, transfer envelopes, hashes, and clipboard event IDs must stay independent of how peers are reached.
-
-The first relay foundation now lives in `relay/` with shared wire definitions in
+The relay server lives in `relay/`, with shared wire definitions in
 `crates/neloa-relay-protocol`. It authenticates a small single-user deployment
 with a server token, keeps presence and tunnel state in memory, and forwards
 bounded binary frames without inspecting their Noise-encrypted contents. The
-current application still uses LAN QUIC only; client transport selection and
-relay connection settings are the next implementation step.
+client maintains one WebSocket connection, maps relay tunnels to bounded local
+byte streams, and reuses the existing pairing, transfer, test-message, and
+clipboard Noise protocol without transport-specific envelopes. Relay pairing is
+intentionally disabled: devices must establish trust locally before they are
+eligible for relay presence or tunnels.
 
 ## Next milestones
 
-1. Relay client integration: separate the authenticated application protocol from LAN QUIC streams, then select LAN QUIC first and the online-only self-hosted relay as fallback.
+1. Relay acceptance: deploy behind a real TLS reverse proxy, validate reconnect and cross-network file/clipboard transfer on two physical devices, and add operational metrics without payload logging.
 2. Mobile acceptance: complete Android real-device validation and expand iOS coverage across network changes, long transfers, lifecycle, and foreground clipboard behavior.
 3. Hardening: pairing throttling, diagnostic error categorization, migration regression coverage, and platform firewall/lifecycle handling.
 4. Packaging: signed `.dmg`/`.app`, Windows MSIX or NSIS, Android release signing, and iOS/TestFlight distribution.

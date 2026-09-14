@@ -21,6 +21,7 @@ export interface PeerDevice {
   addresses: string[];
   port: number;
   lastSeenMs: number;
+  relayAvailable: boolean;
 }
 
 export interface DiscoverySnapshot {
@@ -107,6 +108,15 @@ export interface NetworkStatus {
 export interface SecuritySnapshot {
   network: NetworkStatus;
   trustedDevices: TrustedDevice[];
+}
+
+export interface RelaySnapshot {
+  enabled: boolean;
+  url: string;
+  hasToken: boolean;
+  connected: boolean;
+  onlineDevices: number;
+  error: string | null;
 }
 
 export interface PairingPeer {
