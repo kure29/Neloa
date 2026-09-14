@@ -36,7 +36,7 @@ Neloa discovers devices on the same local network and transfers files or clipboa
 | --- | --- | --- | --- |
 | Universal DMG | x64 NSIS | Signed ARM64/x86_64 APKs | Local IPA; Apple signing required |
 
-iOS uses a native, lifecycle-aware Bonjour adapter. Final cross-device discovery testing on real devices is still pending.
+iOS 0.1.8 has completed P12 re-signing, installation, and baseline real-device validation. Its native Bonjour adapter stops and resumes with the app lifecycle. Android still needs real-device network acceptance testing.
 
 ### Quick start
 
@@ -56,6 +56,7 @@ Test packages are available from [GitHub Releases](https://github.com/kure29/Nel
 - [Architecture and security](ARCHITECTURE.md)
 - [Android and iOS builds](MOBILE_BUILD.md)
 - [Windows build](WINDOWS_BUILD.md)
+- [Self-hosted relay foundation](relay/README.md)
 
 ---
 
@@ -98,3 +99,4 @@ npm run tauri dev
 - [架构与安全说明](ARCHITECTURE.md)
 - [Android 与 iOS 构建说明](MOBILE_BUILD.md)
 - [Windows 构建说明](WINDOWS_BUILD.md)
+- [自建中继基础](relay/README.md)

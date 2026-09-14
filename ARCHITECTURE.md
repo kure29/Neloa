@@ -76,9 +76,16 @@ Platform adapters
 
 The future relay transport must implement the same transport interface as the LAN QUIC transport. Pairing, transfer envelopes, hashes, and clipboard event IDs must stay independent of how peers are reached.
 
+The first relay foundation now lives in `relay/` with shared wire definitions in
+`crates/neloa-relay-protocol`. It authenticates a small single-user deployment
+with a server token, keeps presence and tunnel state in memory, and forwards
+bounded binary frames without inspecting their Noise-encrypted contents. The
+current application still uses LAN QUIC only; client transport selection and
+relay connection settings are the next implementation step.
+
 ## Next milestones
 
-1. Relay foundation: separate the authenticated application protocol from LAN QUIC streams, then add an online-only self-hosted relay that cannot decrypt payloads.
+1. Relay client integration: separate the authenticated application protocol from LAN QUIC streams, then select LAN QUIC first and the online-only self-hosted relay as fallback.
 2. Mobile acceptance: complete Android real-device validation and expand iOS coverage across network changes, long transfers, lifecycle, and foreground clipboard behavior.
 3. Hardening: pairing throttling, diagnostic error categorization, migration regression coverage, and platform firewall/lifecycle handling.
 4. Packaging: signed `.dmg`/`.app`, Windows MSIX or NSIS, Android release signing, and iOS/TestFlight distribution.

@@ -1,6 +1,7 @@
 node_modules/
 dist/
-src-tauri/target/
+target/
+/crates/*/Cargo.lock
 releases/
 .DS_Store
 *.log
