@@ -5,9 +5,9 @@
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
 | Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 0.1.6 的双架构、版本、永久签名、图标和校验和已完成包内核验 | 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
-| iOS | `src-tauri/gen/apple/neloa.xcodeproj` | 工程已生成；本地网络说明、Bonjour 服务与 entitlement 的 plist 语法已检查 | Xcode 编译、签名、iPhone 安装及运行时行为 |
+| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | Xcode 26.6 无签名构建、原生 Bonjour/Rust 链接、包内本地网络声明和首次签名安装已验证 | 修复版在 iPhone 上的发现、配对与双向传输 |
 
-Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。0.1.6 起由项目自己的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 必须使用完整 Xcode 和 Apple 签名，当前机器只有 Command Line Tools，因此没有生成 IPA。
+Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。0.1.6 起由项目自己的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 已使用完整 Xcode 生成无签名 IPA；安装到真机前仍需使用 Apple 开发证书和匹配的描述文件签名。
 
 ## 已接入的移动端能力
 
@@ -16,7 +16,8 @@ Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuM
 - 系统文件选择器返回的 Android `content://` 文件可被读取。选择时只读取信息，点击发送后才复制到应用缓存，传输完成、失败或取消后自动删除缓存副本。
 - iOS 文件选择器显式使用复制模式，避免安全作用域在异步传输期间失效。
 - Android 已声明网络、Wi-Fi 与多播权限，并在 Activity 存活期间持有 mDNS 多播锁。
-- iOS 已声明 `NSLocalNetworkUsageDescription`、`_neloa._udp` Bonjour 服务和多播网络 entitlement。
+- iOS 已声明 `NSLocalNetworkUsageDescription` 与 `_neloa._udp` Bonjour 服务；发现由 `NWBrowser` 和 `NetService` 完成，不需要受限的多播网络 entitlement。
+- iOS 仅在应用处于前台活动状态时运行 Bonjour；进入后台会主动停止，返回前台会重建。若系统将 mDNS 会话标记为 `DefunctConnection`，浏览器会自动重连。
 - 移动端支持纯文本系统剪贴板，但当前产品定义为“应用在前台时同步”。Android 10 以后限制后台读取剪贴板；iOS 也可能显示系统粘贴授权提示。
 
 ## Android 真机安装
@@ -79,9 +80,9 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
    rustup target add aarch64-apple-ios aarch64-apple-ios-sim
    ```
 
-2. 在 Apple Developer 账号中申请 Multicast Networking entitlement。Neloa 当前通过原始 mDNS 多播套接字发现设备，没有此能力时真机可能安装成功但无法发现附近设备。
+2. 应用标识已统一为 `com.kure29.neloa`。从旧标识版本升级时，需要先卸载旧应用再安装一次。
 
-3. 打开 `src-tauri/gen/apple/neloa.xcodeproj`，选择 `neloa_iOS` target，在 Signing & Capabilities 中选择自己的 Team，并确认 Multicast Networking 能力有效。
+3. 打开 `src-tauri/gen/apple/neloa.xcodeproj`，选择 `neloa_iOS` target，在 Signing & Capabilities 中选择自己的 Team并开启自动签名。无需添加 Multicast Networking 能力。
 
 4. 连接已信任的 iPhone，保持 Mac 与 iPhone 在同一 Wi-Fi。可让 Tauri 打开工程：
 
@@ -95,7 +96,7 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
    APPLE_DEVELOPMENT_TEAM=你的TeamID npm run tauri -- ios build --export-method debugging
    ```
 
-不要再次运行 `tauri ios init` 或 `tauri android init`，除非准备重新合并生成目录中的原生改动；Android 多播锁、iOS entitlement 和 Xcode 构建脚本都在生成工程内有定制。
+不要再次运行 `tauri ios init` 或 `tauri android init`，除非准备重新合并生成目录中的原生改动；Android 多播锁、iOS Bonjour 适配层和 Xcode 构建脚本都在生成工程内有定制。
 
 ## 真机验收顺序
 
@@ -113,6 +114,6 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
 ## 已知的发布前事项
 
 - Android 0.1.6 Release APK 已验证：ARM64 约 10.6 MB、x86_64 约 11.6 MB，均使用同一永久证书；首次从旧 Debug 签名迁移仍需卸载重装。
-- iOS 多播 entitlement 需要 Apple 批准；若不希望申请，后续应把 iOS 发现层改成原生 Network.framework Bonjour 适配器。
+- iOS 发现层已经改为原生 Bonjour 适配器，不再依赖需要 Apple 额外批准的多播 entitlement。首次真机启动发现了 `DefunctConnection` 生命周期问题，修复版已完成编译和包内声明核验，仍需重新签名后验证授权、前后台恢复和跨设备解析。
 - 移动系统不允许把剪贴板同步做成与桌面端完全相同的无限后台轮询。后续可增加“回到前台自动检查”和用户主动粘贴入口。
-- 当前应用标识沿用 `app.neloa.desktop`，为保持桌面端已有数据与配对身份没有在本轮更改；首次公开发布前应统一决定最终 bundle/application ID。
+- iOS 与 Android 应用标识统一为 `com.kure29.neloa`。首次从旧标识迁移时，系统会将其视为一个新应用。

@@ -94,16 +94,16 @@
     transform var(--dur-fast) var(--ease);
 }
 
-.btn:hover:not(:disabled) {
-  background: var(--paper-2);
-}
-
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
+/*
+ * A disabled button drops its variant identity for one recessed surface and
+ * one recessed ink. Deliberately not `opacity`: group opacity composites the
+ * label toward whatever is behind the button, and on the primary button that
+ * left "发送" at 2.9:1 against its own fill. These land at 4.6.
+ */
 .btn:disabled {
-  opacity: 0.45;
+  border-color: var(--line-strong);
+  background: var(--paper-2);
+  color: var(--ink-3);
   cursor: not-allowed;
 }
 
@@ -113,18 +113,8 @@
   color: var(--paper-0);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--ink-2);
-  border-color: var(--ink-2);
-}
-
 .btn-danger {
   color: var(--danger);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: var(--danger-soft);
-  border-color: var(--danger);
 }
 
 .btn-ghost {
@@ -155,9 +145,56 @@
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
-.icon-btn:hover {
+/*
+ * Pressed and hovered states, for every control in this file.
+ *
+ * `:active` is unconditional and `:hover` is gated behind a real pointer. A
+ * touch screen has no hover, but WebKit synthesises one on tap and then leaves
+ * it applied until the next tap lands elsewhere — so an ungated `:hover` reads
+ * as a second selected peer, or a permanently lit button. Gating it also means
+ * every tappable surface needs its own `:active`, or a tap looks like nothing
+ * happened: the app sets `-webkit-tap-highlight-color: transparent`, so there
+ * is no platform feedback underneath.
+ */
+.btn:active:not(:disabled) {
+  background: var(--paper-2);
+  transform: translateY(1px);
+}
+
+.btn-primary:active:not(:disabled) {
+  border-color: var(--ink-2);
+  background: var(--ink-2);
+}
+
+.btn-danger:active:not(:disabled) {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.icon-btn:active {
   background: var(--paper-2);
   color: var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) {
+    background: var(--paper-2);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    border-color: var(--ink-2);
+    background: var(--ink-2);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: var(--danger-soft);
+  }
+
+  .icon-btn:hover {
+    background: var(--paper-2);
+    color: var(--ink);
+  }
 }
 
 /* ---------- state indicators ---------- */
@@ -350,8 +387,14 @@
   font-size: var(--text-small);
 }
 
-.row-action:hover {
+.row-action:active {
   color: var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row-action:hover {
+    color: var(--ink);
+  }
 }
 
 .empty-state {
@@ -536,9 +579,16 @@
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
-.peer-node:hover {
-  background: var(--paper-1);
+.peer-node:active {
   border-color: var(--line);
+  background: var(--paper-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .peer-node:hover {
+    background: var(--paper-1);
+    border-color: var(--line);
+  }
 }
 
 .peer-node.selected {
@@ -626,9 +676,17 @@
   transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
-.file-picker:hover {
+.file-picker:active {
   border-color: var(--ink-3);
+  background: var(--paper-2);
   color: var(--ink-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .file-picker:hover {
+    border-color: var(--ink-3);
+    color: var(--ink-2);
+  }
 }
 
 .file-picker.has-file {
@@ -722,45 +780,117 @@
   flex: none;
 }
 
+.record-delete {
+  width: 30px;
+  height: 30px;
+  color: var(--ink-3);
+}
+
+.record-delete:active {
+  color: var(--danger);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .record-delete:hover {
+    color: var(--danger);
+  }
+}
+
 /* ---------- settings ---------- */
 
-.policy-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.policy-tile {
+.setting-note,
+.clipboard-event {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: var(--s3) var(--s4);
-}
-
-.policy-tile + .policy-tile {
-  border-left: 1px solid var(--line);
-}
-
-.policy-icon {
-  color: var(--ink-3);
-}
-
-.policy-tile strong {
-  font-size: var(--text-small);
-  font-weight: 500;
-}
-
-.policy-tile small {
-  color: var(--ink-3);
-  font-size: var(--text-micro);
-}
-
-.event-line {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--s3);
   padding: var(--s3) var(--s4);
   background: var(--paper-2);
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.setting-note svg,
+.clipboard-event .status-dot {
+  flex: none;
+  margin-top: 3px;
+}
+
+.clipboard-event {
+  align-items: center;
+  background: var(--paper-1);
+}
+
+.advanced-settings > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--row-h);
+  padding: var(--s3) var(--s4);
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-settings > summary:active {
+  background: var(--paper-2);
+}
+
+.advanced-summary-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-control);
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.advanced-summary-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.advanced-summary-copy strong {
+  font-size: var(--text-body);
+  font-weight: 500;
+}
+
+.advanced-summary-copy small {
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.advanced-summary-chevron {
+  flex: none;
+  color: var(--ink-3);
+  transition: transform var(--dur) var(--ease);
+}
+
+.advanced-settings[open] .advanced-summary-chevron {
+  transform: rotate(90deg);
+}
+
+.advanced-panel > * + * {
+  border-top: 1px solid var(--line);
+}
+
+.advanced-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+}
+
+.row-value {
+  flex: none;
+  color: var(--ink-2);
+  font-size: var(--text-small);
 }
 
 .check {

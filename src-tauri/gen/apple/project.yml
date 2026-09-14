@@ -1,6 +1,6 @@
 name: neloa
 options:
-  bundleIdPrefix: app.neloa.desktop
+  bundleIdPrefix: com.kure29.neloa
   deploymentTarget:
     iOS: 14.0
 fileGroups: [../../src]
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Neloa
-      PRODUCT_BUNDLE_IDENTIFIER: app.neloa.desktop
+      PRODUCT_BUNDLE_IDENTIFIER: com.kure29.neloa
 targetTemplates:
   app:
     type: application
@@ -53,8 +53,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 0.1.3
-        CFBundleVersion: "0.1.3"
+        CFBundleShortVersionString: 0.1.8
+        CFBundleVersion: "0.1.8"
     entitlements:
       path: neloa_iOS/neloa_iOS.entitlements
     scheme:
@@ -70,6 +70,7 @@ targets:
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/Sources/neloa/BonjourBridge.h
       groups: [app]
     dependencies:
       - framework: libapp.a
@@ -77,6 +78,7 @@ targets:
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
+      - sdk: Network.framework
       - sdk: QuartzCore.framework
       - sdk: Security.framework
       - sdk: UIKit.framework

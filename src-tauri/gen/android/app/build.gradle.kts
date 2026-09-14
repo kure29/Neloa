@@ -20,10 +20,10 @@ val hasAndroidReleaseSigning =
 
 android {
     compileSdk = 36
-    namespace = "app.neloa.desktop"
+    namespace = "com.kure29.neloa"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "app.neloa.desktop"
+        applicationId = "com.kure29.neloa"
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()

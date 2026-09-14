@@ -61,7 +61,7 @@ const EMPTY_CLIPBOARD: ClipboardSnapshot = {
 };
 const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   generatedAtMs: 0,
-  appVersion: "0.1.6",
+  appVersion: "0.1.8",
   platform: "macos",
   protocolVersion: 1,
   minProtocolVersion: 1,
@@ -415,6 +415,16 @@ export function useNeloa() {
     void beginFileTransfer(record.peerId, record.path, record.name, record.size ?? 0);
   }, [beginFileTransfer, showToast]);
 
+  const removeHistoryRecord = useCallback((recordId: string) => {
+    setHistory((current) => current.filter((record) => record.id !== recordId));
+    showToast("已删除记录");
+  }, [showToast]);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    showToast("已清空传输记录");
+  }, [showToast]);
+
   const revoke = useCallback(async (device: TrustedDevice) => {
     try {
       const removed = await revokeTrustedDevice(device.id);
@@ -493,6 +503,8 @@ export function useNeloa() {
     cancelTransfer,
     history,
     retryTransfer,
+    removeHistoryRecord,
+    clearHistory,
     busyAction,
     toast,
     showToast,
