@@ -1,11 +1,14 @@
 use std::{
     collections::HashMap,
+    io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    task::{Context, Poll},
     thread,
     time::{Duration, Instant},
 };
@@ -24,7 +27,7 @@ use snow::{params::NoiseParams, Builder, TransportState};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::{
     fs::{File, OpenOptions},
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     sync::{mpsc, oneshot},
     time::{sleep, timeout},
 };
@@ -38,6 +41,11 @@ use crate::{
         NetworkStatus, PairingPeer, PairingRequest, PairingResult, PeerDevice, TestMessageEvent,
         TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
     },
+    relay_client::{
+        relay_client_channel, IncomingRelayTunnel, RelayClientHandle, RelayClientWorker,
+        RelayTunnel,
+    },
+    relay_settings::RelayDirective,
     trust::TrustStore,
     unix_millis,
 };
@@ -57,6 +65,100 @@ type PendingConfirmations = Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>;
 type PendingFileOffers = Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>;
 type ActiveTransfers = Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>;
 
+enum SessionSend {
+    Quic(SendStream),
+    Relay(tokio::io::WriteHalf<tokio::io::DuplexStream>),
+}
+
+enum SessionReceive {
+    Quic(RecvStream),
+    Relay(tokio::io::ReadHalf<tokio::io::DuplexStream>),
+}
+
+impl AsyncWrite for SessionSend {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        match self.get_mut() {
+            Self::Quic(stream) => {
+                <SendStream as AsyncWrite>::poll_write(Pin::new(stream), context, buffer)
+            }
+            Self::Relay(stream) => Pin::new(stream).poll_write(context, buffer),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            Self::Quic(stream) => <SendStream as AsyncWrite>::poll_flush(Pin::new(stream), context),
+            Self::Relay(stream) => Pin::new(stream).poll_flush(context),
+        }
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            Self::Quic(stream) => {
+                <SendStream as AsyncWrite>::poll_shutdown(Pin::new(stream), context)
+            }
+            Self::Relay(stream) => Pin::new(stream).poll_shutdown(context),
+        }
+    }
+}
+
+impl AsyncRead for SessionReceive {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            Self::Quic(stream) => Pin::new(stream).poll_read(context, buffer),
+            Self::Relay(stream) => Pin::new(stream).poll_read(context, buffer),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct TransportConnector {
+    quic: Endpoint,
+    relay: RelayClientHandle,
+}
+
+impl TransportConnector {
+    async fn connect(&self, peer: &PeerDevice) -> Result<(SessionSend, SessionReceive), String> {
+        let lan_error = if peer.addresses.is_empty() {
+            None
+        } else {
+            match connect_quic(&self.quic, peer).await {
+                Ok((send, receive)) => {
+                    return Ok((SessionSend::Quic(send), SessionReceive::Quic(receive)));
+                }
+                Err(error) => Some(error),
+            }
+        };
+        if peer.relay_available {
+            match self.relay.open_tunnel(peer.id.clone()).await {
+                Ok(RelayTunnel { send, receive }) => {
+                    return Ok((SessionSend::Relay(send), SessionReceive::Relay(receive)));
+                }
+                Err(relay_error) => {
+                    if let Some(lan_error) = lan_error {
+                        return Err(format!(
+                            "局域网连接失败：{lan_error}；中继回退失败：{relay_error}"
+                        ));
+                    }
+                    return Err(relay_error);
+                }
+            }
+        }
+        match lan_error {
+            Some(error) => Err(error),
+            _ => Err("设备当前没有可用的局域网或中继连接".into()),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct NetworkContext {
     app: AppHandle,
@@ -64,6 +166,28 @@ struct NetworkContext {
     identity: NoiseIdentity,
     trust: TrustStore,
     clipboard: ClipboardService,
+}
+
+pub(crate) struct NetworkStartup {
+    pub(crate) app: AppHandle,
+    pub(crate) local: LocalDevice,
+    pub(crate) identity: NoiseIdentity,
+    pub(crate) trust: TrustStore,
+    pub(crate) clipboard: ClipboardService,
+    pub(crate) port: u16,
+    pub(crate) peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
+    pub(crate) relay_directive: RelayDirective,
+}
+
+struct NetworkRuntime {
+    context: NetworkContext,
+    port: u16,
+    commands: mpsc::UnboundedReceiver<NetworkCommand>,
+    status: Arc<RwLock<NetworkStatus>>,
+    peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
+    relay: RelayClientHandle,
+    relay_worker: RelayClientWorker,
+    relay_incoming: mpsc::Receiver<IncomingRelayTunnel>,
 }
 
 #[derive(Clone)]
@@ -184,12 +308,15 @@ enum NetworkCommand {
 pub(crate) struct NetworkHandle {
     sender: mpsc::UnboundedSender<NetworkCommand>,
     status: Arc<RwLock<NetworkStatus>>,
+    relay: RelayClientHandle,
 }
 
 impl NetworkHandle {
-    pub(crate) fn unavailable(error: String, port: u16) -> Self {
+    pub(crate) fn unavailable(error: String, port: u16, relay: RelayDirective) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         drop(receiver);
+        let relay =
+            RelayClientHandle::unavailable(relay, "设备加密身份不可用，中继连接无法启动".into());
         Self {
             sender,
             status: Arc::new(RwLock::new(NetworkStatus {
@@ -198,18 +325,24 @@ impl NetworkHandle {
                 port,
                 identity_fingerprint: "不可用".to_string(),
             })),
+            relay,
         }
     }
 
-    pub(crate) fn start(
-        app: AppHandle,
-        local: LocalDevice,
-        identity: NoiseIdentity,
-        trust: TrustStore,
-        clipboard: ClipboardService,
-        port: u16,
-    ) -> Self {
+    pub(crate) fn start(startup: NetworkStartup) -> Self {
+        let NetworkStartup {
+            app,
+            local,
+            identity,
+            trust,
+            clipboard,
+            port,
+            peers,
+            relay_directive,
+        } = startup;
         let (sender, receiver) = mpsc::unbounded_channel();
+        let (relay, relay_worker, relay_incoming) = relay_client_channel(relay_directive);
+        let thread_relay = relay.clone();
         let status = Arc::new(RwLock::new(NetworkStatus {
             active: false,
             error: None,
@@ -232,12 +365,17 @@ impl NetworkHandle {
                 .build();
             match runtime {
                 Ok(runtime) => {
-                    if let Err(error) = runtime.block_on(run_network(
+                    let network = NetworkRuntime {
                         context,
                         port,
-                        receiver,
-                        Arc::clone(&thread_status),
-                    )) {
+                        commands: receiver,
+                        status: Arc::clone(&thread_status),
+                        peers,
+                        relay: thread_relay,
+                        relay_worker,
+                        relay_incoming,
+                    };
+                    if let Err(error) = runtime.block_on(run_network(network)) {
                         let mut current = thread_status.write();
                         current.active = false;
                         current.error = Some(error);
@@ -249,11 +387,23 @@ impl NetworkHandle {
             }
         });
 
-        Self { sender, status }
+        Self {
+            sender,
+            status,
+            relay,
+        }
     }
 
     pub(crate) fn status(&self) -> NetworkStatus {
         self.status.read().clone()
+    }
+
+    pub(crate) fn relay_status(&self) -> crate::model::RelaySnapshot {
+        self.relay.status()
+    }
+
+    pub(crate) fn configure_relay(&self, directive: RelayDirective) -> Result<(), String> {
+        self.relay.configure(directive)
     }
 
     pub(crate) async fn begin_pairing(&self, peer: PeerDevice) -> Result<PairingRequest, String> {
@@ -365,12 +515,17 @@ impl NetworkHandle {
     }
 }
 
-async fn run_network(
-    context: NetworkContext,
-    port: u16,
-    mut commands: mpsc::UnboundedReceiver<NetworkCommand>,
-    status: Arc<RwLock<NetworkStatus>>,
-) -> Result<(), String> {
+async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
+    let NetworkRuntime {
+        context,
+        port,
+        mut commands,
+        status,
+        peers,
+        relay,
+        relay_worker,
+        mut relay_incoming,
+    } = runtime;
     let NetworkContext {
         app,
         local,
@@ -380,6 +535,11 @@ async fn run_network(
     } = context;
     let mut endpoint = make_endpoint(port)?;
     endpoint.set_default_client_config(insecure_quic_client_config()?);
+    let connector = TransportConnector {
+        quic: endpoint.clone(),
+        relay: relay.clone(),
+    };
+    tokio::spawn(relay_worker.run(app.clone(), local.clone(), trust.clone(), peers));
     status.write().active = true;
     let pending: PendingConfirmations = Arc::new(Mutex::new(HashMap::new()));
     let pending_offers: PendingFileOffers = Arc::new(Mutex::new(HashMap::new()));
@@ -419,9 +579,51 @@ async fn run_network(
                             clipboard,
                             pending_pairing: pending,
                         };
-                        handle_incoming(context, send, receive).await
+                        handle_incoming(
+                            context,
+                            SessionSend::Quic(send),
+                            SessionReceive::Quic(receive),
+                        )
+                        .await
                     }.await;
                     if let Err(error) = result {
+                        let _ = app.emit("network-error", error);
+                    }
+                });
+            }
+            incoming = relay_incoming.recv() => {
+                let Some(IncomingRelayTunnel { source_id, tunnel }) = incoming else {
+                    return Err("中继连接服务意外停止".into());
+                };
+                if trust.find(&source_id).is_none() {
+                    continue;
+                }
+                let app = app.clone();
+                let local = local.clone();
+                let identity = identity.clone();
+                let trust = trust.clone();
+                let clipboard = clipboard.clone();
+                let pending = Arc::clone(&pending);
+                let pending_offers = Arc::clone(&pending_offers);
+                let active_transfers = Arc::clone(&active_transfers);
+                tokio::spawn(async move {
+                    let context = IncomingContext {
+                        file: FileTransferContext {
+                            app: app.clone(),
+                            local,
+                            identity,
+                            trust,
+                            pending_offers,
+                            active_transfers,
+                        },
+                        clipboard,
+                        pending_pairing: pending,
+                    };
+                    if let Err(error) = handle_incoming(
+                        context,
+                        SessionSend::Relay(tunnel.send),
+                        SessionReceive::Relay(tunnel.receive),
+                    ).await {
                         let _ = app.emit("network-error", error);
                     }
                 });
@@ -430,7 +632,7 @@ async fn run_network(
                 let Some(command) = command else { return Ok(()); };
                 match command {
                     NetworkCommand::BeginPairing { peer, response } => {
-                        let endpoint = endpoint.clone();
+                        let connector = connector.clone();
                         let context = PairingContext {
                             app: app.clone(),
                             local: local.clone(),
@@ -439,7 +641,7 @@ async fn run_network(
                             pending: Arc::clone(&pending),
                         };
                         tokio::spawn(async move {
-                            begin_outgoing_pairing(endpoint, context, peer, response).await;
+                            begin_outgoing_pairing(connector, context, peer, response).await;
                         });
                     }
                     NetworkCommand::ConfirmPairing { session_id, accepted, response } => {
@@ -451,7 +653,7 @@ async fn run_network(
                         let _ = response.send(result);
                     }
                     NetworkCommand::SendTestMessage { peer, text, response } => {
-                        let endpoint = endpoint.clone();
+                        let connector = connector.clone();
                         let context = TrustedSendContext {
                             app: app.clone(),
                             local: local.clone(),
@@ -459,7 +661,7 @@ async fn run_network(
                             trust: trust.clone(),
                         };
                         tokio::spawn(async move {
-                            let result = outgoing_test_message(endpoint, context, peer, text).await;
+                            let result = outgoing_test_message(connector, context, peer, text).await;
                             let _ = response.send(result);
                         });
                     }
@@ -471,7 +673,7 @@ async fn run_network(
                         cleanup_source,
                         transfer_id,
                     } => {
-                        let file_endpoint = endpoint.clone();
+                        let file_connector = connector.clone();
                         let cancel = Arc::new(AtomicBool::new(false));
                         active_transfers.lock().insert(transfer_id.clone(), Arc::clone(&cancel));
                         let context = FileTransferContext {
@@ -494,7 +696,7 @@ async fn run_network(
                         };
                         tokio::spawn(async move {
                             run_outgoing_file_transfer(
-                                file_endpoint,
+                                file_connector,
                                 context,
                                 peer,
                                 info,
@@ -523,7 +725,7 @@ async fn run_network(
                     }
                     NetworkCommand::BroadcastClipboard { peers, event_id, text } => {
                         for peer in peers {
-                            let endpoint = endpoint.clone();
+                            let connector = connector.clone();
                             let app = app.clone();
                             let context = TrustedSendContext {
                                 app: app.clone(),
@@ -536,7 +738,7 @@ async fn run_network(
                             tokio::spawn(async move {
                                 let bytes = text.len();
                                 let outcome = outgoing_clipboard_update(
-                                    endpoint,
+                                    connector,
                                     context,
                                     &peer,
                                     &event_id,
@@ -569,12 +771,12 @@ async fn run_network(
 }
 
 async fn begin_outgoing_pairing(
-    endpoint: Endpoint,
+    connector: TransportConnector,
     context: PairingContext,
     peer: PeerDevice,
     response: oneshot::Sender<Result<PairingRequest, String>>,
 ) {
-    let (send, receive) = match connect(&endpoint, &peer).await {
+    let (send, receive) = match connector.connect(&peer).await {
         Ok(streams) => streams,
         Err(error) => {
             let _ = response.send(Err(error));
@@ -631,8 +833,8 @@ async fn begin_outgoing_pairing(
 
 async fn handle_incoming(
     context: IncomingContext,
-    send: SendStream,
-    receive: RecvStream,
+    send: SessionSend,
+    receive: SessionReceive,
 ) -> Result<(), String> {
     let session =
         responder_handshake(send, receive, &context.file.identity, &context.file.local).await?;
@@ -748,12 +950,16 @@ async fn finish_pairing(
     // The trust decision has already been exchanged and persisted. Stream shutdown is
     // best-effort here so a platform-specific QUIC close race cannot create one-sided trust.
     let _ = finish_stream(&mut session.send);
-    let _ = timeout(Duration::from_secs(1), session.send.stopped()).await;
+    let _ = timeout(
+        Duration::from_secs(1),
+        wait_stream_stopped(&mut session.send),
+    )
+    .await;
     Ok(())
 }
 
 async fn outgoing_test_message(
-    endpoint: Endpoint,
+    connector: TransportConnector,
     context: TrustedSendContext,
     peer: PeerDevice,
     text: String,
@@ -771,7 +977,7 @@ async fn outgoing_test_message(
         .ok_or_else(|| "请先完成设备配对".to_string())?;
     let expected_key = decode_public_key(&trusted.public_key)?;
 
-    let (send, receive) = connect(&endpoint, &peer).await?;
+    let (send, receive) = connector.connect(&peer).await?;
     let mut session = initiator_handshake(
         send,
         receive,
@@ -872,7 +1078,7 @@ async fn incoming_test_message(
 }
 
 async fn outgoing_clipboard_update(
-    endpoint: Endpoint,
+    connector: TransportConnector,
     context: TrustedSendContext,
     peer: &PeerDevice,
     event_id: &str,
@@ -886,7 +1092,7 @@ async fn outgoing_clipboard_update(
         .ok_or_else(|| "请先完成设备配对".to_string())?;
     let expected_key = decode_public_key(&trusted.public_key)?;
 
-    let (send, receive) = connect(&endpoint, peer).await?;
+    let (send, receive) = connector.connect(peer).await?;
     let mut session = initiator_handshake(
         send,
         receive,
@@ -982,7 +1188,11 @@ async fn incoming_clipboard_update(
     )
     .await?;
     finish_stream(&mut session.send)?;
-    let _ = timeout(Duration::from_secs(1), session.send.stopped()).await;
+    let _ = timeout(
+        Duration::from_secs(1),
+        wait_stream_stopped(&mut session.send),
+    )
+    .await;
 
     if applied {
         trust.touch(&session.peer.id, unix_millis())?;
@@ -1007,7 +1217,7 @@ async fn incoming_clipboard_update(
 }
 
 async fn run_outgoing_file_transfer(
-    endpoint: Endpoint,
+    connector: TransportConnector,
     context: FileTransferContext,
     peer: PeerDevice,
     info: TransferInfo,
@@ -1026,8 +1236,15 @@ async fn run_outgoing_file_transfer(
         context.active_transfers.lock().remove(&transfer_id);
         return;
     };
-    let outcome =
-        outgoing_file_transfer(endpoint, &context, &peer, &path, &info, Arc::clone(&cancel)).await;
+    let outcome = outgoing_file_transfer(
+        connector,
+        &context,
+        &peer,
+        &path,
+        &info,
+        Arc::clone(&cancel),
+    )
+    .await;
     let result_path = (!info.cleanup_source).then(|| path.clone());
 
     match outcome {
@@ -1055,7 +1272,7 @@ async fn run_outgoing_file_transfer(
 }
 
 async fn outgoing_file_transfer(
-    endpoint: Endpoint,
+    connector: TransportConnector,
     context: &FileTransferContext,
     peer: &PeerDevice,
     path: &Path,
@@ -1070,7 +1287,8 @@ async fn outgoing_file_transfer(
     let sha256 = hash_file(&context.app, info, path, Arc::clone(&cancel)).await?;
     ensure_not_cancelled(&cancel)?;
 
-    let (send, receive) = connect(&endpoint, peer)
+    let (send, receive) = connector
+        .connect(peer)
         .await
         .map_err(TransferFailure::failed)?;
     let mut session = initiator_handshake(send, receive, &context.identity, &context.local, "file")
@@ -1335,7 +1553,11 @@ async fn handle_incoming_file_transfer(
                 )
                 .await?;
                 finish_stream(&mut session.send)?;
-                let _ = timeout(Duration::from_secs(1), session.send.stopped()).await;
+                let _ = timeout(
+                    Duration::from_secs(1),
+                    wait_stream_stopped(&mut session.send),
+                )
+                .await;
                 context.trust.touch(&info.peer_id, unix_millis())?;
                 emit_transfer_result(
                     &context.app,
@@ -1407,8 +1629,8 @@ async fn receive_file_payload(
         let mut last_progress = Instant::now() - PROGRESS_INTERVAL;
         loop {
             if cancel.load(Ordering::Relaxed) {
-                let _ = session.receive.stop(0_u8.into());
-                let _ = session.send.reset(0_u8.into());
+                let _ = stop_receive(&mut session.receive);
+                let _ = reset_send(&mut session.send);
                 return Err(TransferFailure::cancelled("文件接收已取消"));
             }
             let record = read_record_or_cancel(
@@ -1613,7 +1835,7 @@ async fn wait_for_cancel(cancel: &AtomicBool) {
 }
 
 async fn read_control_or_cancel(
-    receive: &mut RecvStream,
+    receive: &mut SessionReceive,
     transport: &mut TransportState,
     duration: Duration,
     cancel: &AtomicBool,
@@ -1631,7 +1853,7 @@ async fn read_control_or_cancel(
 }
 
 async fn read_record_or_cancel(
-    receive: &mut RecvStream,
+    receive: &mut SessionReceive,
     transport: &mut TransportState,
     duration: Duration,
     cancel: &AtomicBool,
@@ -1729,8 +1951,8 @@ struct HandshakeMetadata {
 }
 
 struct NoiseSession {
-    send: SendStream,
-    receive: RecvStream,
+    send: SessionSend,
+    receive: SessionReceive,
     transport: TransportState,
     peer: HandshakeMetadata,
     remote_static: [u8; 32],
@@ -1791,8 +2013,8 @@ enum SecureRecord {
 }
 
 async fn initiator_handshake(
-    mut send: SendStream,
-    mut receive: RecvStream,
+    mut send: SessionSend,
+    mut receive: SessionReceive,
     identity: &NoiseIdentity,
     local: &LocalDevice,
     purpose: &str,
@@ -1831,8 +2053,8 @@ async fn initiator_handshake(
 }
 
 async fn responder_handshake(
-    mut send: SendStream,
-    mut receive: RecvStream,
+    mut send: SessionSend,
+    mut receive: SessionReceive,
     identity: &NoiseIdentity,
     local: &LocalDevice,
 ) -> Result<NoiseSession, String> {
@@ -1870,8 +2092,8 @@ async fn responder_handshake(
 }
 
 fn finish_handshake(
-    send: SendStream,
-    receive: RecvStream,
+    send: SessionSend,
+    receive: SessionReceive,
     noise: snow::HandshakeState,
     peer: HandshakeMetadata,
 ) -> Result<NoiseSession, String> {
@@ -1972,7 +2194,7 @@ fn noise_params() -> Result<NoiseParams, String> {
 }
 
 async fn write_encrypted(
-    send: &mut SendStream,
+    send: &mut SessionSend,
     transport: &mut TransportState,
     message: &WireMessage,
 ) -> Result<(), String> {
@@ -1986,7 +2208,7 @@ async fn write_encrypted(
 }
 
 async fn read_encrypted(
-    receive: &mut RecvStream,
+    receive: &mut SessionReceive,
     transport: &mut TransportState,
 ) -> Result<WireMessage, String> {
     match read_secure_record(receive, transport).await? {
@@ -1996,7 +2218,7 @@ async fn read_encrypted(
 }
 
 async fn write_encrypted_chunk(
-    send: &mut SendStream,
+    send: &mut SessionSend,
     transport: &mut TransportState,
     offset: u64,
     bytes: &[u8],
@@ -2016,7 +2238,7 @@ async fn write_encrypted_chunk(
 }
 
 async fn read_secure_record(
-    receive: &mut RecvStream,
+    receive: &mut SessionReceive,
     transport: &mut TransportState,
 ) -> Result<SecureRecord, String> {
     let encrypted = read_frame(receive).await?;
@@ -2045,7 +2267,7 @@ async fn read_secure_record(
     }
 }
 
-async fn write_frame(send: &mut SendStream, bytes: &[u8]) -> Result<(), String> {
+async fn write_frame(send: &mut SessionSend, bytes: &[u8]) -> Result<(), String> {
     if bytes.len() > FRAME_LIMIT {
         return Err("协议消息超过大小限制".to_string());
     }
@@ -2058,7 +2280,7 @@ async fn write_frame(send: &mut SendStream, bytes: &[u8]) -> Result<(), String> 
     Ok(())
 }
 
-async fn read_frame(receive: &mut RecvStream) -> Result<Vec<u8>, String> {
+async fn read_frame(receive: &mut SessionReceive) -> Result<Vec<u8>, String> {
     let size = receive
         .read_u32()
         .await
@@ -2077,18 +2299,51 @@ async fn read_frame(receive: &mut RecvStream) -> Result<Vec<u8>, String> {
 fn transport_read_error(action: &str, error: impl std::fmt::Display) -> String {
     let detail = error.to_string();
     if detail.contains("connection lost") || detail.contains("closed") || detail.contains("reset") {
-        "连接意外中断，请确认两端仍在同一局域网并重试".to_string()
+        "连接意外中断，请确认两端仍在线并重试".to_string()
     } else {
         format!("无法{action}：{detail}")
     }
 }
 
-fn finish_stream(send: &mut SendStream) -> Result<(), String> {
-    send.finish()
-        .map_err(|error| format!("无法完成加密数据流：{error}"))
+fn finish_stream(send: &mut SessionSend) -> Result<(), String> {
+    match send {
+        SessionSend::Quic(stream) => stream
+            .finish()
+            .map_err(|error| format!("无法完成加密数据流：{error}")),
+        SessionSend::Relay(_) => Ok(()),
+    }
 }
 
-async fn connect(
+async fn wait_stream_stopped(send: &mut SessionSend) -> Result<(), String> {
+    match send {
+        SessionSend::Quic(stream) => stream
+            .stopped()
+            .await
+            .map(|_| ())
+            .map_err(|error| format!("等待对端完成数据流失败：{error}")),
+        SessionSend::Relay(_) => Ok(()),
+    }
+}
+
+fn stop_receive(receive: &mut SessionReceive) -> Result<(), String> {
+    match receive {
+        SessionReceive::Quic(stream) => stream
+            .stop(0_u8.into())
+            .map_err(|error| format!("无法停止接收数据流：{error}")),
+        SessionReceive::Relay(_) => Ok(()),
+    }
+}
+
+fn reset_send(send: &mut SessionSend) -> Result<(), String> {
+    match send {
+        SessionSend::Quic(stream) => stream
+            .reset(0_u8.into())
+            .map_err(|error| format!("无法重置发送数据流：{error}")),
+        SessionSend::Relay(_) => Ok(()),
+    }
+}
+
+async fn connect_quic(
     endpoint: &Endpoint,
     peer: &PeerDevice,
 ) -> Result<(SendStream, RecvStream), String> {
@@ -2223,7 +2478,11 @@ async fn validate_incoming_trust(
     )
     .await?;
     let _ = finish_stream(&mut session.send);
-    let _ = timeout(Duration::from_secs(1), session.send.stopped()).await;
+    let _ = timeout(
+        Duration::from_secs(1),
+        wait_stream_stopped(&mut session.send),
+    )
+    .await;
     Ok(false)
 }
 
@@ -2397,6 +2656,87 @@ mod tests {
         assert_eq!(&payload[..size], b"encrypted hello");
     }
 
+    #[tokio::test]
+    async fn relay_virtual_stream_carries_noise_encrypted_protocol() {
+        let initiator_identity = NoiseIdentity::generate_for_test();
+        let responder_identity = NoiseIdentity::generate_for_test();
+        let initiator_device = LocalDevice {
+            id: "relay-initiator".into(),
+            name: "Initiator".into(),
+            platform: "ios".into(),
+            version: "test".into(),
+        };
+        let responder_device = LocalDevice {
+            id: "relay-responder".into(),
+            name: "Responder".into(),
+            platform: "macos".into(),
+            version: "test".into(),
+        };
+        let (initiator_stream, responder_stream) = tokio::io::duplex(256 * 1024);
+        let (initiator_receive, initiator_send) = tokio::io::split(initiator_stream);
+        let (responder_receive, responder_send) = tokio::io::split(responder_stream);
+        let expected_initiator_key = initiator_identity.public();
+        let expected_responder_key = responder_identity.public();
+
+        let responder = tokio::spawn(async move {
+            let mut session = responder_handshake(
+                SessionSend::Relay(responder_send),
+                SessionReceive::Relay(responder_receive),
+                &responder_identity,
+                &responder_device,
+            )
+            .await
+            .unwrap();
+            assert_eq!(session.remote_static, expected_initiator_key);
+            match read_encrypted(&mut session.receive, &mut session.transport)
+                .await
+                .unwrap()
+            {
+                WireMessage::TestMessage { id, text } => {
+                    assert_eq!(text, "encrypted across relay");
+                    write_encrypted(
+                        &mut session.send,
+                        &mut session.transport,
+                        &WireMessage::TestAck { id },
+                    )
+                    .await
+                    .unwrap();
+                }
+                _ => panic!("unexpected relay test message"),
+            }
+        });
+
+        let mut session = initiator_handshake(
+            SessionSend::Relay(initiator_send),
+            SessionReceive::Relay(initiator_receive),
+            &initiator_identity,
+            &initiator_device,
+            "trusted-test",
+        )
+        .await
+        .unwrap();
+        assert_eq!(session.remote_static, expected_responder_key);
+        let id = Uuid::new_v4().to_string();
+        write_encrypted(
+            &mut session.send,
+            &mut session.transport,
+            &WireMessage::TestMessage {
+                id: id.clone(),
+                text: "encrypted across relay".into(),
+            },
+        )
+        .await
+        .unwrap();
+        match read_encrypted(&mut session.receive, &mut session.transport)
+            .await
+            .unwrap()
+        {
+            WireMessage::TestAck { id: acknowledged } => assert_eq!(acknowledged, id),
+            _ => panic!("unexpected relay test acknowledgement"),
+        }
+        responder.await.unwrap();
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn quic_loopback_carries_noise_encrypted_file_protocol() {
         let server_identity = NoiseIdentity::generate_for_test();
@@ -2421,9 +2761,14 @@ mod tests {
         let responder = tokio::spawn(async move {
             let connection = server.accept().await.unwrap().await.unwrap();
             let (send, receive) = connection.accept_bi().await.unwrap();
-            let mut session = responder_handshake(send, receive, &server_identity, &server_device)
-                .await
-                .unwrap();
+            let mut session = responder_handshake(
+                SessionSend::Quic(send),
+                SessionReceive::Quic(receive),
+                &server_identity,
+                &server_device,
+            )
+            .await
+            .unwrap();
             assert_eq!(session.remote_static, expected_client_key);
             let authentication_code = short_authentication_string(&session.handshake_hash);
             let (transfer_id, expected_size, expected_sha256) =
@@ -2483,7 +2828,11 @@ mod tests {
                     .await
                     .unwrap();
                     finish_stream(&mut session.send).unwrap();
-                    let _ = timeout(Duration::from_secs(1), session.send.stopped()).await;
+                    let _ = timeout(
+                        Duration::from_secs(1),
+                        wait_stream_stopped(&mut session.send),
+                    )
+                    .await;
                 }
                 _ => panic!("unexpected file completion"),
             }
@@ -2506,12 +2855,13 @@ mod tests {
             addresses: vec![Ipv4Addr::LOCALHOST.to_string()],
             port: server_address.port(),
             last_seen_ms: 0,
+            relay_available: false,
             service_fullname: String::new(),
         };
-        let (send, receive) = connect(&client, &peer).await.unwrap();
+        let (send, receive) = connect_quic(&client, &peer).await.unwrap();
         let mut session = initiator_handshake(
-            send,
-            receive,
+            SessionSend::Quic(send),
+            SessionReceive::Quic(receive),
             &client_identity,
             &client_device,
             "trusted-test",
@@ -2592,9 +2942,14 @@ mod tests {
         let responder = tokio::spawn(async move {
             let connection = server.accept().await.unwrap().await.unwrap();
             let (send, receive) = connection.accept_bi().await.unwrap();
-            let mut session = responder_handshake(send, receive, &server_identity, &server_device)
-                .await
-                .unwrap();
+            let mut session = responder_handshake(
+                SessionSend::Quic(send),
+                SessionReceive::Quic(receive),
+                &server_identity,
+                &server_device,
+            )
+            .await
+            .unwrap();
             assert_eq!(session.remote_static, expected_client_key);
             assert_eq!(session.peer.purpose, "clipboard");
             let id = match read_encrypted(&mut session.receive, &mut session.transport)
@@ -2619,7 +2974,11 @@ mod tests {
             .await
             .unwrap();
             finish_stream(&mut session.send).unwrap();
-            let _ = timeout(Duration::from_secs(1), session.send.stopped()).await;
+            let _ = timeout(
+                Duration::from_secs(1),
+                wait_stream_stopped(&mut session.send),
+            )
+            .await;
         });
 
         let mut client = make_endpoint(0).unwrap();
@@ -2638,13 +2997,19 @@ mod tests {
             addresses: vec![Ipv4Addr::LOCALHOST.to_string()],
             port: server_address.port(),
             last_seen_ms: 0,
+            relay_available: false,
             service_fullname: String::new(),
         };
-        let (send, receive) = connect(&client, &peer).await.unwrap();
-        let mut session =
-            initiator_handshake(send, receive, &client_identity, &client_device, "clipboard")
-                .await
-                .unwrap();
+        let (send, receive) = connect_quic(&client, &peer).await.unwrap();
+        let mut session = initiator_handshake(
+            SessionSend::Quic(send),
+            SessionReceive::Quic(receive),
+            &client_identity,
+            &client_device,
+            "clipboard",
+        )
+        .await
+        .unwrap();
         let id = Uuid::new_v4().to_string();
         write_encrypted(
             &mut session.send,

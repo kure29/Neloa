@@ -28,6 +28,7 @@ Neloa discovers devices on the same local network and transfers files or clipboa
 - Six-digit verification before trusting a new device
 - Cancellable, SHA-256-verified file transfers
 - Opt-in text clipboard sync with sensitive-content safeguards
+- Optional self-hosted relay fallback for previously paired devices
 - Shared Tauri 2 interface for macOS, Windows, Android, and iOS
 
 ### Platform status
@@ -56,7 +57,7 @@ Test packages are available from [GitHub Releases](https://github.com/kure29/Nel
 - [Architecture and security](ARCHITECTURE.md)
 - [Android and iOS builds](MOBILE_BUILD.md)
 - [Windows build](WINDOWS_BUILD.md)
-- [Self-hosted relay foundation](relay/README.md)
+- [Self-hosted relay deployment](relay/README.md)
 
 ---
 
@@ -71,6 +72,7 @@ Neloa 可以发现同一局域网内的设备，并在设备之间直接传输�
 - 首次信任设备前核对六位验证码
 - 支持取消传输，并通过 SHA-256 校验文件
 - 剪贴板同步默认关闭，并提供敏感内容保护
+- 已配对设备可选用自建中继作为局域网直连的回退链路
 - 使用 Tauri 2 为 macOS、Windows、Android 和 iOS 提供统一界面
 
 ### 平台状态
@@ -99,4 +101,4 @@ npm run tauri dev
 - [架构与安全说明](ARCHITECTURE.md)
 - [Android 与 iOS 构建说明](MOBILE_BUILD.md)
 - [Windows 构建说明](WINDOWS_BUILD.md)
-- [自建中继基础](relay/README.md)
+- [自建中继部署](relay/README.md)

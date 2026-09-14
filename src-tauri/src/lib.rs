@@ -1,13 +1,16 @@
 use std::{
     collections::HashMap,
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[cfg(not(mobile))]
+use std::path::Path;
 
 #[cfg(not(target_os = "ios"))]
 use std::thread;
@@ -31,16 +34,19 @@ mod clipboard;
 mod identity;
 mod model;
 mod network;
+mod relay_client;
+mod relay_settings;
 mod trust;
 
 use clipboard::ClipboardService;
 use identity::NoiseIdentity;
 use model::{
     ClipboardSnapshot, DiagnosticCheck, DiagnosticPeer, DiagnosticsSnapshot, DiscoverySnapshot,
-    LocalDevice, PairingRequest, PeerDevice, SecuritySnapshot, SelectedFile, TestMessageEvent,
-    CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+    LocalDevice, PairingRequest, PeerDevice, RelaySnapshot, SecuritySnapshot, SelectedFile,
+    TestMessageEvent, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
 };
-use network::NetworkHandle;
+use network::{NetworkHandle, NetworkStartup};
+use relay_settings::RelaySettingsStore;
 use trust::TrustStore;
 
 #[cfg(not(target_os = "ios"))]
@@ -49,7 +55,12 @@ const SERVICE_PORT: u16 = 48_631;
 #[cfg(not(mobile))]
 const LEGACY_IDENTIFIER: &str = "app.neloa.desktop";
 #[cfg(not(mobile))]
-const PERSISTENT_DATA_FILES: [&str; 3] = ["device-id", "trusted-devices.json", "settings.json"];
+const PERSISTENT_DATA_FILES: [&str; 4] = [
+    "device-id",
+    "trusted-devices.json",
+    "settings.json",
+    "relay-settings.json",
+];
 
 struct DiscoveryState {
     #[cfg(not(target_os = "ios"))]
@@ -80,6 +91,7 @@ struct AppState {
     network: NetworkHandle,
     trust: TrustStore,
     clipboard: ClipboardService,
+    relay_settings: RelaySettingsStore,
 }
 
 struct PreparedTransferSource {
@@ -301,6 +313,9 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                             if id.is_empty() || id == local_id {
                                 false
                             } else {
+                                let mut peers = peers_for_thread.write();
+                                let relay_available =
+                                    peers.get(&id).is_some_and(|peer| peer.relay_available);
                                 let peer = PeerDevice {
                                     id: id.clone(),
                                     name: info
@@ -338,18 +353,27 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                         .collect(),
                                     port: info.get_port(),
                                     last_seen_ms: unix_millis(),
+                                    relay_available,
                                     service_fullname: info.get_fullname().to_string(),
                                 };
-                                peers_for_thread.write().insert(id, peer);
+                                peers.insert(id, peer);
                                 true
                             }
                         }
                         ServiceEvent::ServiceRemoved(_, fullname) => {
-                            let before = peers_for_thread.read().len();
-                            peers_for_thread
-                                .write()
-                                .retain(|_, peer| peer.service_fullname != fullname);
-                            peers_for_thread.read().len() != before
+                            let mut removed_lan_route = false;
+                            peers_for_thread.write().retain(|_, peer| {
+                                if peer.service_fullname == fullname {
+                                    removed_lan_route = true;
+                                    peer.addresses.clear();
+                                    peer.port = 0;
+                                    peer.service_fullname.clear();
+                                    peer.relay_available
+                                } else {
+                                    true
+                                }
+                            });
+                            removed_lan_route
                         }
                         _ => false,
                     };
@@ -490,6 +514,10 @@ pub extern "C" fn neloa_ios_discovery_peer_upsert(peer_json: *const std::ffi::c_
     });
     match result {
         Ok(peer) if !peer.id.is_empty() && peer.id != context.local_id => {
+            let mut peers = context.peers.write();
+            let relay_available = peers
+                .get(&peer.id)
+                .is_some_and(|current| current.relay_available);
             let peer = PeerDevice {
                 id: peer.id.clone(),
                 name: peer.name,
@@ -501,9 +529,11 @@ pub extern "C" fn neloa_ios_discovery_peer_upsert(peer_json: *const std::ffi::c_
                 addresses: peer.addresses,
                 port: peer.port,
                 last_seen_ms: unix_millis(),
+                relay_available,
                 service_fullname: peer.service_fullname,
             };
-            context.peers.write().insert(peer.id.clone(), peer);
+            peers.insert(peer.id.clone(), peer);
+            drop(peers);
             emit_ios_discovery_snapshot(context);
         }
         Ok(_) => {}
@@ -523,12 +553,19 @@ pub extern "C" fn neloa_ios_discovery_peer_remove(fullname: *const std::ffi::c_c
     let Ok(fullname) = ios_callback_json(fullname) else {
         return;
     };
-    let before = context.peers.read().len();
-    context
-        .peers
-        .write()
-        .retain(|_, peer| peer.service_fullname != fullname);
-    if context.peers.read().len() != before {
+    let mut removed_lan_route = false;
+    context.peers.write().retain(|_, peer| {
+        if peer.service_fullname == fullname {
+            removed_lan_route = true;
+            peer.addresses.clear();
+            peer.port = 0;
+            peer.service_fullname.clear();
+            peer.relay_available
+        } else {
+            true
+        }
+    });
+    if removed_lan_route {
         emit_ios_discovery_snapshot(context);
     }
 }
@@ -629,6 +666,23 @@ fn get_security_snapshot(state: tauri::State<'_, AppState>) -> SecuritySnapshot 
 }
 
 #[tauri::command]
+fn get_relay_snapshot(state: tauri::State<'_, AppState>) -> RelaySnapshot {
+    state.network.relay_status()
+}
+
+#[tauri::command(rename_all = "camelCase")]
+fn set_relay_config(
+    enabled: bool,
+    url: String,
+    token: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<RelaySnapshot, String> {
+    let directive = state.relay_settings.update(enabled, url, token)?;
+    state.network.configure_relay(directive)?;
+    Ok(state.network.relay_status())
+}
+
+#[tauri::command]
 fn get_clipboard_snapshot(state: tauri::State<'_, AppState>) -> ClipboardSnapshot {
     state.clipboard.snapshot()
 }
@@ -637,6 +691,7 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
     let network = state.network.status();
     let discovery_error = state.discovery.error.read().clone();
     let clipboard = state.clipboard.snapshot();
+    let relay = state.network.relay_status();
     let mut peers: Vec<_> = state
         .discovery
         .peers
@@ -753,6 +808,27 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
         },
         guidance: None,
     };
+    let relay_check = DiagnosticCheck {
+        id: "relay".into(),
+        label: "自建中继".into(),
+        state: if relay.connected {
+            "ok"
+        } else if relay.enabled && relay.error.is_some() {
+            "warning"
+        } else {
+            "idle"
+        }
+        .into(),
+        detail: if relay.connected {
+            format!("已连接 · {} 台已配对设备在线", relay.online_devices)
+        } else if relay.enabled {
+            relay.error.clone().unwrap_or_else(|| "正在连接中继".into())
+        } else {
+            "未启用 · 局域网传输不受影响".into()
+        },
+        guidance: (relay.enabled && !relay.connected)
+            .then(|| "确认中继地址、令牌和 TLS 证书有效；服务端与客户端协议需保持一致".into()),
+    };
 
     let firewall_guidance = if state.local.platform == "windows" {
         "在 Windows Defender 防火墙中允许 Neloa 访问“专用网络”；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。"
@@ -775,6 +851,7 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
             identity_check,
             protocol_check,
             clipboard_check,
+            relay_check,
         ],
         peers,
         firewall_guidance: firewall_guidance.into(),
@@ -786,6 +863,7 @@ fn diagnostic_report(state: &AppState, snapshot: &DiagnosticsSnapshot) -> String
     let network = state.network.status();
     let discovery_error = state.discovery.error.read().is_some();
     let clipboard = state.clipboard.snapshot();
+    let relay = state.network.relay_status();
     let peer_lines = if snapshot.peers.is_empty() {
         "peer.none=true".to_string()
     } else {
@@ -826,6 +904,10 @@ discovery.peerCount={}\n\
 trust.count={}\n\
 clipboard.enabled={}\n\
 clipboard.maxBytes={}\n\
+relay.enabled={}\n\
+relay.connected={}\n\
+relay.onlineDevices={}\n\
+relay.errorPresent={}\n\
 {}\n\
 privacy=No IP addresses, full device IDs, public keys, file paths, or clipboard content included.",
         snapshot.generated_at_ms,
@@ -845,6 +927,10 @@ privacy=No IP addresses, full device IDs, public keys, file paths, or clipboard 
         state.trust.list().len(),
         clipboard.enabled,
         clipboard.max_bytes,
+        relay.enabled,
+        relay.connected,
+        relay.online_devices,
+        relay.error.is_some(),
         peer_lines,
     )
 }
@@ -973,6 +1059,14 @@ fn revoke_trusted_device(
 ) -> Result<bool, String> {
     let removed = state.trust.remove(&peer_id)?;
     if removed {
+        state.discovery.peers.write().retain(|id, peer| {
+            if id == &peer_id {
+                peer.relay_available = false;
+                !peer.addresses.is_empty()
+            } else {
+                true
+            }
+        });
         app.emit("trusted-devices-changed", state.trust.list())
             .map_err(|error| format!("无法刷新可信设备列表：{error}"))?;
     }
@@ -1261,18 +1355,23 @@ pub fn run() {
             let trust = TrustStore::load(app_data_dir.join("trusted-devices.json"))?;
             let clipboard =
                 ClipboardService::load(app.handle().clone(), app_data_dir.join("settings.json"));
-            let network = match NoiseIdentity::load_or_create() {
-                Ok(identity) => NetworkHandle::start(
-                    app.handle().clone(),
-                    local.clone(),
-                    identity,
-                    trust.clone(),
-                    clipboard.clone(),
-                    SERVICE_PORT,
-                ),
-                Err(error) => NetworkHandle::unavailable(error, SERVICE_PORT),
-            };
+            let relay_settings =
+                RelaySettingsStore::load(app_data_dir.join("relay-settings.json"))?;
+            let relay_directive = relay_settings.directive();
             let discovery = start_discovery(app.handle().clone(), &local);
+            let network = match NoiseIdentity::load_or_create() {
+                Ok(identity) => NetworkHandle::start(NetworkStartup {
+                    app: app.handle().clone(),
+                    local: local.clone(),
+                    identity,
+                    trust: trust.clone(),
+                    clipboard: clipboard.clone(),
+                    port: SERVICE_PORT,
+                    peers: Arc::clone(&discovery.peers),
+                    relay_directive,
+                }),
+                Err(error) => NetworkHandle::unavailable(error, SERVICE_PORT, relay_directive),
+            };
             clipboard.configure(network.clone(), Arc::clone(&discovery.peers), trust.clone())?;
 
             // Non-fatal: without it the close button falls back to minimising,
@@ -1291,6 +1390,7 @@ pub fn run() {
                 network,
                 trust,
                 clipboard,
+                relay_settings,
             });
             Ok(())
         })
@@ -1298,6 +1398,8 @@ pub fn run() {
             get_local_device,
             get_discovery_snapshot,
             get_security_snapshot,
+            get_relay_snapshot,
+            set_relay_config,
             get_clipboard_snapshot,
             set_clipboard_enabled,
             get_diagnostics_snapshot,

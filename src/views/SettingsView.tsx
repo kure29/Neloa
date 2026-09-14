@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { formatBytes, formatTime } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
@@ -51,10 +51,45 @@ function Row({
 }
 
 export function SettingsView({ app }: { app: NeloaState }) {
-  const { security, clipboard, diagnostics, discovery, lastClipboardEvent } = app;
+  const { security, clipboard, relay, diagnostics, discovery, lastClipboardEvent } = app;
+  const [relayEnabled, setRelayEnabled] = useState(relay.enabled);
+  const [relayUrl, setRelayUrl] = useState(relay.url);
+  const [relayToken, setRelayToken] = useState("");
+  const [relayFormError, setRelayFormError] = useState("");
   const problems = diagnostics.checks.filter(
     (check) => check.state === "warning" || check.state === "error",
   ).length;
+
+  useEffect(() => {
+    setRelayEnabled(relay.enabled);
+    setRelayUrl(relay.url);
+  }, [relay.enabled, relay.url]);
+
+  const submitRelay = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRelayFormError("");
+    try {
+      await app.configureRelay(relayEnabled, relayUrl, relayToken);
+      setRelayToken("");
+    } catch (error) {
+      setRelayFormError(String(error).replace(/^Error:\s*/, ""));
+    }
+  };
+
+  const relayTone = relay.connected
+    ? "ok"
+    : relay.enabled && relay.error
+      ? "danger"
+      : relay.enabled
+        ? "warn"
+        : "neutral";
+  const relayLabel = relay.connected
+    ? "已连接"
+    : relay.enabled && relay.error
+      ? "连接失败"
+      : relay.enabled
+        ? "连接中"
+        : "未启用";
 
   return (
     <div className="page">
@@ -157,6 +192,83 @@ export function SettingsView({ app }: { app: NeloaState }) {
               {discovery.active ? "正常" : "启动中"}
             </Badge>
           </Row>
+
+          <form
+            className="relay-config"
+            aria-busy={app.busyAction === "relay"}
+            onSubmit={(event) => void submitRelay(event)}
+          >
+            <div className="row relay-heading">
+              <div className="row-body">
+                <strong>自建中继</strong>
+                <span>
+                  {relay.connected
+                    ? `${relay.onlineDevices} 台已配对设备通过中继在线`
+                    : relay.enabled
+                      ? "正在保持与自建中继的连接"
+                      : "局域网不可达时自动回退，不经中继配对"}
+                </span>
+              </div>
+              <Badge tone={relayTone}>{relayLabel}</Badge>
+              <Switch
+                checked={relayEnabled}
+                disabled={app.busyAction === "relay"}
+                label={relayEnabled ? "关闭自建中继" : "启用自建中继"}
+                onChange={() => {
+                  setRelayEnabled((enabled) => !enabled);
+                  setRelayFormError("");
+                }}
+              />
+            </div>
+
+            {relayEnabled && (
+              <div className="relay-fields">
+                <label className="setting-field">
+                  <span>WebSocket 地址</span>
+                  <input
+                    value={relayUrl}
+                    inputMode="url"
+                    maxLength={2048}
+                    placeholder="wss://relay.example.com/v1/ws"
+                    spellCheck={false}
+                    required
+                    aria-describedby="relay-url-hint"
+                    onChange={(event) => setRelayUrl(event.target.value)}
+                  />
+                  <small id="relay-url-hint">公网必须使用 wss://；省略路径时自动补全。</small>
+                </label>
+                <label className="setting-field">
+                  <span>访问令牌</span>
+                  <input
+                    type="password"
+                    value={relayToken}
+                    autoComplete="off"
+                    maxLength={512}
+                    placeholder={relay.hasToken ? "已安全保存；留空表示不更换" : "至少 32 个字符"}
+                    spellCheck={false}
+                    required={!relay.hasToken}
+                    aria-describedby="relay-token-hint"
+                    aria-invalid={Boolean(relayFormError)}
+                    onChange={(event) => setRelayToken(event.target.value)}
+                  />
+                  <small id="relay-token-hint">令牌保存在系统凭据库，不写入诊断报告。</small>
+                </label>
+              </div>
+            )}
+
+            {(relayFormError || (relay.enabled && relay.error)) && (
+              <p className="relay-error" role="alert">
+                {relayFormError || relay.error}
+              </p>
+            )}
+
+            <div className="relay-actions">
+              <span>修改后保存；关闭中继不会影响局域网直连。</span>
+              <Button type="submit" size="sm" disabled={app.busyAction === "relay"}>
+                {app.busyAction === "relay" ? "保存中…" : "保存中继设置"}
+              </Button>
+            </div>
+          </form>
 
           <div className="advanced-actions">
             <div className="row-body">

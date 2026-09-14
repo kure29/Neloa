@@ -15,6 +15,8 @@ tauri-build = { version = "2.6.3", features = [] }
 [dependencies]
 hex = "0.4.3"
 hostname = "0.4.1"
+futures-util = "0.3.31"
+neloa-relay-protocol = { path = "../crates/neloa-relay-protocol" }
 parking_lot = "0.12.4"
 quinn = { version = "0.11.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
 rcgen = "0.14.5"
@@ -28,6 +30,8 @@ tauri-plugin-clipboard-manager = "2.3.3"
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-fs = "2.5.2"
 tokio = { version = "1.47", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+url = "2.5"
 uuid = { version = "1.18", features = ["v4"] }
 x25519-dalek = { version = "3.0.0-pre.3", features = ["getrandom", "static_secrets"] }
 zeroize = "1.8.1"

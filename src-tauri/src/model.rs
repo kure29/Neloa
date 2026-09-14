@@ -43,6 +43,8 @@ pub(crate) struct PeerDevice {
     pub addresses: Vec<String>,
     pub port: u16,
     pub last_seen_ms: u128,
+    #[serde(default)]
+    pub relay_available: bool,
     #[serde(skip)]
     pub service_fullname: String,
 }
@@ -95,6 +97,17 @@ pub(crate) struct NetworkStatus {
 pub(crate) struct SecuritySnapshot {
     pub network: NetworkStatus,
     pub trusted_devices: Vec<TrustedDevice>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RelaySnapshot {
+    pub enabled: bool,
+    pub url: String,
+    pub has_token: bool,
+    pub connected: bool,
+    pub online_devices: usize,
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -880,6 +880,89 @@
   border-top: 1px solid var(--line);
 }
 
+.relay-config {
+  display: flex;
+  flex-direction: column;
+}
+
+.relay-heading {
+  border: 0;
+}
+
+.relay-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: var(--s3);
+  padding: 0 var(--s4) var(--s3);
+}
+
+.setting-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--s1);
+}
+
+.setting-field > span {
+  color: var(--ink-2);
+  font-size: var(--text-small);
+  font-weight: 500;
+}
+
+.setting-field input {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-h);
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  outline: none;
+  background: var(--paper-0);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.setting-field input::placeholder {
+  color: var(--ink-3);
+}
+
+.setting-field input:focus-visible {
+  border-color: var(--ink-2);
+  box-shadow: 0 0 0 2px var(--paper-3);
+}
+
+.setting-field small {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  overflow-wrap: anywhere;
+}
+
+.relay-error {
+  margin: 0 var(--s4) var(--s3);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-control);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--text-small);
+  overflow-wrap: anywhere;
+}
+
+.relay-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--paper-2);
+}
+
+.relay-actions > span {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
 .advanced-actions {
   display: flex;
   align-items: center;

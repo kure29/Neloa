@@ -12,6 +12,7 @@ use zeroize::Zeroizing;
 // trust, and settings data are migrated separately during desktop startup.
 const KEYRING_SERVICE: &str = "app.neloa.desktop";
 const KEYRING_ACCOUNT: &str = "noise-static-key-v1";
+const RELAY_TOKEN_ACCOUNT: &str = "relay-access-token-v1";
 
 #[derive(Clone)]
 pub(crate) struct NoiseIdentity {
@@ -21,8 +22,7 @@ pub(crate) struct NoiseIdentity {
 
 impl NoiseIdentity {
     pub(crate) fn load_or_create() -> Result<Self, String> {
-        #[cfg(mobile)]
-        initialize_mobile_keyring()?;
+        initialize_keyring()?;
 
         let entry = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
             .map_err(|error| format!("无法连接系统凭据库：{error}"))?;
@@ -71,8 +71,38 @@ impl NoiseIdentity {
     }
 }
 
+pub(crate) fn load_relay_token() -> Result<Option<Zeroizing<String>>, String> {
+    initialize_keyring()?;
+    let entry = Entry::new(KEYRING_SERVICE, RELAY_TOKEN_ACCOUNT)
+        .map_err(|error| format!("无法连接系统凭据库：{error}"))?;
+    match entry.get_secret() {
+        Ok(bytes) => {
+            let bytes = Zeroizing::new(bytes);
+            String::from_utf8(bytes.to_vec())
+                .map(Zeroizing::new)
+                .map(Some)
+                .map_err(|_| "系统凭据库中的中继令牌不是有效文本".to_string())
+        }
+        Err(KeyringError::NoEntry) => Ok(None),
+        Err(error) => Err(format!("无法读取系统凭据库中的中继令牌：{error}")),
+    }
+}
+
+pub(crate) fn store_relay_token(token: &str) -> Result<(), String> {
+    initialize_keyring()?;
+    Entry::new(KEYRING_SERVICE, RELAY_TOKEN_ACCOUNT)
+        .map_err(|error| format!("无法连接系统凭据库：{error}"))?
+        .set_secret(token.as_bytes())
+        .map_err(|error| format!("无法将中继令牌写入系统凭据库：{error}"))
+}
+
+#[cfg(not(mobile))]
+fn initialize_keyring() -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(target_os = "android")]
-fn initialize_mobile_keyring() -> Result<(), String> {
+fn initialize_keyring() -> Result<(), String> {
     use std::sync::OnceLock;
 
     static INITIALIZED: OnceLock<Result<(), String>> = OnceLock::new();
@@ -87,7 +117,7 @@ fn initialize_mobile_keyring() -> Result<(), String> {
 }
 
 #[cfg(target_os = "ios")]
-fn initialize_mobile_keyring() -> Result<(), String> {
+fn initialize_keyring() -> Result<(), String> {
     use std::sync::OnceLock;
 
     static INITIALIZED: OnceLock<Result<(), String>> = OnceLock::new();
