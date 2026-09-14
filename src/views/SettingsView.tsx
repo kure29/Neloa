@@ -344,7 +344,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
       {security.network.error && (
         <p className="page-error">加密网络服务：{security.network.error}</p>
       )}
-      <p className="page-footnote">Neloa {app.local?.version ?? "0.1.8"}</p>
+      <p className="page-footnote">Neloa {app.local?.version ?? "0.1.9"}</p>
     </div>
   );
 }
