@@ -439,20 +439,19 @@ static IOS_DISCOVERY: OnceLock<IosDiscoveryContext> = OnceLock::new();
 type IosDiscoveryStart = unsafe extern "C" fn(*const std::ffi::c_char) -> i32;
 
 #[cfg(target_os = "ios")]
+static IOS_DISCOVERY_START: OnceLock<IosDiscoveryStart> = OnceLock::new();
+
+#[cfg(target_os = "ios")]
+#[no_mangle]
+pub extern "C" fn neloa_ios_discovery_register_start(start: IosDiscoveryStart) {
+    let _ = IOS_DISCOVERY_START.set(start);
+}
+
+#[cfg(target_os = "ios")]
 fn ios_discovery_start(config_json: &CString) -> Result<(), String> {
-    const START_SYMBOL: &[u8] = b"neloa_ios_discovery_start\0";
-    // The Swift adapter is linked into the application after Cargo produces
-    // the Rust dynamic library, so resolve its entry point when the app runs.
-    let pointer = unsafe {
-        libc::dlsym(
-            libc::RTLD_DEFAULT,
-            START_SYMBOL.as_ptr().cast::<std::ffi::c_char>(),
-        )
-    };
-    if pointer.is_null() {
-        return Err("找不到 iOS Bonjour 适配层".into());
-    }
-    let start: IosDiscoveryStart = unsafe { std::mem::transmute(pointer) };
+    let start = IOS_DISCOVERY_START
+        .get()
+        .ok_or_else(|| "iOS Bonjour 适配层尚未注册".to_string())?;
     let result = unsafe { start(config_json.as_ptr()) };
     (result == 0)
         .then_some(())
