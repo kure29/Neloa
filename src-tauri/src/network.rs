@@ -266,6 +266,7 @@ impl TransferFailure {
 }
 
 enum NetworkCommand {
+    UpdateLocalDevice(LocalDevice),
     BeginPairing {
         peer: PeerDevice,
         response: oneshot::Sender<Result<PairingRequest, String>>,
@@ -312,11 +313,19 @@ pub(crate) struct NetworkHandle {
 }
 
 impl NetworkHandle {
-    pub(crate) fn unavailable(error: String, port: u16, relay: RelayDirective) -> Self {
+    pub(crate) fn unavailable(
+        error: String,
+        port: u16,
+        relay: RelayDirective,
+        local: LocalDevice,
+    ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         drop(receiver);
-        let relay =
-            RelayClientHandle::unavailable(relay, "设备加密身份不可用，中继连接无法启动".into());
+        let relay = RelayClientHandle::unavailable(
+            relay,
+            local,
+            "设备加密身份不可用，中继连接无法启动".into(),
+        );
         Self {
             sender,
             status: Arc::new(RwLock::new(NetworkStatus {
@@ -341,7 +350,8 @@ impl NetworkHandle {
             relay_directive,
         } = startup;
         let (sender, receiver) = mpsc::unbounded_channel();
-        let (relay, relay_worker, relay_incoming) = relay_client_channel(relay_directive);
+        let (relay, relay_worker, relay_incoming) =
+            relay_client_channel(relay_directive, local.clone());
         let thread_relay = relay.clone();
         let status = Arc::new(RwLock::new(NetworkStatus {
             active: false,
@@ -404,6 +414,13 @@ impl NetworkHandle {
 
     pub(crate) fn configure_relay(&self, directive: RelayDirective) -> Result<(), String> {
         self.relay.configure(directive)
+    }
+
+    pub(crate) fn update_local_device(&self, device: LocalDevice) -> Result<(), String> {
+        self.relay.update_device(device.clone())?;
+        self.sender
+            .send(NetworkCommand::UpdateLocalDevice(device))
+            .map_err(|_| "加密网络服务未运行".to_string())
     }
 
     pub(crate) async fn begin_pairing(&self, peer: PeerDevice) -> Result<PairingRequest, String> {
@@ -528,7 +545,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
     } = runtime;
     let NetworkContext {
         app,
-        local,
+        mut local,
         identity,
         trust,
         clipboard,
@@ -539,7 +556,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
         quic: endpoint.clone(),
         relay: relay.clone(),
     };
-    tokio::spawn(relay_worker.run(app.clone(), local.clone(), trust.clone(), peers));
+    tokio::spawn(relay_worker.run(app.clone(), trust.clone(), peers));
     status.write().active = true;
     let pending: PendingConfirmations = Arc::new(Mutex::new(HashMap::new()));
     let pending_offers: PendingFileOffers = Arc::new(Mutex::new(HashMap::new()));
@@ -631,6 +648,9 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
             command = commands.recv() => {
                 let Some(command) = command else { return Ok(()); };
                 match command {
+                    NetworkCommand::UpdateLocalDevice(device) => {
+                        local = device;
+                    }
                     NetworkCommand::BeginPairing { peer, response } => {
                         let connector = connector.clone();
                         let context = PairingContext {
@@ -1606,6 +1626,13 @@ async fn receive_file_payload(
     cancel: &Arc<AtomicBool>,
     session: &mut NoiseSession,
 ) -> Result<PathBuf, TransferFailure> {
+    #[cfg(target_os = "ios")]
+    let download_dir = app
+        .path()
+        .document_dir()
+        .map_err(|error| TransferFailure::failed(format!("无法定位应用文稿目录：{error}")))?
+        .join("Neloa");
+    #[cfg(not(target_os = "ios"))]
     let download_dir = app
         .path()
         .download_dir()

@@ -31,6 +31,7 @@ use tauri_plugin_fs::{FsExt, OpenOptions};
 use uuid::Uuid;
 
 mod clipboard;
+mod device_settings;
 mod identity;
 mod model;
 mod network;
@@ -39,6 +40,7 @@ mod relay_settings;
 mod trust;
 
 use clipboard::ClipboardService;
+use device_settings::DeviceSettingsStore;
 use identity::NoiseIdentity;
 use model::{
     ClipboardSnapshot, DiagnosticCheck, DiagnosticPeer, DiagnosticsSnapshot, DiscoverySnapshot,
@@ -55,8 +57,9 @@ const SERVICE_PORT: u16 = 48_631;
 #[cfg(not(mobile))]
 const LEGACY_IDENTIFIER: &str = "app.neloa.desktop";
 #[cfg(not(mobile))]
-const PERSISTENT_DATA_FILES: [&str; 4] = [
+const PERSISTENT_DATA_FILES: [&str; 5] = [
     "device-id",
+    "device-settings.json",
     "trusted-devices.json",
     "settings.json",
     "relay-settings.json",
@@ -65,6 +68,8 @@ const PERSISTENT_DATA_FILES: [&str; 4] = [
 struct DiscoveryState {
     #[cfg(not(target_os = "ios"))]
     daemon: Option<ServiceDaemon>,
+    #[cfg(not(target_os = "ios"))]
+    service_host_name: String,
     peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     error: Arc<RwLock<Option<String>>>,
     advertising: Arc<AtomicBool>,
@@ -83,15 +88,45 @@ impl DiscoveryState {
             && self.browsing.load(Ordering::Relaxed)
             && self.error.read().is_none()
     }
+
+    #[cfg(not(target_os = "ios"))]
+    fn refresh_local_device(&self, local: &LocalDevice) -> Result<(), String> {
+        let daemon = self
+            .daemon
+            .as_ref()
+            .ok_or_else(|| "mDNS 发现服务未运行".to_string())?;
+        let service = discovery_service(local, &self.service_host_name)?;
+        match daemon.register(service) {
+            Ok(()) => {
+                self.advertising.store(true, Ordering::Relaxed);
+                if self.browsing.load(Ordering::Relaxed) {
+                    *self.error.write() = None;
+                }
+                Ok(())
+            }
+            Err(error) => {
+                self.advertising.store(false, Ordering::Relaxed);
+                let message = format!("无法刷新设备名称广播：{error}");
+                *self.error.write() = Some(message.clone());
+                Err(message)
+            }
+        }
+    }
+
+    #[cfg(target_os = "ios")]
+    fn refresh_local_device(&self, local: &LocalDevice) -> Result<(), String> {
+        start_ios_discovery(local)
+    }
 }
 
 struct AppState {
-    local: LocalDevice,
+    local: RwLock<LocalDevice>,
     discovery: DiscoveryState,
     network: NetworkHandle,
     trust: TrustStore,
     clipboard: ClipboardService,
     relay_settings: RelaySettingsStore,
+    device_settings: DeviceSettingsStore,
 }
 
 struct PreparedTransferSource {
@@ -206,7 +241,7 @@ fn load_or_create_device_id(app: &tauri::AppHandle) -> String {
     id
 }
 
-fn local_device(app: &tauri::AppHandle) -> LocalDevice {
+fn default_device_name() -> String {
     #[cfg(target_os = "ios")]
     let hostname = "iPhone".to_string();
     #[cfg(not(target_os = "ios"))]
@@ -216,9 +251,13 @@ fn local_device(app: &tauri::AppHandle) -> LocalDevice {
         .filter(|name| !name.trim().is_empty())
         .unwrap_or_else(|| "Neloa Device".into());
 
+    hostname
+}
+
+fn local_device(app: &tauri::AppHandle, name: String) -> LocalDevice {
     LocalDevice {
         id: load_or_create_device_id(app),
-        name: hostname,
+        name,
         platform: platform_name(),
         version: env!("CARGO_PKG_VERSION").into(),
     }
@@ -232,10 +271,39 @@ fn snapshot_from(
     let mut peers: Vec<_> = peers.read().values().cloned().collect();
     peers.sort_by_key(|peer| peer.name.to_lowercase());
     DiscoverySnapshot {
-        active,
+        active: active && error.read().is_none(),
         error: error.read().clone(),
         peers,
     }
+}
+
+#[cfg(not(target_os = "ios"))]
+fn discovery_service(local: &LocalDevice, host_name: &str) -> Result<ServiceInfo, String> {
+    let short_id = local.id.chars().take(8).collect::<String>();
+    let instance_name = format!("Neloa-{short_id}");
+    let protocol_version = PROTOCOL_VERSION.to_string();
+    let min_protocol_version = MIN_PROTOCOL_VERSION.to_string();
+    let capabilities = CAPABILITIES.join(",");
+    let properties = [
+        ("id", local.id.as_str()),
+        ("name", local.name.as_str()),
+        ("platform", local.platform.as_str()),
+        ("version", local.version.as_str()),
+        ("protocolVersion", protocol_version.as_str()),
+        ("minProtocolVersion", min_protocol_version.as_str()),
+        ("capabilities", capabilities.as_str()),
+    ];
+
+    ServiceInfo::new(
+        SERVICE_TYPE,
+        &instance_name,
+        host_name,
+        "",
+        SERVICE_PORT,
+        &properties[..],
+    )
+    .map(ServiceInfo::enable_addr_auto)
+    .map_err(|error| error.to_string())
 }
 
 #[cfg(not(target_os = "ios"))]
@@ -251,6 +319,7 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
             *error.write() = Some(format!("无法启动 mDNS：{problem}"));
             return DiscoveryState {
                 daemon: None,
+                service_host_name: String::new(),
                 peers,
                 error,
                 advertising: advertising_state,
@@ -259,34 +328,13 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
         }
     };
 
-    let short_id = local.id.chars().take(8).collect::<String>();
     let host_label = safe_host_label(&local.name);
     let host_name = format!("{host_label}.local.");
-    let instance_name = format!("Neloa-{short_id}");
-    let protocol_version = PROTOCOL_VERSION.to_string();
-    let min_protocol_version = MIN_PROTOCOL_VERSION.to_string();
-    let capabilities = CAPABILITIES.join(",");
-    let properties = [
-        ("id", local.id.as_str()),
-        ("name", local.name.as_str()),
-        ("platform", local.platform.as_str()),
-        ("version", local.version.as_str()),
-        ("protocolVersion", protocol_version.as_str()),
-        ("minProtocolVersion", min_protocol_version.as_str()),
-        ("capabilities", capabilities.as_str()),
-    ];
+    let service = discovery_service(local, &host_name);
 
-    let service = ServiceInfo::new(
-        SERVICE_TYPE,
-        &instance_name,
-        &host_name,
-        "",
-        SERVICE_PORT,
-        &properties[..],
-    )
-    .map(ServiceInfo::enable_addr_auto);
-
-    let advertising = match service.and_then(|service| daemon.register(service)) {
+    let advertising = match service
+        .and_then(|service| daemon.register(service).map_err(|error| error.to_string()))
+    {
         Ok(()) => true,
         Err(problem) => {
             *error.write() = Some(format!("无法广播本机设备：{problem}"));
@@ -396,6 +444,7 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
 
     DiscoveryState {
         daemon: Some(daemon),
+        service_host_name: host_name,
         peers,
         error,
         advertising: advertising_state,
@@ -480,6 +529,25 @@ fn ios_discovery_start(config_json: &CString) -> Result<(), String> {
     (result == 0)
         .then_some(())
         .ok_or_else(|| "无法启动 iOS Bonjour 适配层".to_string())
+}
+
+#[cfg(target_os = "ios")]
+fn start_ios_discovery(local: &LocalDevice) -> Result<(), String> {
+    let config = IosDiscoveryConfig {
+        service_type: "_neloa._udp",
+        port: SERVICE_PORT,
+        id: &local.id,
+        name: &local.name,
+        platform: &local.platform,
+        version: &local.version,
+        protocol_version: PROTOCOL_VERSION,
+        min_protocol_version: MIN_PROTOCOL_VERSION,
+        capabilities: CAPABILITIES.join(","),
+    };
+    serde_json::to_string(&config)
+        .map_err(|problem| format!("无法生成 Bonjour 配置：{problem}"))
+        .and_then(|json| CString::new(json).map_err(|problem| problem.to_string()))
+        .and_then(|json| ios_discovery_start(&json))
 }
 
 #[cfg(target_os = "ios")]
@@ -600,18 +668,6 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
     let error = Arc::new(RwLock::new(None));
     let advertising = Arc::new(AtomicBool::new(false));
     let browsing = Arc::new(AtomicBool::new(false));
-    let config = IosDiscoveryConfig {
-        service_type: "_neloa._udp",
-        port: SERVICE_PORT,
-        id: &local.id,
-        name: &local.name,
-        platform: &local.platform,
-        version: &local.version,
-        protocol_version: PROTOCOL_VERSION,
-        min_protocol_version: MIN_PROTOCOL_VERSION,
-        capabilities: CAPABILITIES.join(","),
-    };
-
     let state = DiscoveryState {
         peers: Arc::clone(&peers),
         error: Arc::clone(&error),
@@ -633,10 +689,7 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
         return state;
     }
 
-    let start_result = serde_json::to_string(&config)
-        .map_err(|problem| format!("无法生成 Bonjour 配置：{problem}"))
-        .and_then(|json| CString::new(json).map_err(|problem| problem.to_string()))
-        .and_then(|json| ios_discovery_start(&json));
+    let start_result = start_ios_discovery(local);
     if let Err(problem) = start_result {
         *error.write() = Some(problem);
     }
@@ -645,7 +698,29 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
 
 #[tauri::command]
 fn get_local_device(state: tauri::State<'_, AppState>) -> LocalDevice {
-    state.local.clone()
+    state.local.read().clone()
+}
+
+#[tauri::command(rename_all = "camelCase")]
+fn set_device_name(
+    app: tauri::AppHandle,
+    name: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<LocalDevice, String> {
+    let name = state.device_settings.update(&name)?;
+    let local = {
+        let mut local = state.local.write();
+        local.name = name;
+        local.clone()
+    };
+    if let Err(error) = state.discovery.refresh_local_device(&local) {
+        eprintln!("设备名称已保存，但发现广播刷新失败：{error}");
+    }
+    if let Err(error) = state.network.update_local_device(local.clone()) {
+        eprintln!("设备名称已保存，但网络服务刷新失败：{error}");
+    }
+    let _ = app.emit("local-device-changed", local.clone());
+    Ok(local)
 }
 
 #[tauri::command]
@@ -688,6 +763,7 @@ fn get_clipboard_snapshot(state: tauri::State<'_, AppState>) -> ClipboardSnapsho
 }
 
 fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
+    let local = state.local.read().clone();
     let network = state.network.status();
     let discovery_error = state.discovery.error.read().clone();
     let clipboard = state.clipboard.snapshot();
@@ -830,9 +906,9 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
             .then(|| "确认中继地址、令牌和 TLS 证书有效；服务端与客户端协议需保持一致".into()),
     };
 
-    let firewall_guidance = if state.local.platform == "windows" {
+    let firewall_guidance = if local.platform == "windows" {
         "在 Windows Defender 防火墙中允许 Neloa 访问“专用网络”；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。"
-    } else if state.local.platform == "ios" {
+    } else if local.platform == "ios" {
         "请在系统设置中允许 Neloa 访问本地网络；文件传输使用 UDP 48631，设备发现使用系统 Bonjour。"
     } else {
         "若 macOS 弹出网络访问提示，请允许 Neloa 接收入站连接；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。"
@@ -840,11 +916,11 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
 
     DiagnosticsSnapshot {
         generated_at_ms: unix_millis(),
-        app_version: state.local.version.clone(),
-        platform: state.local.platform.clone(),
+        app_version: local.version.clone(),
+        platform: local.platform.clone(),
         protocol_version: PROTOCOL_VERSION,
         min_protocol_version: MIN_PROTOCOL_VERSION,
-        device_id_prefix: state.local.id.chars().take(8).collect(),
+        device_id_prefix: local.id.chars().take(8).collect(),
         checks: vec![
             network_check,
             discovery_check,
@@ -1347,11 +1423,15 @@ pub fn run() {
             #[cfg(not(mobile))]
             migrate_legacy_app_data(app.handle())?;
 
-            let local = local_device(app.handle());
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("无法定位应用数据目录：{error}"))?;
+            let device_settings = DeviceSettingsStore::load(
+                app_data_dir.join("device-settings.json"),
+                default_device_name(),
+            )?;
+            let local = local_device(app.handle(), device_settings.name());
             let trust = TrustStore::load(app_data_dir.join("trusted-devices.json"))?;
             let clipboard =
                 ClipboardService::load(app.handle().clone(), app_data_dir.join("settings.json"));
@@ -1370,7 +1450,9 @@ pub fn run() {
                     peers: Arc::clone(&discovery.peers),
                     relay_directive,
                 }),
-                Err(error) => NetworkHandle::unavailable(error, SERVICE_PORT, relay_directive),
+                Err(error) => {
+                    NetworkHandle::unavailable(error, SERVICE_PORT, relay_directive, local.clone())
+                }
             };
             clipboard.configure(network.clone(), Arc::clone(&discovery.peers), trust.clone())?;
 
@@ -1385,17 +1467,19 @@ pub fn run() {
             }
 
             app.manage(AppState {
-                local,
+                local: RwLock::new(local),
                 discovery,
                 network,
                 trust,
                 clipboard,
                 relay_settings,
+                device_settings,
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_local_device,
+            set_device_name,
             get_discovery_snapshot,
             get_security_snapshot,
             get_relay_snapshot,

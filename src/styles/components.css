@@ -880,6 +880,18 @@
   border-top: 1px solid var(--line);
 }
 
+.device-name-config {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+}
+
+.device-name-field {
+  max-width: 34rem;
+}
+
 .relay-config {
   display: flex;
   flex-direction: column;
@@ -939,6 +951,10 @@
   overflow-wrap: anywhere;
 }
 
+.setting-field .setting-field-error {
+  color: var(--danger);
+}
+
 .relay-error {
   margin: 0 var(--s4) var(--s3);
   padding: var(--s2) var(--s3);
@@ -968,12 +984,6 @@
   align-items: center;
   gap: var(--s4);
   padding: var(--s3) var(--s4);
-}
-
-.row-value {
-  flex: none;
-  color: var(--ink-2);
-  font-size: var(--text-small);
 }
 
 .check {

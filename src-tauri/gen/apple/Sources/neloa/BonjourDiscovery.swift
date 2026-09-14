@@ -36,7 +36,7 @@ private extension String {
 }
 
 private final class NeloaBonjourDiscovery: NSObject, NetServiceDelegate {
-    private let config: DiscoveryConfig
+    private var config: DiscoveryConfig
     // NetService delivers delegate callbacks through a run loop, so keep both
     // Foundation Bonjour and NWBrowser on the application's main run loop.
     private let queue = DispatchQueue.main
@@ -63,6 +63,21 @@ private final class NeloaBonjourDiscovery: NSObject, NetServiceDelegate {
             } else {
                 reportStatus()
             }
+        }
+    }
+
+    func update(config nextConfig: DiscoveryConfig) {
+        queue.async { [self] in
+            guard config.id == nextConfig.id else { return }
+            config = nextConfig
+            publisher?.stop()
+            publisher = nil
+            advertising = false
+            publisherError = nil
+            if UIApplication.shared.applicationState == .active {
+                startPublishing()
+            }
+            reportStatus()
         }
     }
 
@@ -390,7 +405,10 @@ public func neloaIOSDiscoveryStart(_ configJSON: UnsafePointer<CChar>?) -> Int32
           let config = try? JSONDecoder().decode(DiscoveryConfig.self, from: data) else {
         return 1
     }
-    guard NeloaBonjourRuntime.discovery == nil else { return 2 }
+    if let discovery = NeloaBonjourRuntime.discovery {
+        discovery.update(config: config)
+        return 0
+    }
     let discovery = NeloaBonjourDiscovery(config: config)
     NeloaBonjourRuntime.discovery = discovery
     discovery.start()

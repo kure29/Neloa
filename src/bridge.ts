@@ -30,6 +30,7 @@ export const isDesktopRuntime = "__TAURI_INTERNALS__" in window;
 
 let previewTrustedDevices: TrustedDevice[] = [];
 let previewClipboardEnabled = false;
+let previewDeviceName: string | null = null;
 let previewRelay: RelaySnapshot = {
   enabled: false,
   url: "",
@@ -115,7 +116,7 @@ function previewDevice(): LocalDevice {
   };
   return {
     id: "preview-device",
-    name: names[platform],
+    name: previewDeviceName ?? names[platform],
     platform,
     version: "0.1.9-preview",
   };
@@ -125,6 +126,19 @@ export async function getLocalDevice(): Promise<LocalDevice> {
   if (!isDesktopRuntime) return previewDevice();
   return invoke<LocalDevice>("get_local_device");
 }
+
+export async function setDeviceName(name: string): Promise<LocalDevice> {
+  if (!isDesktopRuntime) {
+    previewDeviceName = name.trim();
+    const device = previewDevice();
+    emitPreview("local-device-changed", device);
+    return device;
+  }
+  return invoke<LocalDevice>("set_device_name", { name });
+}
+
+export const onLocalDeviceChanged = (callback: (device: LocalDevice) => void) =>
+  onAppEvent("local-device-changed", callback);
 
 export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
   if (!isDesktopRuntime) {

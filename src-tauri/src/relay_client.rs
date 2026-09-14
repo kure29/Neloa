@@ -41,6 +41,7 @@ use crate::{
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const OPEN_TUNNEL_TIMEOUT: Duration = Duration::from_secs(10);
 const RECONNECT_DELAY: Duration = Duration::from_secs(3);
+const RECONFIGURE_DELAY: Duration = Duration::from_millis(200);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(25);
 const COMMAND_CAPACITY: usize = 32;
 const INCOMING_TUNNEL_CAPACITY: usize = 16;
@@ -87,12 +88,14 @@ enum ConnectionExit {
 #[derive(Clone)]
 pub(crate) struct RelayClientHandle {
     directive: watch::Sender<RelayDirective>,
+    device: watch::Sender<LocalDevice>,
     commands: mpsc::Sender<OpenTunnelRequest>,
     status: std::sync::Arc<RwLock<RelaySnapshot>>,
 }
 
 pub(crate) struct RelayClientWorker {
     directive: watch::Receiver<RelayDirective>,
+    device: watch::Receiver<LocalDevice>,
     commands: mpsc::Receiver<OpenTunnelRequest>,
     incoming: mpsc::Sender<IncomingRelayTunnel>,
     status: std::sync::Arc<RwLock<RelaySnapshot>>,
@@ -100,6 +103,7 @@ pub(crate) struct RelayClientWorker {
 
 pub(crate) fn relay_client_channel(
     directive: RelayDirective,
+    device: LocalDevice,
 ) -> (
     RelayClientHandle,
     RelayClientWorker,
@@ -108,16 +112,19 @@ pub(crate) fn relay_client_channel(
     let initial = directive.initial_snapshot();
     let status = std::sync::Arc::new(RwLock::new(initial));
     let (directive_sender, directive_receiver) = watch::channel(directive);
+    let (device_sender, device_receiver) = watch::channel(device);
     let (command_sender, command_receiver) = mpsc::channel(COMMAND_CAPACITY);
     let (incoming_sender, incoming_receiver) = mpsc::channel(INCOMING_TUNNEL_CAPACITY);
     (
         RelayClientHandle {
             directive: directive_sender,
+            device: device_sender,
             commands: command_sender,
             status: std::sync::Arc::clone(&status),
         },
         RelayClientWorker {
             directive: directive_receiver,
+            device: device_receiver,
             commands: command_receiver,
             incoming: incoming_sender,
             status,
@@ -127,8 +134,13 @@ pub(crate) fn relay_client_channel(
 }
 
 impl RelayClientHandle {
-    pub(crate) fn unavailable(directive: RelayDirective, error: String) -> Self {
+    pub(crate) fn unavailable(
+        directive: RelayDirective,
+        device: LocalDevice,
+        error: String,
+    ) -> Self {
         let (directive_sender, _) = watch::channel(directive.clone());
+        let (device_sender, _) = watch::channel(device);
         let (command_sender, command_receiver) = mpsc::channel(COMMAND_CAPACITY);
         drop(command_receiver);
         let mut status = directive.initial_snapshot();
@@ -136,6 +148,7 @@ impl RelayClientHandle {
         status.error = Some(error);
         Self {
             directive: directive_sender,
+            device: device_sender,
             commands: command_sender,
             status: std::sync::Arc::new(RwLock::new(status)),
         }
@@ -151,6 +164,12 @@ impl RelayClientHandle {
 
     pub(crate) fn status(&self) -> RelaySnapshot {
         self.status.read().clone()
+    }
+
+    pub(crate) fn update_device(&self, device: LocalDevice) -> Result<(), String> {
+        self.device
+            .send(device)
+            .map_err(|_| "中继连接服务未运行".to_string())
     }
 
     pub(crate) async fn open_tunnel(&self, target_id: String) -> Result<RelayTunnel, String> {
@@ -177,7 +196,6 @@ impl RelayClientWorker {
     pub(crate) async fn run(
         mut self,
         app: AppHandle,
-        local: LocalDevice,
         trust: TrustStore,
         peers: std::sync::Arc<RwLock<HashMap<String, PeerDevice>>>,
     ) {
@@ -208,6 +226,7 @@ impl RelayClientWorker {
                     }
                 }
                 RelayDirective::Connect(config) => {
+                    let local = self.device.borrow_and_update().clone();
                     let mut connecting = initial_snapshot.clone();
                     connecting.error = None;
                     publish_status(&app, &self.status, connecting);
@@ -218,6 +237,7 @@ impl RelayClientWorker {
                         &peers,
                         &self.status,
                         &mut self.directive,
+                        &mut self.device,
                         &mut self.commands,
                         &self.incoming,
                         config,
@@ -226,6 +246,7 @@ impl RelayClientWorker {
                     {
                         ConnectionExit::Reconfigure => {
                             clear_relay_presence(&peers);
+                            sleep(RECONFIGURE_DELAY).await;
                         }
                         ConnectionExit::Failed(error) => {
                             clear_relay_presence(&peers);
@@ -275,6 +296,7 @@ async fn run_connection(
     peers: &std::sync::Arc<RwLock<HashMap<String, PeerDevice>>>,
     status: &std::sync::Arc<RwLock<RelaySnapshot>>,
     directive: &mut watch::Receiver<RelayDirective>,
+    device: &mut watch::Receiver<LocalDevice>,
     commands: &mut mpsc::Receiver<OpenTunnelRequest>,
     incoming: &mpsc::Sender<IncomingRelayTunnel>,
     config: RelayConnectionConfig,
@@ -322,11 +344,22 @@ async fn run_connection(
     loop {
         tokio::select! {
             changed = directive.changed() => {
-                return if changed.is_ok() {
+                let exit = if changed.is_ok() {
                     ConnectionExit::Reconfigure
                 } else {
                     ConnectionExit::Failed("中继设置服务已停止".into())
                 };
+                let _ = writer.send(Message::Close(None)).await;
+                return exit;
+            }
+            changed = device.changed() => {
+                let exit = if changed.is_ok() {
+                    ConnectionExit::Reconfigure
+                } else {
+                    ConnectionExit::Failed("设备设置服务已停止".into())
+                };
+                let _ = writer.send(Message::Close(None)).await;
+                return exit;
             }
             request = commands.recv() => {
                 let Some(request) = request else {
