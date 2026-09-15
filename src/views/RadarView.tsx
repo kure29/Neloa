@@ -37,6 +37,12 @@ export function RadarView({ app }: { app: NeloaState }) {
   const radius = useStageRadius(stageRef);
   const peers = app.discovery.peers;
   const ringCount = Math.max(1, Math.ceil(peers.length / PEERS_PER_RING));
+  const selectedSize = app.selectedFiles.reduce((total, file) => total + file.size, 0);
+  const fileSummary = app.selectedFiles.length === 0
+    ? app.shell === "desktop" ? "选择文件，或拖到软件窗口" : "选择要发送的文件（可多选）"
+    : app.selectedFiles.length === 1
+      ? `${app.selectedFiles[0].name} · ${formatBytes(selectedSize)}`
+      : `${app.selectedFiles.length} 个文件 · ${formatBytes(selectedSize)}`;
 
   return (
     <div className="radar-view">
@@ -119,25 +125,45 @@ export function RadarView({ app }: { app: NeloaState }) {
       </div>
 
       <div className="send-dock">
-        <div className="dock-file">
-          <button
-            className={cx("file-picker", app.selectedFile && "has-file")}
-            onClick={() => void app.pickFile()}
-          >
-            <Icon name={app.selectedFile ? "file" : "plus"} />
-            <span className="truncate">
-              {app.selectedFile
-                ? `${app.selectedFile.name} · ${formatBytes(app.selectedFile.size)}`
-                : "选择要发送的文件"}
-            </span>
-          </button>
-          {app.selectedFile && (
-            <IconButton
-              className="file-clear"
-              icon="close"
-              label={`移除 ${app.selectedFile.name}`}
-              onClick={app.clearFile}
-            />
+        <div className="dock-selection">
+          <div className="dock-file">
+            <button
+              className={cx("file-picker", app.selectedFiles.length > 0 && "has-file")}
+              disabled={app.busyAction === "file"}
+              aria-describedby="send-file-hint"
+              onClick={() => void app.pickFiles()}
+            >
+              <Icon name={app.selectedFiles.length > 0 ? "file" : "plus"} />
+              <span className="truncate">{fileSummary}</span>
+            </button>
+            {app.selectedFiles.length > 0 && (
+              <IconButton
+                className="file-clear"
+                icon="trash"
+                label="清空待发送文件"
+                disabled={app.busyAction === "file"}
+                onClick={app.clearSelectedFiles}
+              />
+            )}
+          </div>
+
+          {app.selectedFiles.length > 0 && (
+            <ul className="selected-file-list" aria-label="待发送文件" aria-live="polite">
+              {app.selectedFiles.map((file) => (
+                <li key={file.path}>
+                  <Icon name="file" size={15} />
+                  <span className="truncate" title={file.name}>{file.name}</span>
+                  <small>{formatBytes(file.size)}</small>
+                  <IconButton
+                    className="selected-file-remove"
+                    icon="close"
+                    label={`移除 ${file.name}`}
+                    disabled={app.busyAction === "file"}
+                    onClick={() => app.removeSelectedFile(file.path)}
+                  />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
@@ -150,7 +176,7 @@ export function RadarView({ app }: { app: NeloaState }) {
           {app.primaryAction.label}
         </Button>
 
-        <p className={cx("dock-hint", `tone-${app.primaryAction.tone}`)}>
+        <p id="send-file-hint" className={cx("dock-hint", `tone-${app.primaryAction.tone}`)}>
           {app.primaryAction.hint}
         </p>
       </div>

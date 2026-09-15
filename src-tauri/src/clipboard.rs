@@ -290,17 +290,12 @@ fn run_clipboard(
             );
             continue;
         }
+        let bytes = current.len();
         if let Err(message) = context
             .network
             .broadcast_clipboard(peers, event_id.clone(), current)
         {
-            emit_local_status(
-                &app,
-                event_id,
-                last_text.as_ref().map_or(0, String::len),
-                "failed",
-                &message,
-            );
+            emit_local_status(&app, event_id, bytes, "failed", &message);
         }
     }
 }

@@ -4,10 +4,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     task::{Context, Poll},
     thread,
     time::{Duration, Instant},
@@ -28,8 +25,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
-    sync::{mpsc, oneshot},
-    time::{sleep, timeout},
+    sync::{mpsc, oneshot, watch},
+    time::timeout,
 };
 use uuid::Uuid;
 
@@ -63,7 +60,8 @@ const REPAIR_REQUIRED_MESSAGE: &str = "两端信任状态不一致，请重新�
 
 type PendingConfirmations = Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>;
 type PendingFileOffers = Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>;
-type ActiveTransfers = Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>;
+type TransferCancellation = watch::Receiver<bool>;
+type ActiveTransfers = Arc<Mutex<HashMap<String, watch::Sender<bool>>>>;
 
 enum SessionSend {
     Quic(SendStream),
@@ -694,8 +692,8 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                         transfer_id,
                     } => {
                         let file_connector = connector.clone();
-                        let cancel = Arc::new(AtomicBool::new(false));
-                        active_transfers.lock().insert(transfer_id.clone(), Arc::clone(&cancel));
+                        let (cancel_sender, cancel) = watch::channel(false);
+                        active_transfers.lock().insert(transfer_id.clone(), cancel_sender);
                         let context = FileTransferContext {
                             app: app.clone(),
                             local: local.clone(),
@@ -736,8 +734,8 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                         let cancelled = active_transfers
                             .lock()
                             .get(&transfer_id)
-                            .map(|flag| {
-                                flag.store(true, Ordering::Relaxed);
+                            .map(|cancel| {
+                                cancel.send_replace(true);
                                 true
                             })
                             .unwrap_or(false);
@@ -1037,7 +1035,7 @@ async fn outgoing_test_message(
 
     finish_stream(&mut session.send)?;
     let at_ms = unix_millis();
-    context.trust.touch(&peer.id, at_ms)?;
+    context.trust.touch(&peer.id, at_ms).await?;
     Ok(TestMessageEvent {
         id,
         peer_id: peer.id,
@@ -1081,7 +1079,7 @@ async fn incoming_test_message(
     .await?;
     finish_stream(&mut session.send)?;
     let at_ms = unix_millis();
-    trust.touch(&session.peer.id, at_ms)?;
+    trust.touch(&session.peer.id, at_ms).await?;
     app.emit(
         "test-message-received",
         TestMessageEvent {
@@ -1158,7 +1156,7 @@ async fn outgoing_clipboard_update(
         Err(_) => return Err("等待剪贴板同步确认超时".to_string()),
     };
     finish_stream(&mut session.send)?;
-    context.trust.touch(&peer.id, unix_millis())?;
+    context.trust.touch(&peer.id, unix_millis()).await?;
     Ok(message)
 }
 
@@ -1215,7 +1213,7 @@ async fn incoming_clipboard_update(
     .await;
 
     if applied {
-        trust.touch(&session.peer.id, unix_millis())?;
+        trust.touch(&session.peer.id, unix_millis()).await?;
     }
     if applied || !accepted {
         app.emit(
@@ -1241,7 +1239,7 @@ async fn run_outgoing_file_transfer(
     context: FileTransferContext,
     peer: PeerDevice,
     info: TransferInfo,
-    cancel: Arc<AtomicBool>,
+    cancel: TransferCancellation,
 ) {
     let transfer_id = info.id.clone();
     let Some(path) = info.path.clone() else {
@@ -1256,15 +1254,7 @@ async fn run_outgoing_file_transfer(
         context.active_transfers.lock().remove(&transfer_id);
         return;
     };
-    let outcome = outgoing_file_transfer(
-        connector,
-        &context,
-        &peer,
-        &path,
-        &info,
-        Arc::clone(&cancel),
-    )
-    .await;
+    let outcome = outgoing_file_transfer(connector, &context, &peer, &path, &info, &cancel).await;
     let result_path = (!info.cleanup_source).then(|| path.clone());
 
     match outcome {
@@ -1297,15 +1287,15 @@ async fn outgoing_file_transfer(
     peer: &PeerDevice,
     path: &Path,
     info: &TransferInfo,
-    cancel: Arc<AtomicBool>,
+    cancel: &TransferCancellation,
 ) -> Result<String, TransferFailure> {
     let trusted = context
         .trust
         .find(&peer.id)
         .ok_or_else(|| TransferFailure::failed("请先完成设备配对"))?;
     let expected_key = decode_public_key(&trusted.public_key).map_err(TransferFailure::failed)?;
-    let sha256 = hash_file(&context.app, info, path, Arc::clone(&cancel)).await?;
-    ensure_not_cancelled(&cancel)?;
+    let sha256 = hash_file(&context.app, info, path, cancel).await?;
+    ensure_not_cancelled(cancel)?;
 
     let (send, receive) = connector
         .connect(peer)
@@ -1335,7 +1325,7 @@ async fn outgoing_file_transfer(
         &mut session.receive,
         &mut session.transport,
         FILE_OFFER_TIMEOUT,
-        &cancel,
+        cancel,
         "等待对端确认接收超时",
         "文件发送已取消",
     )
@@ -1362,13 +1352,14 @@ async fn outgoing_file_transfer(
         .await
         .map_err(|error| TransferFailure::failed(format!("无法打开待发送文件：{error}")))?;
     let mut buffer = vec![0_u8; FILE_CHUNK_SIZE];
+    let mut chunk_buffers = ChunkWriteBuffers::new();
     let mut transferred = 0_u64;
     let mut send_hash = Sha256::new();
     let started = Instant::now();
     let mut last_progress = Instant::now() - PROGRESS_INTERVAL;
 
     loop {
-        if cancel.load(Ordering::Relaxed) {
+        if is_cancelled(cancel) {
             let _ = write_encrypted(
                 &mut session.send,
                 &mut session.transport,
@@ -1396,10 +1387,11 @@ async fn outgoing_file_transfer(
             &mut session.transport,
             transferred,
             &buffer[..read],
+            &mut chunk_buffers,
         )
         .await
         .map_err(|error| {
-            if cancel.load(Ordering::Relaxed) {
+            if is_cancelled(cancel) {
                 TransferFailure::cancelled("文件发送已取消")
             } else {
                 TransferFailure::failed(format!("文件传输中断：{error}"))
@@ -1436,7 +1428,7 @@ async fn outgoing_file_transfer(
         &mut session.receive,
         &mut session.transport,
         FILE_IDLE_TIMEOUT,
-        &cancel,
+        cancel,
         "等待接收端校验结果超时",
         "文件发送已取消",
     )
@@ -1457,6 +1449,7 @@ async fn outgoing_file_transfer(
     context
         .trust
         .touch(&peer.id, unix_millis())
+        .await
         .map_err(TransferFailure::failed)?;
     Ok(sent_sha256)
 }
@@ -1498,13 +1491,13 @@ async fn handle_incoming_file_transfer(
         path: None,
         cleanup_source: false,
     };
-    let cancel = Arc::new(AtomicBool::new(false));
+    let (cancel_sender, cancel) = watch::channel(false);
     {
         let mut active = context.active_transfers.lock();
         if active.contains_key(&transfer_id) {
             return Err("检测到重复的文件传输标识".to_string());
         }
-        active.insert(transfer_id.clone(), Arc::clone(&cancel));
+        active.insert(transfer_id.clone(), cancel_sender);
     }
 
     let result = async {
@@ -1578,7 +1571,7 @@ async fn handle_incoming_file_transfer(
                     wait_stream_stopped(&mut session.send),
                 )
                 .await;
-                context.trust.touch(&info.peer_id, unix_millis())?;
+                context.trust.touch(&info.peer_id, unix_millis()).await?;
                 emit_transfer_result(
                     &context.app,
                     &info,
@@ -1623,7 +1616,7 @@ async fn receive_file_payload(
     app: &AppHandle,
     info: &TransferInfo,
     expected_sha256: &str,
-    cancel: &Arc<AtomicBool>,
+    cancel: &TransferCancellation,
     session: &mut NoiseSession,
 ) -> Result<PathBuf, TransferFailure> {
     #[cfg(target_os = "ios")]
@@ -1652,10 +1645,11 @@ async fn receive_file_payload(
     let receive_result = async {
         let mut transferred = 0_u64;
         let mut hasher = Sha256::new();
+        let mut record_buffers = SecureRecordBuffers::new();
         let started = Instant::now();
         let mut last_progress = Instant::now() - PROGRESS_INTERVAL;
         loop {
-            if cancel.load(Ordering::Relaxed) {
+            if is_cancelled(cancel) {
                 let _ = stop_receive(&mut session.receive);
                 let _ = reset_send(&mut session.send);
                 return Err(TransferFailure::cancelled("文件接收已取消"));
@@ -1663,6 +1657,7 @@ async fn receive_file_payload(
             let record = read_record_or_cancel(
                 &mut session.receive,
                 &mut session.transport,
+                &mut record_buffers,
                 FILE_IDLE_TIMEOUT,
                 cancel,
                 "文件传输长时间没有数据",
@@ -1670,7 +1665,7 @@ async fn receive_file_payload(
             )
             .await?;
             match record {
-                SecureRecord::FileChunk { offset, bytes } => {
+                BorrowedSecureRecord::FileChunk { offset, bytes } => {
                     if offset != transferred {
                         return Err(TransferFailure::failed("文件分块顺序或偏移无效"));
                     }
@@ -1679,16 +1674,16 @@ async fn receive_file_payload(
                     {
                         return Err(TransferFailure::failed("文件分块大小无效"));
                     }
-                    file.write_all(&bytes).await.map_err(|error| {
+                    file.write_all(bytes).await.map_err(|error| {
                         TransferFailure::failed(format!("写入临时文件失败：{error}"))
                     })?;
-                    hasher.update(&bytes);
+                    hasher.update(bytes);
                     transferred += bytes.len() as u64;
                     if should_emit_progress(&mut last_progress, transferred == info.size) {
                         emit_transfer_progress(app, info, "transferring", transferred, started);
                     }
                 }
-                SecureRecord::Control(WireMessage::FileComplete { size, sha256 }) => {
+                BorrowedSecureRecord::Control(WireMessage::FileComplete { size, sha256 }) => {
                     if size != info.size || transferred != info.size {
                         return Err(TransferFailure::failed("接收文件大小与发送信息不一致"));
                     }
@@ -1707,7 +1702,7 @@ async fn receive_file_payload(
                     return publish_without_overwrite(&temporary_path, &download_dir, &info.name)
                         .await;
                 }
-                SecureRecord::Control(WireMessage::FileCancel { message }) => {
+                BorrowedSecureRecord::Control(WireMessage::FileCancel { message }) => {
                     return Err(TransferFailure::cancelled(message));
                 }
                 _ => return Err(TransferFailure::failed("文件会话收到了错误的消息类型")),
@@ -1726,7 +1721,7 @@ async fn hash_file(
     app: &AppHandle,
     info: &TransferInfo,
     path: &Path,
-    cancel: Arc<AtomicBool>,
+    cancel: &TransferCancellation,
 ) -> Result<String, TransferFailure> {
     let mut file = File::open(path)
         .await
@@ -1737,7 +1732,7 @@ async fn hash_file(
     let started = Instant::now();
     let mut last_progress = Instant::now() - PROGRESS_INTERVAL;
     loop {
-        ensure_not_cancelled(&cancel)?;
+        ensure_not_cancelled(cancel)?;
         let read = file
             .read(&mut buffer)
             .await
@@ -1847,17 +1842,26 @@ fn validate_sha256(value: &str) -> Result<(), String> {
     }
 }
 
-fn ensure_not_cancelled(cancel: &AtomicBool) -> Result<(), TransferFailure> {
-    if cancel.load(Ordering::Relaxed) {
+fn is_cancelled(cancel: &TransferCancellation) -> bool {
+    *cancel.borrow()
+}
+
+fn ensure_not_cancelled(cancel: &TransferCancellation) -> Result<(), TransferFailure> {
+    if is_cancelled(cancel) {
         Err(TransferFailure::cancelled("文件发送已取消"))
     } else {
         Ok(())
     }
 }
 
-async fn wait_for_cancel(cancel: &AtomicBool) {
-    while !cancel.load(Ordering::Relaxed) {
-        sleep(Duration::from_millis(40)).await;
+async fn wait_for_cancel(mut cancel: TransferCancellation) {
+    if *cancel.borrow_and_update() {
+        return;
+    }
+    while cancel.changed().await.is_ok() {
+        if *cancel.borrow_and_update() {
+            return;
+        }
     }
 }
 
@@ -1865,7 +1869,7 @@ async fn read_control_or_cancel(
     receive: &mut SessionReceive,
     transport: &mut TransportState,
     duration: Duration,
-    cancel: &AtomicBool,
+    cancel: &TransferCancellation,
     timeout_message: &str,
     cancel_message: &str,
 ) -> Result<WireMessage, TransferFailure> {
@@ -1875,25 +1879,26 @@ async fn read_control_or_cancel(
                 .map_err(|_| TransferFailure::failed(timeout_message))?
                 .map_err(TransferFailure::failed)
         }
-        _ = wait_for_cancel(cancel) => Err(TransferFailure::cancelled(cancel_message)),
+        _ = wait_for_cancel(cancel.clone()) => Err(TransferFailure::cancelled(cancel_message)),
     }
 }
 
-async fn read_record_or_cancel(
+async fn read_record_or_cancel<'a>(
     receive: &mut SessionReceive,
     transport: &mut TransportState,
+    buffers: &'a mut SecureRecordBuffers,
     duration: Duration,
-    cancel: &AtomicBool,
+    cancel: &TransferCancellation,
     timeout_message: &str,
     cancel_message: &str,
-) -> Result<SecureRecord, TransferFailure> {
+) -> Result<BorrowedSecureRecord<'a>, TransferFailure> {
     tokio::select! {
-        result = timeout(duration, read_secure_record(receive, transport)) => {
+        result = timeout(duration, read_secure_record_buffered(receive, transport, buffers)) => {
             result
                 .map_err(|_| TransferFailure::failed(timeout_message))?
                 .map_err(TransferFailure::failed)
         }
-        _ = wait_for_cancel(cancel) => Err(TransferFailure::cancelled(cancel_message)),
+        _ = wait_for_cancel(cancel.clone()) => Err(TransferFailure::cancelled(cancel_message)),
     }
 }
 
@@ -2037,6 +2042,39 @@ enum WireMessage {
 enum SecureRecord {
     Control(WireMessage),
     FileChunk { offset: u64, bytes: Vec<u8> },
+}
+
+enum BorrowedSecureRecord<'a> {
+    Control(WireMessage),
+    FileChunk { offset: u64, bytes: &'a [u8] },
+}
+
+struct ChunkWriteBuffers {
+    payload: Vec<u8>,
+    encrypted: Vec<u8>,
+}
+
+impl ChunkWriteBuffers {
+    fn new() -> Self {
+        Self {
+            payload: Vec::with_capacity(9 + FILE_CHUNK_SIZE),
+            encrypted: vec![0_u8; 9 + FILE_CHUNK_SIZE + 64],
+        }
+    }
+}
+
+struct SecureRecordBuffers {
+    encrypted: Vec<u8>,
+    payload: Vec<u8>,
+}
+
+impl SecureRecordBuffers {
+    fn new() -> Self {
+        Self {
+            encrypted: Vec::with_capacity(FILE_CHUNK_SIZE + 9 + 64),
+            payload: vec![0_u8; FILE_CHUNK_SIZE + 9 + 64],
+        }
+    }
 }
 
 async fn initiator_handshake(
@@ -2240,7 +2278,10 @@ async fn read_encrypted(
 ) -> Result<WireMessage, String> {
     match read_secure_record(receive, transport).await? {
         SecureRecord::Control(message) => Ok(message),
-        SecureRecord::FileChunk { .. } => Err("控制会话中收到了文件分块".to_string()),
+        SecureRecord::FileChunk { offset, bytes } => Err(format!(
+            "控制会话中收到了文件分块（偏移 {offset}，{} 字节）",
+            bytes.len()
+        )),
     }
 }
 
@@ -2249,19 +2290,19 @@ async fn write_encrypted_chunk(
     transport: &mut TransportState,
     offset: u64,
     bytes: &[u8],
+    buffers: &mut ChunkWriteBuffers,
 ) -> Result<(), String> {
     if bytes.is_empty() || bytes.len() > FILE_CHUNK_SIZE {
         return Err("文件分块大小无效".to_string());
     }
-    let mut payload = Vec::with_capacity(9 + bytes.len());
-    payload.push(0);
-    payload.extend_from_slice(&offset.to_be_bytes());
-    payload.extend_from_slice(bytes);
-    let mut encrypted = vec![0_u8; payload.len() + 64];
+    buffers.payload.clear();
+    buffers.payload.push(0);
+    buffers.payload.extend_from_slice(&offset.to_be_bytes());
+    buffers.payload.extend_from_slice(bytes);
     let size = transport
-        .write_message(&payload, &mut encrypted)
+        .write_message(&buffers.payload, &mut buffers.encrypted)
         .map_err(|error| format!("无法加密文件分块：{error}"))?;
-    write_frame(send, &encrypted[..size]).await
+    write_frame(send, &buffers.encrypted[..size]).await
 }
 
 async fn read_secure_record(
@@ -2273,7 +2314,31 @@ async fn read_secure_record(
     let size = transport
         .read_message(&encrypted, &mut payload)
         .map_err(|error| format!("无法解密或验证消息：{error}"))?;
-    let payload = &payload[..size];
+    match decode_secure_payload(&payload[..size])? {
+        BorrowedSecureRecord::Control(message) => Ok(SecureRecord::Control(message)),
+        BorrowedSecureRecord::FileChunk { offset, bytes } => Ok(SecureRecord::FileChunk {
+            offset,
+            bytes: bytes.to_vec(),
+        }),
+    }
+}
+
+async fn read_secure_record_buffered<'a>(
+    receive: &mut SessionReceive,
+    transport: &mut TransportState,
+    buffers: &'a mut SecureRecordBuffers,
+) -> Result<BorrowedSecureRecord<'a>, String> {
+    read_frame_into(receive, &mut buffers.encrypted).await?;
+    if buffers.payload.len() < buffers.encrypted.len() {
+        buffers.payload.resize(buffers.encrypted.len(), 0);
+    }
+    let size = transport
+        .read_message(&buffers.encrypted, &mut buffers.payload)
+        .map_err(|error| format!("无法解密或验证消息：{error}"))?;
+    decode_secure_payload(&buffers.payload[..size])
+}
+
+fn decode_secure_payload(payload: &[u8]) -> Result<BorrowedSecureRecord<'_>, String> {
     if payload.first() == Some(&0) {
         if payload.len() < 9 {
             return Err("加密文件分块头部不完整".to_string());
@@ -2283,13 +2348,13 @@ async fn read_secure_record(
                 .try_into()
                 .map_err(|_| "文件分块偏移无效".to_string())?,
         );
-        Ok(SecureRecord::FileChunk {
+        Ok(BorrowedSecureRecord::FileChunk {
             offset,
-            bytes: payload[9..].to_vec(),
+            bytes: &payload[9..],
         })
     } else {
         serde_json::from_slice(payload)
-            .map(SecureRecord::Control)
+            .map(BorrowedSecureRecord::Control)
             .map_err(|error| format!("解密后的消息格式无效：{error}"))
     }
 }
@@ -2308,6 +2373,12 @@ async fn write_frame(send: &mut SessionSend, bytes: &[u8]) -> Result<(), String>
 }
 
 async fn read_frame(receive: &mut SessionReceive) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    read_frame_into(receive, &mut bytes).await?;
+    Ok(bytes)
+}
+
+async fn read_frame_into(receive: &mut SessionReceive, bytes: &mut Vec<u8>) -> Result<(), String> {
     let size = receive
         .read_u32()
         .await
@@ -2315,12 +2386,12 @@ async fn read_frame(receive: &mut SessionReceive) -> Result<Vec<u8>, String> {
     if size > FRAME_LIMIT {
         return Err("拒绝超过大小限制的协议消息".to_string());
     }
-    let mut bytes = vec![0_u8; size];
+    bytes.resize(size, 0);
     receive
-        .read_exact(&mut bytes)
+        .read_exact(bytes)
         .await
         .map_err(|error| transport_read_error("读取完整消息", error))?;
-    Ok(bytes)
+    Ok(())
 }
 
 fn transport_read_error(action: &str, error: impl std::fmt::Display) -> String {
@@ -2552,6 +2623,19 @@ fn ensure_trusted_key(expected: &[u8; 32], actual: &[u8; 32]) -> Result<(), Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn transfer_cancellation_wakes_without_polling() {
+        let (cancel, receiver) = watch::channel(false);
+        let waiter = tokio::spawn(wait_for_cancel(receiver));
+
+        cancel.send_replace(true);
+
+        timeout(Duration::from_millis(100), waiter)
+            .await
+            .expect("cancellation should wake immediately")
+            .unwrap();
+    }
 
     #[test]
     fn authentication_code_is_six_digits_and_stable() {
@@ -2825,16 +2909,24 @@ mod tests {
             .await
             .unwrap();
             let mut received = Vec::new();
-            match read_secure_record(&mut session.receive, &mut session.transport)
+            let mut record_buffers = SecureRecordBuffers::new();
+            let expected_chunks: &[(u64, &[u8])] = &[(0, b"encrypted "), (10, b"file bytes")];
+            for (expected_offset, expected_bytes) in expected_chunks {
+                match read_secure_record_buffered(
+                    &mut session.receive,
+                    &mut session.transport,
+                    &mut record_buffers,
+                )
                 .await
                 .unwrap()
-            {
-                SecureRecord::FileChunk { offset, bytes } => {
-                    assert_eq!(offset, 0);
-                    assert_eq!(bytes, b"encrypted file bytes");
-                    received.extend_from_slice(&bytes);
+                {
+                    BorrowedSecureRecord::FileChunk { offset, bytes } => {
+                        assert_eq!(offset, *expected_offset);
+                        assert_eq!(bytes, *expected_bytes);
+                        received.extend_from_slice(bytes);
+                    }
+                    _ => panic!("unexpected encrypted file record"),
                 }
-                _ => panic!("unexpected encrypted file record"),
             }
             match read_encrypted(&mut session.receive, &mut session.transport)
                 .await
@@ -2918,9 +3010,25 @@ mod tests {
             WireMessage::FileDecision { accepted, .. } => assert!(accepted),
             _ => panic!("unexpected file decision"),
         }
-        write_encrypted_chunk(&mut session.send, &mut session.transport, 0, file_bytes)
-            .await
-            .unwrap();
+        let mut chunk_buffers = ChunkWriteBuffers::new();
+        write_encrypted_chunk(
+            &mut session.send,
+            &mut session.transport,
+            0,
+            b"encrypted ",
+            &mut chunk_buffers,
+        )
+        .await
+        .unwrap();
+        write_encrypted_chunk(
+            &mut session.send,
+            &mut session.transport,
+            b"encrypted ".len() as u64,
+            b"file bytes",
+            &mut chunk_buffers,
+        )
+        .await
+        .unwrap();
         write_encrypted(
             &mut session.send,
             &mut session.transport,

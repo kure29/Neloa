@@ -1,18 +1,22 @@
 use std::{cmp::Reverse, collections::HashMap, fs, path::PathBuf, sync::Arc};
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 
 use crate::model::TrustedDevice;
+
+const TOUCH_PERSIST_INTERVAL_MS: u128 = 30_000;
 
 #[derive(Clone)]
 pub(crate) struct TrustStore {
     path: PathBuf,
     devices: Arc<RwLock<HashMap<String, TrustedDevice>>>,
+    persist_lock: Arc<Mutex<()>>,
+    last_touch_persisted_ms: Arc<Mutex<u128>>,
 }
 
 impl TrustStore {
     pub(crate) fn load(path: PathBuf) -> Result<Self, String> {
-        let devices = if path.exists() {
+        let devices: HashMap<String, TrustedDevice> = if path.exists() {
             let bytes =
                 fs::read(&path).map_err(|error| format!("无法读取可信设备列表：{error}"))?;
             serde_json::from_slice::<Vec<TrustedDevice>>(&bytes)
@@ -23,10 +27,17 @@ impl TrustStore {
         } else {
             HashMap::new()
         };
+        let last_touch_persisted_ms = devices
+            .values()
+            .map(|device| device.last_verified_ms)
+            .max()
+            .unwrap_or_default();
 
         Ok(Self {
             path,
             devices: Arc::new(RwLock::new(devices)),
+            persist_lock: Arc::new(Mutex::new(())),
+            last_touch_persisted_ms: Arc::new(Mutex::new(last_touch_persisted_ms)),
         })
     }
 
@@ -53,7 +64,7 @@ impl TrustStore {
         Ok(removed)
     }
 
-    pub(crate) fn touch(&self, id: &str, at_ms: u128) -> Result<(), String> {
+    pub(crate) async fn touch(&self, id: &str, at_ms: u128) -> Result<(), String> {
         let changed = {
             let mut devices = self.devices.write();
             if let Some(device) = devices.get_mut(id) {
@@ -63,18 +74,93 @@ impl TrustStore {
                 false
             }
         };
-        if changed {
-            self.persist()?;
+        if !changed {
+            return Ok(());
         }
-        Ok(())
+
+        // Verification timestamps are useful metadata, not trust decisions. Keep the in-memory
+        // value exact while coalescing frequent clipboard and transfer updates into one disk write.
+        let should_persist = {
+            let mut last_persisted = self.last_touch_persisted_ms.lock();
+            if at_ms.saturating_sub(*last_persisted) < TOUCH_PERSIST_INTERVAL_MS {
+                false
+            } else {
+                *last_persisted = at_ms;
+                true
+            }
+        };
+        if !should_persist {
+            return Ok(());
+        }
+
+        let store = self.clone();
+        let outcome = tokio::task::spawn_blocking(move || store.persist())
+            .await
+            .map_err(|error| format!("等待可信设备列表保存任务失败：{error}"))
+            .and_then(|result| result);
+        if outcome.is_err() {
+            let mut last_persisted = self.last_touch_persisted_ms.lock();
+            if *last_persisted == at_ms {
+                *last_persisted = 0;
+            }
+        }
+        outcome
     }
 
     fn persist(&self) -> Result<(), String> {
+        let _persist_guard = self.persist_lock.lock();
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent).map_err(|error| format!("无法创建应用数据目录：{error}"))?;
         }
-        let data = serde_json::to_vec_pretty(&self.list())
+        let devices = self.list();
+        let data = serde_json::to_vec_pretty(&devices)
             .map_err(|error| format!("无法序列化可信设备列表：{error}"))?;
-        fs::write(&self.path, data).map_err(|error| format!("无法保存可信设备列表：{error}"))
+        fs::write(&self.path, data).map_err(|error| format!("无法保存可信设备列表：{error}"))?;
+        *self.last_touch_persisted_ms.lock() = devices
+            .iter()
+            .map(|device| device.last_verified_ms)
+            .max()
+            .unwrap_or_default();
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn trusted_device(last_verified_ms: u128) -> TrustedDevice {
+        TrustedDevice {
+            id: "device-1".into(),
+            name: "Test device".into(),
+            platform: "test".into(),
+            public_key: "public-key".into(),
+            fingerprint: "fingerprint".into(),
+            paired_at_ms: 0,
+            last_verified_ms,
+        }
+    }
+
+    fn persisted_timestamp(path: &std::path::Path) -> u128 {
+        let bytes = fs::read(path).unwrap();
+        serde_json::from_slice::<Vec<TrustedDevice>>(&bytes).unwrap()[0].last_verified_ms
+    }
+
+    #[tokio::test]
+    async fn coalesces_frequent_touch_writes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("trusted-devices.json");
+        let store = TrustStore::load(path.clone()).unwrap();
+        store.upsert(trusted_device(0)).unwrap();
+
+        store.touch("device-1", 30_000).await.unwrap();
+        assert_eq!(persisted_timestamp(&path), 30_000);
+
+        store.touch("device-1", 30_001).await.unwrap();
+        assert_eq!(store.find("device-1").unwrap().last_verified_ms, 30_001);
+        assert_eq!(persisted_timestamp(&path), 30_000);
+
+        store.touch("device-1", 60_000).await.unwrap();
+        assert_eq!(persisted_timestamp(&path), 60_000);
     }
 }

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   beginPairing,
   cancelFileTransfer,
-  chooseFile,
+  chooseFiles,
   copyDiagnosticReport,
   decideFileOffer,
   decidePairing,
@@ -14,9 +14,11 @@ import {
   getLocalDevice,
   getRelaySnapshot,
   getSecuritySnapshot,
+  inspectFilePaths,
   isDesktopRuntime,
   onClipboardSettingsChanged,
   onClipboardSyncEvent,
+  onFileDragDrop,
   onFileOffer,
   onFileTransferProgress,
   onFileTransferResult,
@@ -45,6 +47,7 @@ import type {
   FileTransferProgress,
   RelaySnapshot,
   SecuritySnapshot,
+  SelectedFile,
   TransferRecord,
   TrustedDevice,
 } from "../types";
@@ -85,6 +88,13 @@ const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   firewallGuidance: "正在读取本机网络建议…",
   reportPrivacy: "报告不含 IP、完整设备 ID、公钥、文件路径或剪贴板正文",
 };
+const MAX_QUEUED_FILES = 20;
+
+interface QueuedFileResult {
+  added: number;
+  duplicates: number;
+  overflow: number;
+}
 
 /**
  * Every piece of application state, so the desktop and mobile shells render the
@@ -102,7 +112,9 @@ export function useNeloa() {
   const [lastClipboardEvent, setLastClipboardEvent] = useState<ClipboardSyncEvent | null>(null);
   const [view, setView] = useState<ViewName>("radar");
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<Awaited<ReturnType<typeof chooseFile>>>(null);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const selectedFilesRef = useRef<SelectedFile[]>([]);
+  const [fileDrop, setFileDrop] = useState({ active: false, count: 0 });
   const [pairing, setPairing] = useState<Awaited<ReturnType<typeof beginPairing>> | null>(null);
   const [fileOffers, setFileOffers] = useState<FileOffer[]>([]);
   const [fileTransfers, setFileTransfers] = useState<Record<string, FileTransferProgress>>({});
@@ -117,7 +129,99 @@ export function useNeloa() {
     toastTimer.current = window.setTimeout(() => setToast(""), 3000);
   }, []);
 
+  const replaceSelectedFiles = useCallback((files: SelectedFile[]) => {
+    selectedFilesRef.current = files;
+    setSelectedFiles(files);
+  }, []);
+
+  const queueSelectedFiles = useCallback((files: SelectedFile[]): QueuedFileResult => {
+    const next = [...selectedFilesRef.current];
+    const knownPaths = new Set(next.map((file) => file.path));
+    let duplicates = 0;
+    let overflow = 0;
+
+    for (const file of files) {
+      if (knownPaths.has(file.path)) {
+        duplicates += 1;
+      } else if (next.length >= MAX_QUEUED_FILES) {
+        overflow += 1;
+      } else {
+        knownPaths.add(file.path);
+        next.push(file);
+      }
+    }
+
+    const added = next.length - selectedFilesRef.current.length;
+    if (added > 0) replaceSelectedFiles(next);
+    return { added, duplicates, overflow };
+  }, [replaceSelectedFiles]);
+
+  const reportQueuedFiles = useCallback((
+    queued: QueuedFileResult,
+    rejected: number,
+    omitted: number,
+  ) => {
+    const unreadable = rejected + omitted;
+    const skipped = queued.duplicates + queued.overflow + unreadable;
+    if (queued.added > 0) {
+      showToast(skipped > 0
+        ? `已添加 ${queued.added} 个文件，${skipped} 个未添加`
+        : `已添加 ${queued.added} 个文件`);
+      return;
+    }
+    if (selectedFilesRef.current.length >= MAX_QUEUED_FILES || queued.overflow > 0) {
+      showToast(`发送列表已满，最多 ${MAX_QUEUED_FILES} 个文件`);
+    } else if (unreadable > 0) {
+      showToast("未添加：文件夹或文件不可读取");
+    } else if (queued.duplicates > 0) {
+      showToast("所选文件已在发送列表中");
+    } else {
+      showToast("没有可添加的文件");
+    }
+  }, [showToast]);
+
   useEffect(() => onShellChange(setShell), []);
+
+  useEffect(() => {
+    if (shell !== "desktop" || !isDesktopRuntime) {
+      setFileDrop({ active: false, count: 0 });
+      return;
+    }
+
+    let disposed = false;
+    let stop = () => {};
+    void onFileDragDrop((event) => {
+      if (disposed) return;
+      if (event.type === "enter") {
+        setFileDrop({ active: true, count: event.paths.length });
+      } else if (event.type === "over") {
+        setFileDrop((current) => current.active ? current : { active: true, count: 1 });
+      } else if (event.type === "leave") {
+        setFileDrop({ active: false, count: 0 });
+      } else {
+        setFileDrop({ active: false, count: 0 });
+        setView("radar");
+        void inspectFilePaths(event.paths)
+          .then((result) => {
+            if (disposed) return;
+            reportQueuedFiles(queueSelectedFiles(result.files), result.rejected, result.omitted);
+          })
+          .catch((error) => {
+            if (!disposed) showToast(`无法读取拖入的文件：${String(error)}`);
+          });
+      }
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    }).catch((error) => {
+      if (!disposed) showToast(`无法启用文件拖放：${String(error)}`);
+    });
+
+    return () => {
+      disposed = true;
+      stop();
+    };
+  }, [queueSelectedFiles, reportQueuedFiles, shell, showToast]);
 
   const refreshDiscovery = useCallback(async (announce = false) => {
     if (announce) showToast("正在重新扫描…");
@@ -294,21 +398,33 @@ export function useNeloa() {
     () => resolvePrimaryAction({
       peer: selectedPeer,
       trusted: selectedPeerTrusted,
-      file: selectedFile,
+      files: selectedFiles,
       busyPairing: busyAction === "pair",
       busyFile: busyAction === "file",
     }),
-    [selectedPeer, selectedPeerTrusted, selectedFile, busyAction],
+    [selectedPeer, selectedPeerTrusted, selectedFiles, busyAction],
   );
 
-  const pickFile = useCallback(async () => {
-    const file = await chooseFile();
-    if (!file) {
+  const pickFiles = useCallback(async () => {
+    const selection = await chooseFiles();
+    if (!selection) {
       if (!isDesktopRuntime) showToast("桌面应用中会打开系统文件选择器");
       return;
     }
-    setSelectedFile(file);
-  }, [showToast]);
+    reportQueuedFiles(
+      queueSelectedFiles(selection.files),
+      selection.rejected,
+      selection.omitted,
+    );
+  }, [queueSelectedFiles, reportQueuedFiles, showToast]);
+
+  const removeSelectedFile = useCallback((path: string) => {
+    replaceSelectedFiles(selectedFilesRef.current.filter((file) => file.path !== path));
+  }, [replaceSelectedFiles]);
+
+  const clearSelectedFiles = useCallback(() => {
+    replaceSelectedFiles([]);
+  }, [replaceSelectedFiles]);
 
   const startPairing = useCallback(async (peerId: string) => {
     if (!security.network.active) {
@@ -325,11 +441,10 @@ export function useNeloa() {
     }
   }, [security.network, showToast]);
 
-  const beginFileTransfer = useCallback(async (
+  const beginFileTransfers = useCallback(async (
     peerId: string,
-    path: string,
-    name: string,
-    size: number,
+    files: SelectedFile[],
+    removeStartedFromQueue = true,
   ) => {
     const peer = discovery.peers.find((item) => item.id === peerId);
     if (!peer) {
@@ -337,28 +452,48 @@ export function useNeloa() {
       return;
     }
     setBusyAction("file");
+    const startedPaths = new Set<string>();
+    let lastError = "";
     try {
-      const transferId = await startFileTransfer(peerId, path);
-      setFileTransfers((current) => ({
-        ...current,
-        [transferId]: {
-          transferId,
-          peerId,
-          peerName: peer.name,
-          name,
-          direction: "sent",
-          stage: "hashing",
-          transferred: 0,
-          size,
-          bytesPerSecond: 0,
-        },
-      }));
-    } catch (error) {
-      showToast(String(error));
+      for (const file of files) {
+        try {
+          const transferId = await startFileTransfer(peerId, file.path);
+          startedPaths.add(file.path);
+          setFileTransfers((current) => ({
+            ...current,
+            [transferId]: {
+              transferId,
+              peerId,
+              peerName: peer.name,
+              name: file.name,
+              direction: "sent",
+              stage: "hashing",
+              transferred: 0,
+              size: file.size,
+              bytesPerSecond: 0,
+            },
+          }));
+        } catch (error) {
+          lastError = String(error);
+        }
+      }
+
+      if (removeStartedFromQueue && startedPaths.size > 0) {
+        replaceSelectedFiles(
+          selectedFilesRef.current.filter((file) => !startedPaths.has(file.path)),
+        );
+      }
+      if (startedPaths.size === files.length) {
+        showToast(files.length === 1 ? "文件已加入发送队列" : `${files.length} 个文件已加入发送队列`);
+      } else if (startedPaths.size > 0) {
+        showToast(`已开始 ${startedPaths.size} 个文件，${files.length - startedPaths.size} 个启动失败`);
+      } else {
+        showToast(lastError || "无法开始文件传输");
+      }
     } finally {
       setBusyAction(null);
     }
-  }, [discovery.peers, showToast]);
+  }, [discovery.peers, replaceSelectedFiles, showToast]);
 
   const runPrimaryAction = useCallback(() => {
     if (primaryAction.disabled) {
@@ -370,19 +505,19 @@ export function useNeloa() {
       void startPairing(selectedPeer.id);
       return;
     }
-    if (!selectedFile) {
-      void pickFile();
+    if (selectedFiles.length === 0) {
+      void pickFiles();
       return;
     }
-    void beginFileTransfer(selectedPeer.id, selectedFile.path, selectedFile.name, selectedFile.size);
+    void beginFileTransfers(selectedPeer.id, [...selectedFiles]);
   }, [
     primaryAction,
     selectedPeer,
-    selectedFile,
+    selectedFiles,
     selectedPeerTrusted,
     startPairing,
-    pickFile,
-    beginFileTransfer,
+    pickFiles,
+    beginFileTransfers,
     showToast,
   ]);
 
@@ -444,8 +579,12 @@ export function useNeloa() {
       showToast("缺少重试所需的文件信息");
       return;
     }
-    void beginFileTransfer(record.peerId, record.path, record.name, record.size ?? 0);
-  }, [beginFileTransfer, showToast]);
+    void beginFileTransfers(record.peerId, [{
+      path: record.path,
+      name: record.name,
+      size: record.size ?? 0,
+    }], false);
+  }, [beginFileTransfers, showToast]);
 
   const removeHistoryRecord = useCallback((recordId: string) => {
     setHistory((current) => current.filter((record) => record.id !== recordId));
@@ -558,9 +697,11 @@ export function useNeloa() {
     selectedPeer,
     selectedPeerTrusted,
     trustedIds,
-    selectedFile,
-    pickFile,
-    clearFile: () => setSelectedFile(null),
+    selectedFiles,
+    pickFiles,
+    removeSelectedFile,
+    clearSelectedFiles,
+    fileDrop,
     pairing,
     submitPairing,
     fileOffers,

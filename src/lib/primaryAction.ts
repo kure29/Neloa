@@ -1,5 +1,5 @@
 import type { PeerDevice, SelectedFile } from "../types";
-import { peerIsCompatible } from "./format";
+import { formatBytes, peerIsCompatible } from "./format";
 
 export interface PrimaryAction {
   label: string;
@@ -16,17 +16,17 @@ export interface PrimaryAction {
 export function resolvePrimaryAction(input: {
   peer: PeerDevice | null;
   trusted: boolean;
-  file: SelectedFile | null;
+  files: SelectedFile[];
   busyPairing: boolean;
   busyFile: boolean;
 }): PrimaryAction {
-  const { peer, trusted, file, busyPairing, busyFile } = input;
+  const { peer, trusted, files, busyPairing, busyFile } = input;
 
   if (busyPairing) {
     return { label: "建立通道…", disabled: true, hint: "正在与对方协商加密会话", tone: "neutral" };
   }
   if (busyFile) {
-    return { label: "准备中…", disabled: true, hint: "正在准备文件", tone: "neutral" };
+    return { label: "正在加入队列…", disabled: true, hint: "正在为所选文件建立加密传输", tone: "neutral" };
   }
   if (!peer) {
     return { label: "发送", disabled: true, hint: "先在雷达中选择一台设备", tone: "neutral" };
@@ -47,7 +47,7 @@ export function resolvePrimaryAction(input: {
       tone: "warn",
     };
   }
-  if (!file) {
+  if (files.length === 0) {
     return {
       label: "选择文件",
       disabled: false,
@@ -55,5 +55,11 @@ export function resolvePrimaryAction(input: {
       tone: "ok",
     };
   }
-  return { label: "发送", disabled: false, hint: `已与 ${peer.name} 配对，端到端加密`, tone: "ok" };
+  const totalSize = files.reduce((total, file) => total + file.size, 0);
+  return {
+    label: files.length === 1 ? "发送" : `发送 ${files.length} 个文件`,
+    disabled: false,
+    hint: `将向 ${peer.name} 发送 ${formatBytes(totalSize)}，端到端加密`,
+    tone: "ok",
+  };
 }

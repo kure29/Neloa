@@ -652,6 +652,10 @@
   box-shadow: var(--elev-1);
 }
 
+.dock-selection {
+  min-width: 0;
+}
+
 .dock-file {
   display: flex;
   align-items: center;
@@ -700,7 +704,45 @@
   flex: none;
 }
 
+.file-picker:disabled {
+  cursor: not-allowed;
+}
+
+.selected-file-list {
+  max-height: 104px;
+  margin: var(--s2) 0 0;
+  padding: var(--s1) 0;
+  overflow-y: auto;
+  border-radius: var(--r-control);
+  background: var(--paper-2);
+  list-style: none;
+}
+
+.selected-file-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 32px;
+  padding: 0 var(--s1) 0 var(--s3);
+  color: var(--ink-2);
+  font-size: var(--text-small);
+}
+
+.selected-file-list small {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.selected-file-remove {
+  width: 28px;
+  height: 28px;
+}
+
 .dock-send {
+  align-self: start;
   min-width: 120px;
 }
 
@@ -1271,6 +1313,60 @@ small.tone-warn {
   gap: var(--s2);
   color: var(--ink-3);
   font-size: var(--text-micro);
+}
+
+/* ---------- native file drop ---------- */
+
+.file-drop-overlay {
+  position: absolute;
+  inset: var(--s3);
+  z-index: 250;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--copper);
+  border-radius: var(--frame-radius);
+  background: color-mix(in srgb, var(--paper-0) 94%, transparent);
+  pointer-events: none;
+  animation: file-drop-in var(--dur) var(--ease);
+}
+
+.file-drop-message {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: var(--s2);
+  max-width: 360px;
+  padding: var(--s6);
+  color: var(--ink);
+  text-align: center;
+}
+
+.file-drop-message strong {
+  font-size: var(--text-title);
+  font-weight: 600;
+}
+
+.file-drop-message > span:last-child {
+  color: var(--ink-2);
+  font-size: var(--text-small);
+}
+
+.file-drop-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--s2);
+  border-radius: 50%;
+  background: var(--copper-soft);
+  color: var(--copper);
+}
+
+@keyframes file-drop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.992);
+  }
 }
 
 /* ---------- toast ---------- */

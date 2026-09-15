@@ -23,6 +23,7 @@
         "minHeight": 520,
         "center": true,
         "decorations": false,
+        "devtools": false,
         "resizable": true,
         "transparent": false
       }

@@ -268,11 +268,12 @@ fn snapshot_from(
     error: &Arc<RwLock<Option<String>>>,
     active: bool,
 ) -> DiscoverySnapshot {
+    let error = error.read().clone();
     let mut peers: Vec<_> = peers.read().values().cloned().collect();
-    peers.sort_by_key(|peer| peer.name.to_lowercase());
+    peers.sort_by_cached_key(|peer| peer.name.to_lowercase());
     DiscoverySnapshot {
-        active: active && error.read().is_none(),
-        error: error.read().clone(),
+        active: active && error.is_none(),
+        error,
         peers,
     }
 }
@@ -785,7 +786,7 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
             last_seen_ms: peer.last_seen_ms,
         })
         .collect();
-    peers.sort_by_key(|peer| peer.name.to_lowercase());
+    peers.sort_by_cached_key(|peer| peer.name.to_lowercase());
     let incompatible_peers = peers.iter().filter(|peer| !peer.compatible).count();
     let identity_ready = network.identity_fingerprint != "不可用";
 
@@ -1224,7 +1225,7 @@ fn inspect_selected_file(app: &tauri::AppHandle, path: &str) -> Result<SelectedF
     let metadata =
         fs::metadata(&local_path).map_err(|error| format!("无法读取文件信息：{error}"))?;
     if !metadata.is_file() {
-        return Err("当前阶段仅支持选择单个文件".into());
+        return Err("暂不支持发送文件夹，请选择一个或多个文件".into());
     }
     Ok(SelectedFile {
         path: path.to_string(),

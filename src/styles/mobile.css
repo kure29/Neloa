@@ -204,6 +204,23 @@
   width: 100%;
 }
 
+.shell-mobile .selected-file-list {
+  max-height: 132px;
+}
+
+.shell-mobile .selected-file-list li {
+  min-height: 44px;
+}
+
+.shell-mobile .selected-file-remove {
+  width: 44px;
+  height: 44px;
+}
+
+.shell-mobile .file-drop-overlay {
+  display: none;
+}
+
 /* ---------- overlays ---------- */
 
 /*

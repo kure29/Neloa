@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -465,7 +466,7 @@ export async function startFileTransfer(peerId: string, path: string): Promise<s
     const trusted = previewTrustedDevices.find((device) => device.id === peerId);
     if (!trusted) throw new Error("请先完成设备配对");
     const transferId = crypto.randomUUID();
-    const size = 18_874_368;
+    const size = path.endsWith("产品交付说明.pdf") ? 2_416_640 : 18_874_368;
     const base: Omit<FileTransferProgress, "stage" | "transferred" | "bytesPerSecond"> = {
       transferId,
       peerId,
@@ -583,23 +584,63 @@ export const onFileTransferProgress = (callback: (progress: FileTransferProgress
 export const onFileTransferResult = (callback: (result: FileTransferResult) => void) =>
   onAppEvent("file-transfer-result", callback);
 
-export async function chooseFile(): Promise<SelectedFile | null> {
+export interface FileInspectionResult {
+  files: SelectedFile[];
+  rejected: number;
+  omitted: number;
+}
+
+const MAX_INSPECTED_PATHS = 100;
+
+/** Validates native paths through Rust before they enter the send queue. */
+export async function inspectFilePaths(paths: string[]): Promise<FileInspectionResult> {
+  const candidates = paths.slice(0, MAX_INSPECTED_PATHS);
+  const omitted = Math.max(0, paths.length - candidates.length);
+  const inspected = await Promise.allSettled(
+    candidates.map((path) => invoke<SelectedFile>("inspect_file", { path })),
+  );
+  return {
+    files: inspected.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
+    rejected: inspected.filter((result) => result.status === "rejected").length,
+    omitted,
+  };
+}
+
+export async function chooseFiles(): Promise<FileInspectionResult | null> {
   if (!isDesktopRuntime) {
     return {
-      path: "/Users/yuki/Downloads/Neloa Demo.zip",
-      name: "Neloa Demo.zip",
-      size: 18_874_368,
+      files: [
+        {
+          path: "/Users/yuki/Downloads/Neloa Demo.zip",
+          name: "Neloa Demo.zip",
+          size: 18_874_368,
+        },
+        {
+          path: "/Users/yuki/Downloads/产品交付说明.pdf",
+          name: "产品交付说明.pdf",
+          size: 2_416_640,
+        },
+      ],
+      rejected: 0,
+      omitted: 0,
     };
   }
-  const path = await open({
-    multiple: false,
+  const selection = await open({
+    multiple: true,
     directory: false,
-    title: "选择要发送的文件",
+    title: "选择要发送的文件（可多选）",
     pickerMode: "document",
     fileAccessMode: "copy",
   });
-  if (!path || Array.isArray(path)) return null;
-  return invoke<SelectedFile>("inspect_file", { path });
+  if (!selection) return null;
+  return inspectFilePaths(Array.isArray(selection) ? selection : [selection]);
+}
+
+export async function onFileDragDrop(
+  callback: (event: DragDropEvent) => void,
+): Promise<UnlistenFn> {
+  if (!isDesktopRuntime) return () => {};
+  return getCurrentWebview().onDragDropEvent((event) => callback(event.payload));
 }
 
 export async function performWindowAction(
