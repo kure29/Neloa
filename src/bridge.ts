@@ -15,6 +15,7 @@ import type {
   LocalDevice,
   PairingRequest,
   PairingResult,
+  PeerDevice,
   Platform,
   RelaySnapshot,
   SecuritySnapshot,
@@ -57,7 +58,19 @@ async function onAppEvent<T>(name: string, callback: (payload: T) => void): Prom
   return () => window.removeEventListener(`neloa:${name}`, listener);
 }
 
-const DESKTOP_PLATFORMS: Platform[] = ["macos", "windows", "linux"];
+const DESKTOP_PLATFORMS: Platform[] = [
+  "macos",
+  "windows",
+  "linux",
+  "debian",
+  "ubuntu",
+  "fedora",
+  "arch",
+  "manjaro",
+  "opensuse",
+  "linuxmint",
+  "redhat",
+];
 const MOBILE_PLATFORMS: Platform[] = ["ios", "android"];
 /** A touch device narrow enough that window chrome and hover affordances make no sense. */
 const MOBILE_MEDIA = "(pointer: coarse) and (max-width: 819px)";
@@ -112,6 +125,14 @@ function previewDevice(): LocalDevice {
     macos: "Yuki 的 MacBook",
     windows: "Studio-PC",
     linux: "Neloa Workstation",
+    debian: "Debian Workstation",
+    ubuntu: "Ubuntu Workstation",
+    fedora: "Fedora Workstation",
+    arch: "Arch Workstation",
+    manjaro: "Manjaro Workstation",
+    opensuse: "openSUSE Workstation",
+    linuxmint: "Linux Mint Workstation",
+    redhat: "Red Hat Workstation",
     ios: "Yuki 的 iPhone",
     android: "Pixel 8",
   };
@@ -144,38 +165,38 @@ export const onLocalDeviceChanged = (callback: (device: LocalDevice) => void) =>
 export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
   if (!isDesktopRuntime) {
     const platform = previewPlatform();
+    const previewPeer = (
+      id: string,
+      name: string,
+      peerPlatform: string,
+      address: string,
+    ): PeerDevice => ({
+      id,
+      name,
+      platform: peerPlatform,
+      version: "0.1.11",
+      protocolVersion: 1,
+      minProtocolVersion: 1,
+      capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],
+      addresses: [address],
+      port: 48631,
+      lastSeenMs: Date.now(),
+      relayAvailable: false,
+    });
+    const peers = platform === "windows"
+      ? [
+          previewPeer("preview-mac", "MacBook Pro M3", "macos", "192.168.1.18"),
+          previewPeer("preview-ubuntu", "Home Server", "ubuntu", "192.168.1.31"),
+          previewPeer("preview-debian", "Debian NAS", "debian", "192.168.1.32"),
+          previewPeer("preview-linux", "Linux Device", "linux", "192.168.1.33"),
+        ]
+      : platform === "android"
+        ? [previewPeer("preview-ios", "Yuki 的 iPhone", "ios", "192.168.1.19")]
+        : [previewPeer("preview-windows", "Surface Laptop", "windows", "192.168.1.23")];
     return {
       active: true,
       error: null,
-      peers: [
-        platform === "windows"
-          ? {
-              id: "preview-mac",
-              name: "MacBook Pro M3",
-              platform: "macos",
-              version: "0.1.11",
-              protocolVersion: 1,
-              minProtocolVersion: 1,
-              capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],
-              addresses: ["192.168.1.18"],
-              port: 48631,
-              lastSeenMs: Date.now(),
-              relayAvailable: false,
-            }
-          : {
-              id: "preview-windows",
-              name: "Surface Laptop",
-              platform: "windows",
-              version: "0.1.11",
-              protocolVersion: 1,
-              minProtocolVersion: 1,
-              capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],
-              addresses: ["192.168.1.23"],
-              port: 48631,
-              lastSeenMs: Date.now(),
-              relayAvailable: false,
-            },
-      ],
+      peers,
     };
   }
   return invoke<DiscoverySnapshot>("get_discovery_snapshot");
@@ -356,25 +377,7 @@ export async function getDiagnosticsSnapshot(): Promise<DiagnosticsSnapshot> {
     firewallGuidance: device.platform === "windows"
       ? "在 Windows Defender 防火墙中允许 Neloa 访问“专用网络”；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。"
       : "若 macOS 弹出网络访问提示，请允许 Neloa 接收入站连接；局域网传输使用 UDP 48631，mDNS 使用 UDP 5353。",
-    reportPrivacy: "报告不包含 IP、完整设备 ID、公钥、文件路径或剪贴板正文",
   };
-}
-
-export async function copyDiagnosticReport(): Promise<string> {
-  if (isDesktopRuntime) return invoke<string>("copy_diagnostic_report");
-  const snapshot = await getDiagnosticsSnapshot();
-  const report = [
-    "Neloa sanitized diagnostic report",
-    `generatedAtMs=${snapshot.generatedAtMs}`,
-    `appVersion=${snapshot.appVersion}`,
-    `platform=${snapshot.platform}`,
-    `deviceIdPrefix=${snapshot.deviceIdPrefix}`,
-    `protocolRange=${snapshot.minProtocolVersion}-${snapshot.protocolVersion}`,
-    `discovery.peerCount=${snapshot.peers.length}`,
-    "privacy=No IP addresses, full device IDs, public keys, file paths, or clipboard content included.",
-  ].join("\n");
-  await navigator.clipboard.writeText(report);
-  return "脱敏诊断报告已复制到系统剪贴板";
 }
 
 export async function beginPairing(peerId: string): Promise<PairingRequest> {
@@ -459,6 +462,26 @@ export async function revokeTrustedDevice(peerId: string): Promise<boolean> {
     return before !== previewTrustedDevices.length;
   }
   return invoke<boolean>("revoke_trusted_device", { peerId });
+}
+
+export async function setTrustedDeviceAlias(
+  peerId: string,
+  alias: string,
+): Promise<TrustedDevice> {
+  if (!isDesktopRuntime) {
+    const device = previewTrustedDevices.find((item) => item.id === peerId);
+    if (!device) throw new Error("只能为已配对设备设置备注名");
+    const normalized = alias.trim();
+    if ([...normalized].length > 32) throw new Error("设备备注最多 32 个字符");
+    if (/[\u0000-\u001F\u007F]/u.test(normalized)) {
+      throw new Error("设备备注不能包含换行或控制字符");
+    }
+    if (normalized) device.alias = normalized;
+    else delete device.alias;
+    emitPreview("trusted-devices-changed", [...previewTrustedDevices]);
+    return { ...device };
+  }
+  return invoke<TrustedDevice>("set_trusted_device_alias", { peerId, alias });
 }
 
 export async function startFileTransfer(peerId: string, path: string): Promise<string> {

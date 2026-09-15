@@ -78,11 +78,13 @@ export function DesktopShell({ app }: { app: NeloaState }) {
             <StatusDot tone={app.discovery.error ? "danger" : app.discovery.active ? "ok" : "warn"} />
             <span className="truncate">{app.deviceName}</span>
           </span>
-          <IconButton
-            icon="scan"
-            label="重新扫描局域网设备"
-            onClick={() => void app.refreshDiscovery(true)}
-          />
+          {app.view === "radar" && (
+            <IconButton
+              icon="scan"
+              label="重新查找设备"
+              onClick={() => void app.refreshDiscovery(true)}
+            />
+          )}
           {!isMac && (
             <div className="window-controls">
               <button aria-label="最小化窗口" onClick={() => void performWindowAction("minimize")}>

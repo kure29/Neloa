@@ -50,7 +50,7 @@ WebSocket listener directly to the internet.
 1. Pair the devices once while they can reach each other over the same LAN.
 2. Deploy the relay behind HTTPS and keep the generated
    `NELOA_RELAY_TOKEN` available on each device.
-3. On every client, open **设置 → 高级 → 连接与诊断 → 自建中继**.
+3. On every client, open **设置 → 连接 → 自建中继**.
 4. Enter the public `wss://.../v1/ws` URL and the same token, enable the
    switch, then save.
 

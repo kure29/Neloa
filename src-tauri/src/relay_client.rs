@@ -761,6 +761,7 @@ mod tests {
             .upsert(TrustedDevice {
                 id: "trusted".into(),
                 name: "Trusted".into(),
+                alias: None,
                 platform: "test".into(),
                 public_key: "00".repeat(32),
                 fingerprint: "00:00:00:00".into(),

@@ -1,4 +1,17 @@
-export type Platform = "macos" | "windows" | "linux" | "ios" | "android";
+export type Platform =
+  | "macos"
+  | "windows"
+  | "linux"
+  | "debian"
+  | "ubuntu"
+  | "fedora"
+  | "arch"
+  | "manjaro"
+  | "opensuse"
+  | "linuxmint"
+  | "redhat"
+  | "ios"
+  | "android";
 
 /** Which shell renders the interface. Independent of the operating system. */
 export type Shell = "desktop" | "mobile";
@@ -91,6 +104,7 @@ export interface FileTransferResult {
 export interface TrustedDevice {
   id: string;
   name: string;
+  alias?: string;
   platform: string;
   publicKey: string;
   fingerprint: string;
@@ -202,5 +216,4 @@ export interface DiagnosticsSnapshot {
   checks: DiagnosticCheck[];
   peers: DiagnosticPeer[];
   firewallGuidance: string;
-  reportPrivacy: string;
 }

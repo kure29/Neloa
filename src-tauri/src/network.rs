@@ -939,6 +939,7 @@ async fn finish_pairing(
         trust.upsert(TrustedDevice {
             id: session.peer.id.clone(),
             name: session.peer.name.clone(),
+            alias: None,
             platform: session.peer.platform.clone(),
             public_key: hex::encode(session.remote_static),
             fingerprint: fingerprint(&session.remote_static),

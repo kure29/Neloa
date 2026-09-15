@@ -30,6 +30,24 @@ export function peerIsCompatible(peer: PeerDevice): boolean {
     && peer.minProtocolVersion <= 1;
 }
 
+export function platformLabel(platform: string): string {
+  const normalized = platform.toLowerCase();
+  if (normalized === "macos") return "macOS";
+  if (normalized === "ios") return "iOS";
+  if (normalized === "windows") return "Windows";
+  if (normalized === "android") return "Android";
+  if (normalized === "debian") return "Debian";
+  if (normalized === "ubuntu") return "Ubuntu";
+  if (normalized === "fedora") return "Fedora";
+  if (normalized === "arch") return "Arch Linux";
+  if (normalized === "manjaro") return "Manjaro";
+  if (normalized === "opensuse") return "openSUSE";
+  if (normalized === "linuxmint") return "Linux Mint";
+  if (normalized === "redhat") return "Red Hat Enterprise Linux";
+  if (normalized === "linux") return "Linux";
+  return platform || "未知系统";
+}
+
 export function transferRecord(message: TestMessageEvent): TransferRecord {
   const condensed = message.text.replace(/\s+/g, " ").trim();
   return {

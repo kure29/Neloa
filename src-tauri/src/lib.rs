@@ -45,7 +45,7 @@ use identity::NoiseIdentity;
 use model::{
     ClipboardSnapshot, DiagnosticCheck, DiagnosticPeer, DiagnosticsSnapshot, DiscoverySnapshot,
     LocalDevice, PairingRequest, PeerDevice, RelaySnapshot, SecuritySnapshot, SelectedFile,
-    TestMessageEvent, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+    TestMessageEvent, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
 };
 use network::{NetworkHandle, NetworkStartup};
 use relay_settings::RelaySettingsStore;
@@ -187,16 +187,76 @@ fn migrate_legacy_app_data(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 fn platform_name() -> String {
-    if cfg!(target_os = "windows") {
-        "windows".into()
-    } else if cfg!(target_os = "macos") {
-        "macos".into()
-    } else if cfg!(target_os = "ios") {
-        "ios".into()
-    } else if cfg!(target_os = "android") {
-        "android".into()
-    } else {
-        "linux".into()
+    #[cfg(target_os = "windows")]
+    return "windows".into();
+    #[cfg(target_os = "macos")]
+    return "macos".into();
+    #[cfg(target_os = "ios")]
+    return "ios".into();
+    #[cfg(target_os = "android")]
+    return "android".into();
+    #[cfg(target_os = "linux")]
+    return fs::read_to_string("/etc/os-release")
+        .map(|contents| linux_platform_from_os_release(&contents).to_string())
+        .unwrap_or_else(|_| "linux".into());
+
+    #[allow(unreachable_code)]
+    "linux".into()
+}
+
+fn linux_platform_from_os_release(contents: &str) -> &'static str {
+    let id = contents
+        .lines()
+        .find_map(|line| {
+            let (candidate, value) = line.split_once('=')?;
+            (candidate.trim() == "ID")
+                .then(|| value.trim().trim_matches(['"', '\'']).to_lowercase())
+        })
+        .unwrap_or_default();
+
+    match id.as_str() {
+        "ubuntu" => "ubuntu",
+        "debian" => "debian",
+        "fedora" => "fedora",
+        "arch" | "archlinux" => "arch",
+        "manjaro" | "manjarolinux" => "manjaro",
+        "opensuse" | "opensuse-leap" | "opensuse-tumbleweed" | "suse" => "opensuse",
+        "linuxmint" => "linuxmint",
+        "rhel" | "redhat" | "redhatenterpriselinux" => "redhat",
+        _ => "linux",
+    }
+}
+
+#[cfg(test)]
+mod platform_tests {
+    use super::linux_platform_from_os_release;
+
+    #[test]
+    fn identifies_supported_linux_distributions() {
+        assert_eq!(
+            linux_platform_from_os_release("NAME=Ubuntu\nID=ubuntu\nID_LIKE=debian\n"),
+            "ubuntu"
+        );
+        assert_eq!(
+            linux_platform_from_os_release("NAME=Debian GNU/Linux\nID=debian\n"),
+            "debian"
+        );
+        assert_eq!(
+            linux_platform_from_os_release("ID=linuxmint\nID_LIKE=\"ubuntu debian\"\n"),
+            "linuxmint"
+        );
+        assert_eq!(linux_platform_from_os_release("ID=fedora\n"), "fedora");
+        assert_eq!(linux_platform_from_os_release("ID=arch\n"), "arch");
+        assert_eq!(
+            linux_platform_from_os_release("ID=opensuse-tumbleweed\n"),
+            "opensuse"
+        );
+        assert_eq!(linux_platform_from_os_release("ID=rhel\n"), "redhat");
+        // A related distro must not borrow its parent's logo; unsupported IDs use Tux.
+        assert_eq!(
+            linux_platform_from_os_release("ID=pop\nID_LIKE=\"ubuntu debian\"\n"),
+            "linux"
+        );
     }
 }
 
@@ -741,6 +801,19 @@ fn get_security_snapshot(state: tauri::State<'_, AppState>) -> SecuritySnapshot 
     }
 }
 
+#[tauri::command(rename_all = "camelCase")]
+fn set_trusted_device_alias(
+    app: tauri::AppHandle,
+    peer_id: String,
+    alias: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<TrustedDevice, String> {
+    let device = state.trust.set_alias(&peer_id, &alias)?;
+    app.emit("trusted-devices-changed", state.trust.list())
+        .map_err(|error| format!("无法刷新可信设备列表：{error}"))?;
+    Ok(device)
+}
+
 #[tauri::command]
 fn get_relay_snapshot(state: tauri::State<'_, AppState>) -> RelaySnapshot {
     state.network.relay_status()
@@ -932,97 +1005,12 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
         ],
         peers,
         firewall_guidance: firewall_guidance.into(),
-        report_privacy: "报告不包含 IP、完整设备 ID、公钥、文件路径或剪贴板正文".into(),
     }
-}
-
-fn diagnostic_report(state: &AppState, snapshot: &DiagnosticsSnapshot) -> String {
-    let network = state.network.status();
-    let discovery_error = state.discovery.error.read().is_some();
-    let clipboard = state.clipboard.snapshot();
-    let relay = state.network.relay_status();
-    let peer_lines = if snapshot.peers.is_empty() {
-        "peer.none=true".to_string()
-    } else {
-        snapshot
-            .peers
-            .iter()
-            .enumerate()
-            .map(|(index, peer)| {
-                format!(
-                    "peer.{}=platform:{} app:{} protocol:{}-{} compatible:{} capabilities:{}",
-                    index + 1,
-                    peer.platform,
-                    peer.app_version,
-                    peer.min_protocol_version,
-                    peer.protocol_version,
-                    peer.compatible,
-                    peer.capabilities.join(",")
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
-    format!(
-        "Neloa sanitized diagnostic report\n\
-generatedAtMs={}\n\
-appVersion={}\n\
-platform={}\n\
-deviceIdPrefix={}\n\
-protocolRange={}-{}\n\
-network.active={}\n\
-network.udpPort={}\n\
-network.errorPresent={}\n\
-identity.available={}\n\
-discovery.advertising={}\n\
-discovery.browsing={}\n\
-discovery.errorPresent={}\n\
-discovery.peerCount={}\n\
-trust.count={}\n\
-clipboard.enabled={}\n\
-clipboard.maxBytes={}\n\
-relay.enabled={}\n\
-relay.connected={}\n\
-relay.onlineDevices={}\n\
-relay.errorPresent={}\n\
-{}\n\
-privacy=No IP addresses, full device IDs, public keys, file paths, or clipboard content included.",
-        snapshot.generated_at_ms,
-        snapshot.app_version,
-        snapshot.platform,
-        snapshot.device_id_prefix,
-        snapshot.min_protocol_version,
-        snapshot.protocol_version,
-        network.active,
-        network.port,
-        network.error.is_some(),
-        network.identity_fingerprint != "不可用",
-        state.discovery.advertising.load(Ordering::Relaxed),
-        state.discovery.browsing.load(Ordering::Relaxed),
-        discovery_error,
-        snapshot.peers.len(),
-        state.trust.list().len(),
-        clipboard.enabled,
-        clipboard.max_bytes,
-        relay.enabled,
-        relay.connected,
-        relay.online_devices,
-        relay.error.is_some(),
-        peer_lines,
-    )
 }
 
 #[tauri::command]
 fn get_diagnostics_snapshot(state: tauri::State<'_, AppState>) -> DiagnosticsSnapshot {
     diagnostics_snapshot(&state)
-}
-
-#[tauri::command]
-async fn copy_diagnostic_report(state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let snapshot = diagnostics_snapshot(&state);
-    let report = diagnostic_report(&state, &snapshot);
-    state.clipboard.write_local(report).await?;
-    Ok("脱敏诊断报告已复制到系统剪贴板".into())
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -1483,12 +1471,12 @@ pub fn run() {
             set_device_name,
             get_discovery_snapshot,
             get_security_snapshot,
+            set_trusted_device_alias,
             get_relay_snapshot,
             set_relay_config,
             get_clipboard_snapshot,
             set_clipboard_enabled,
             get_diagnostics_snapshot,
-            copy_diagnostic_report,
             begin_pairing,
             decide_pairing,
             send_test_message,

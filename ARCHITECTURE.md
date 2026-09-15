@@ -27,7 +27,7 @@ Neloa is local-first. Every client should remain useful without an account or an
 - An 8 KB payload limit, strong credential-marker blocking, and no clipboard-body persistence.
 - Protocol range and capability negotiation in discovery and authenticated handshakes.
 - Explicit rejection of legacy, malformed, or feature-incompatible peers before application data is accepted.
-- A local diagnostics snapshot and sanitized copyable report for QUIC, mDNS, identity, clipboard, peer capability, and firewall checks.
+- A user-readable local connection status for QUIC, mDNS, identity, clipboard, peer capability, and firewall checks.
 - An optional self-hosted relay client with persistent authenticated WebSocket connections, trusted-device presence, and bounded virtual streams.
 - LAN-first transport selection: QUIC is attempted whenever a local address exists, then the relay is used only as a fallback for an already trusted online device.
 

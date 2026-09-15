@@ -6,7 +6,7 @@ title: Sending and receiving files
 
 ## Sending
 
-1. On the devices screen, select a **paired** device. The selected device gets a check mark.
+1. On the devices screen, select a **paired** device. The selected device gets a check mark; press the device or its check mark again to clear the selection. On desktop, you can also press an empty part of the device area.
 2. Press Select files, or drag files straight into the window (macOS and Windows accept multiple files).
 3. The pending list shows each file's name and size, and any file can be removed individually.
 4. Press send.

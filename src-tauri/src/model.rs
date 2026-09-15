@@ -76,6 +76,8 @@ pub(crate) struct SelectedFile {
 pub(crate) struct TrustedDevice {
     pub id: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
     pub platform: String,
     pub public_key: String,
     pub fingerprint: String,
@@ -248,7 +250,6 @@ pub(crate) struct DiagnosticsSnapshot {
     pub checks: Vec<DiagnosticCheck>,
     pub peers: Vec<DiagnosticPeer>,
     pub firewall_guidance: String,
-    pub report_privacy: String,
 }
 
 #[cfg(test)]

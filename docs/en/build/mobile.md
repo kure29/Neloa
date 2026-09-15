@@ -115,7 +115,7 @@ For a first pass, use one phone and the current Mac, in this order:
 5. Keep the app in the foreground, enable clipboard sync in settings, and test ordinary short text in both directions.
 6. Test pause/resume, a text longer than 8 KB, and text containing `-----BEGIN PRIVATE KEY-----`; the latter two should stay local.
 7. Move the app to the background and confirm the product never promises continuous clipboard monitoring; continue testing after returning to the foreground.
-8. If something fails, open Settings → Connection → Technical details on both ends first and record the OS version, network type, failure direction, and error message.
+8. If something fails, open Settings → Connection → Connection status on both ends first and record the OS version, network type, failure direction, and error message.
 
 ## Relay acceptance on real devices
 
