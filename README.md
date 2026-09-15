@@ -6,7 +6,7 @@
   <p>
     <a href="https://github.com/kure29/Neloa/actions/workflows/ci.yml"><img src="https://github.com/kure29/Neloa/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <a href="https://github.com/kure29/Neloa/releases/latest"><img src="https://img.shields.io/github/v/release/kure29/Neloa?label=release" alt="Latest release" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/github/license/kure29/Neloa" alt="MIT License" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/kure29/Neloa" alt="Apache License 2.0" /></a>
     <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2" />
   </p>
   <p><a href="#简体中文">简体中文</a> · <a href="#english">English</a></p>
@@ -46,7 +46,7 @@ Neloa 优先使用局域网直连；设备不在同一网络时，也可以通�
 ### 使用方法
 
 1. 在两台设备上打开 Neloa；局域网使用时让它们连接同一网络。
-2. 在雷达页选择设备，核对两端显示的六位数字并确认配对。
+2. 在设备页选择设备，核对两端显示的六位数字并确认配对。
 3. 选择一个或多个文件；桌面端也可以把文件拖进窗口。
 4. 检查发送列表并点击发送，接收端需要明确接受每个文件。
 5. 跨网络使用前，先在局域网完成一次配对，再在两端配置同一个自建中继。
@@ -135,4 +135,4 @@ See [architecture and security](ARCHITECTURE.md), [mobile builds](MOBILE_BUILD.m
 
 ## License
 
-Neloa is available under the [MIT License](LICENSE).
+Neloa is available under the [Apache License 2.0](LICENSE).

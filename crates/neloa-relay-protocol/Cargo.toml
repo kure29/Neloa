@@ -2,7 +2,7 @@
 name = "neloa-relay-protocol"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 description = "Wire protocol shared by Neloa relay clients and servers"
 
 [dependencies]
