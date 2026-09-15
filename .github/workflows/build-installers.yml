@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Draft release tag used for the generated installers
         required: true
-        default: v0.1.8-test
+        default: v0.1.11-rc.1
   push:
     tags:
       - v*
@@ -36,7 +36,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "Neloa $RELEASE_TAG" \
-              --notes "Automated unsigned desktop test builds plus signed, ABI-specific Android release APKs. These packages are intended for real-device validation." \
+              --notes "Automated macOS, Windows, and signed ABI-specific Android packages for real-device validation. macOS uses ad-hoc signing; Windows is unsigned." \
               --draft \
               --prerelease
           fi
@@ -98,7 +98,7 @@ jobs:
           args: ${{ matrix.args }}
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: Automated unsigned desktop test builds plus signed, ABI-specific Android release APKs. These packages are intended for real-device validation.
+          releaseBody: "Automated macOS, Windows, and signed ABI-specific Android packages for real-device validation. macOS uses ad-hoc signing; Windows is unsigned."
           releaseDraft: true
           prerelease: true
 
@@ -192,6 +192,6 @@ jobs:
           args: --target ${{ matrix.tauri_target }} --split-per-abi --apk --ci
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: Automated unsigned desktop test builds plus signed, ABI-specific Android release APKs. These packages are intended for real-device validation.
+          releaseBody: "Automated macOS, Windows, and signed ABI-specific Android packages for real-device validation. macOS uses ad-hoc signing; Windows is unsigned."
           releaseDraft: true
           prerelease: true

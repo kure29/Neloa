@@ -53,8 +53,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 0.1.10
-        CFBundleVersion: "0.1.10"
+        CFBundleShortVersionString: 0.1.11
+        CFBundleVersion: "0.1.11"
     entitlements:
       path: neloa_iOS/neloa_iOS.entitlements
     scheme:

@@ -4,10 +4,10 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 0.1.6 的双架构、版本、永久签名、图标和校验和已完成包内核验 | 真机与桥接网络下的局域网发现、双向传输、前台剪贴板 |
-| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | 0.1.8 的 Xcode 26.6 构建、P12 重签安装、原生 Bonjour/Rust 启动桥和真机基础流程已验证 | 更多网络环境、长时间传输与前后台回归 |
+| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 固定签名、双架构、图标和校验和已完成包内核验 | 0.1.11 的多文件、局域网与中继真机回归 |
+| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 重签安装、原生 Bonjour/Rust 启动桥和真机基础流程已验证 | 0.1.11 的多文件、长时间传输与前后台回归 |
 
-Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。0.1.6 起由项目自己的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 已使用完整 Xcode 生成无签名 IPA；安装到真机前仍需使用 Apple 开发证书和匹配的描述文件签名。
+Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。APK 由项目固定的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 使用完整 Xcode 生成无签名 IPA；安装到真机前仍需使用 Apple 开发证书和匹配的描述文件签名。
 
 ## 已接入的移动端能力
 
@@ -27,13 +27,13 @@ Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuM
 最方便的方式是把 APK 发送到手机，允许当前文件管理器“安装未知应用”，然后点 APK 安装。也可以打开 USB 调试后运行：
 
 ```bash
-adb install -r Neloa_0.1.6_arm64.apk
+adb install -r Neloa_<版本号>_arm64.apk
 ```
 
-0.1.6 APK 构建完成后可在下载目录校验 SHA-256：
+APK 下载完成后可在下载目录校验 SHA-256：
 
 ```bash
-shasum -a 256 Neloa_0.1.6_arm64.apk
+shasum -a 256 Neloa_<版本号>_arm64.apk
 ```
 
 ## Android Release 签名
@@ -124,7 +124,8 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
 
 ## 已知的发布前事项
 
-- Android 0.1.6 Release APK 已验证：ARM64 约 10.6 MB、x86_64 约 11.6 MB，均使用同一永久证书；首次从旧 Debug 签名迁移仍需卸载重装。
-- iOS 发现层已经改为原生 Bonjour 适配器，不再依赖需要 Apple 额外批准的多播 entitlement。`DefunctConnection` 生命周期恢复和 Swift/Rust 静态启动桥已通过 P12 重签后的真机基础验证，后续继续覆盖更多网络环境与长时间运行场景。
+- Android Release APK 使用同一永久证书；首次从旧 Debug 签名迁移仍需卸载重装。
+- iOS 发现层使用原生 Bonjour 适配器，不依赖需要 Apple 额外批准的多播 entitlement。`DefunctConnection` 生命周期恢复和 Swift/Rust 静态启动桥已通过 P12 重签后的真机基础验证。
+- 0.1.11 新增多文件选择与批量发送；发布前应在 Android 和 iOS 上分别验证多选、连续接受、拒绝、取消与中继传输。
 - 移动系统不允许把剪贴板同步做成与桌面端完全相同的无限后台轮询。后续可增加“回到前台自动检查”和用户主动粘贴入口。
 - iOS 与 Android 应用标识统一为 `com.kure29.neloa`。首次从旧标识迁移时，系统会将其视为一个新应用。
