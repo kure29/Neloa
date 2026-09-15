@@ -1,0 +1,69 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/**
+      - README.md
+      - ARCHITECTURE.md
+      - MOBILE_BUILD.md
+      - WINDOWS_BUILD.md
+      - relay/README.md
+      - package.json
+      - package-lock.json
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build manual
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build manual
+        run: npm run docs:build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload manual
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy manual
+        id: deployment
+        uses: actions/deploy-pages@v5
