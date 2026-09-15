@@ -210,3 +210,14 @@
     display: none;
   }
 }
+
+/* Keep the full queue and primary action visible at the supported 720×520 minimum. */
+@media (max-height: 600px) {
+  .shell-desktop .send-dock {
+    row-gap: 0;
+  }
+
+  .shell-desktop .dock-hint {
+    display: none;
+  }
+}

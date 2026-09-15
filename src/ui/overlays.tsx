@@ -161,10 +161,28 @@ export function Toast({ message }: { message: string }) {
   );
 }
 
+export function FileDropOverlay({ app }: { app: NeloaState }) {
+  if (!app.fileDrop.active) return null;
+  const count = Math.max(1, app.fileDrop.count);
+
+  return (
+    <div className="file-drop-overlay" role="status" aria-live="polite" aria-atomic="true">
+      <div className="file-drop-message">
+        <span className="file-drop-icon" aria-hidden="true">
+          <Icon name="download" size={24} />
+        </span>
+        <strong>释放以添加 {count} 个文件</strong>
+        <span>文件会进入待发送列表，不会立即发送</span>
+      </div>
+    </div>
+  );
+}
+
 /** Every overlay layer, so both shells mount the same set in the same order. */
 export function Overlays({ app }: { app: NeloaState }) {
   return (
     <>
+      <FileDropOverlay app={app} />
       <TransferTray app={app} />
       <PairingSheet app={app} />
       <FileOfferSheet app={app} />

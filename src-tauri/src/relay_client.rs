@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    sync::Arc,
     time::Duration,
 };
 
@@ -90,7 +91,7 @@ pub(crate) struct RelayClientHandle {
     directive: watch::Sender<RelayDirective>,
     device: watch::Sender<LocalDevice>,
     commands: mpsc::Sender<OpenTunnelRequest>,
-    status: std::sync::Arc<RwLock<RelaySnapshot>>,
+    status: Arc<RwLock<RelaySnapshot>>,
 }
 
 pub(crate) struct RelayClientWorker {
@@ -98,7 +99,7 @@ pub(crate) struct RelayClientWorker {
     device: watch::Receiver<LocalDevice>,
     commands: mpsc::Receiver<OpenTunnelRequest>,
     incoming: mpsc::Sender<IncomingRelayTunnel>,
-    status: std::sync::Arc<RwLock<RelaySnapshot>>,
+    status: Arc<RwLock<RelaySnapshot>>,
 }
 
 pub(crate) fn relay_client_channel(
@@ -110,7 +111,7 @@ pub(crate) fn relay_client_channel(
     mpsc::Receiver<IncomingRelayTunnel>,
 ) {
     let initial = directive.initial_snapshot();
-    let status = std::sync::Arc::new(RwLock::new(initial));
+    let status = Arc::new(RwLock::new(initial));
     let (directive_sender, directive_receiver) = watch::channel(directive);
     let (device_sender, device_receiver) = watch::channel(device);
     let (command_sender, command_receiver) = mpsc::channel(COMMAND_CAPACITY);
@@ -120,7 +121,7 @@ pub(crate) fn relay_client_channel(
             directive: directive_sender,
             device: device_sender,
             commands: command_sender,
-            status: std::sync::Arc::clone(&status),
+            status: Arc::clone(&status),
         },
         RelayClientWorker {
             directive: directive_receiver,
@@ -150,7 +151,7 @@ impl RelayClientHandle {
             directive: directive_sender,
             device: device_sender,
             commands: command_sender,
-            status: std::sync::Arc::new(RwLock::new(status)),
+            status: Arc::new(RwLock::new(status)),
         }
     }
 
@@ -197,7 +198,7 @@ impl RelayClientWorker {
         mut self,
         app: AppHandle,
         trust: TrustStore,
-        peers: std::sync::Arc<RwLock<HashMap<String, PeerDevice>>>,
+        peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     ) {
         loop {
             let directive = self.directive.borrow().clone();
@@ -293,8 +294,8 @@ async fn run_connection(
     app: &AppHandle,
     local: &LocalDevice,
     trust: &TrustStore,
-    peers: &std::sync::Arc<RwLock<HashMap<String, PeerDevice>>>,
-    status: &std::sync::Arc<RwLock<RelaySnapshot>>,
+    peers: &Arc<RwLock<HashMap<String, PeerDevice>>>,
+    status: &Arc<RwLock<RelaySnapshot>>,
     directive: &mut watch::Receiver<RelayDirective>,
     device: &mut watch::Receiver<LocalDevice>,
     commands: &mut mpsc::Receiver<OpenTunnelRequest>,
@@ -620,7 +621,7 @@ async fn run_tunnel_pump(
 }
 
 fn apply_relay_presence(
-    peers: &std::sync::Arc<RwLock<HashMap<String, PeerDevice>>>,
+    peers: &Arc<RwLock<HashMap<String, PeerDevice>>>,
     trust: &TrustStore,
     local_id: &str,
     devices: Vec<RelayDevice>,
@@ -639,8 +640,8 @@ fn apply_relay_presence(
         }
         true
     });
+    let now = unix_millis();
     for (id, device) in &devices {
-        let now = unix_millis();
         if let Some(peer) = peers.get_mut(id) {
             peer.relay_available = true;
             peer.last_seen_ms = now;
@@ -675,7 +676,7 @@ fn apply_relay_presence(
     devices.len()
 }
 
-fn clear_relay_presence(peers: &std::sync::Arc<RwLock<HashMap<String, PeerDevice>>>) {
+fn clear_relay_presence(peers: &Arc<RwLock<HashMap<String, PeerDevice>>>) {
     peers.write().retain(|_, peer| {
         peer.relay_available = false;
         !peer.addresses.is_empty()
@@ -693,11 +694,7 @@ fn config_snapshot(config: &RelayConnectionConfig) -> RelaySnapshot {
     }
 }
 
-fn publish_status(
-    app: &AppHandle,
-    status: &std::sync::Arc<RwLock<RelaySnapshot>>,
-    snapshot: RelaySnapshot,
-) {
+fn publish_status(app: &AppHandle, status: &Arc<RwLock<RelaySnapshot>>, snapshot: RelaySnapshot) {
     *status.write() = snapshot.clone();
     let _ = app.emit("relay-status-changed", snapshot);
 }
@@ -771,7 +768,7 @@ mod tests {
                 last_verified_ms: 1,
             })
             .unwrap();
-        let peers = std::sync::Arc::new(RwLock::new(HashMap::new()));
+        let peers = Arc::new(RwLock::new(HashMap::new()));
 
         let online = apply_relay_presence(
             &peers,
