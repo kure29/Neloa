@@ -4,7 +4,7 @@ version = "0.1.11"
 description = "Local-first encrypted file and clipboard transfer"
 authors = ["Neloa contributors"]
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 [lib]
 name = "neloa_lib"
