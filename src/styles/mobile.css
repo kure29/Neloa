@@ -67,7 +67,7 @@
 }
 
 .tabbar-item.active {
-  color: var(--ink);
+  color: var(--primary);
   font-weight: 500;
 }
 
@@ -82,14 +82,32 @@
   padding: var(--s3) var(--s4) var(--s4);
 }
 
-.shell-mobile .radar-stage {
-  min-height: 320px;
+.shell-mobile .device-browser {
+  min-height: 260px;
 }
 
-.shell-mobile .peer-node {
-  width: 84px;
-  min-height: 44px;
+.shell-mobile .peer-row {
+  min-height: 68px;
   padding: var(--s1);
+}
+
+.shell-mobile .peer-row-main {
+  min-height: 60px;
+  padding: var(--s2);
+}
+
+.shell-mobile .peer-more {
+  width: 44px;
+  height: 44px;
+}
+
+.shell-mobile .peer-selected-mark {
+  width: 44px;
+  height: 44px;
+}
+
+.shell-mobile .device-browser-heading {
+  padding-top: var(--s2);
 }
 
 .shell-mobile .section-title {
@@ -130,8 +148,8 @@
 }
 
 .shell-mobile .switch.on::before {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--primary);
+  background: var(--primary);
 }
 
 .shell-mobile .switch-knob {
@@ -153,29 +171,21 @@
   gap: var(--s1);
 }
 
-.shell-mobile .advanced-settings > summary {
-  min-height: 64px;
-}
-
-.shell-mobile .advanced-actions {
-  align-items: flex-start;
-  flex-direction: column;
-}
-
 .shell-mobile .relay-fields {
   grid-template-columns: 1fr;
 }
 
 .shell-mobile .device-name-config {
-  grid-template-columns: 1fr;
-}
-
-.shell-mobile .device-name-config .btn {
-  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .shell-mobile .setting-field input {
   font-size: 16px;
+}
+
+.shell-mobile .alias-reset {
+  min-height: 44px;
+  margin-left: calc(var(--s3) * -1);
 }
 
 .shell-mobile .relay-actions {
@@ -187,13 +197,42 @@
   width: 100%;
 }
 
-.shell-mobile .advanced-actions .section-buttons {
+.shell-mobile .relay-action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   width: 100%;
-  margin-left: 0;
 }
 
-.shell-mobile .advanced-actions .btn {
-  flex: 1;
+.shell-mobile .connection-health-summary {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  min-height: 0;
+  padding-block: var(--s4);
+}
+
+.shell-mobile .connection-health-summary .btn {
+  margin-top: 1px;
+}
+
+.shell-mobile .connection-issue {
+  align-items: flex-start;
+}
+
+.shell-mobile .connection-issue .badge {
+  margin-top: 1px;
+}
+
+.shell-mobile .diagnostic-details > summary {
+  min-height: 56px;
+}
+
+.shell-mobile .diagnostic-support {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.shell-mobile .diagnostic-support .btn {
+  width: 100%;
 }
 
 .shell-mobile .send-dock {

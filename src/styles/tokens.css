@@ -1,47 +1,78 @@
 /*
- * Neloa design tokens — "paper & ink".
+ * Neloa design tokens — "white & signal".
  *
- * Warm neutral surfaces, an ink-black primary, and a single copper accent used
- * only where something genuinely needs to be noticed. No gradients, no glows.
+ * Pure-white working surfaces keep file transfer calm and familiar. Colour is
+ * reserved for meaning: blue actions, purple relay, green readiness, amber
+ * pairing, and recognisable platform accents. No gradients, no glows.
  *
  * Every colour exists as one variable name with a light and a dark value, so
- * component rules never branch on the colour scheme. The primary button is
- * `background: var(--ink); color: var(--paper-0)`, which inverts on its own.
+ * component rules never branch on the colour scheme.
  *
  * Contrast against --paper-0 / --paper-1 (WCAG AA body text needs 4.5:1):
- *   light  ink 16.1  ink-2 7.4  ink-3 5.0  copper 4.6  ok 5.0  warn 5.3  danger 6.3
- *   dark   ink 16.3  ink-2 7.4  ink-3 4.8  copper 7.1  ok 7.4  warn 8.0  danger 6.5
+ *   light ink 17.7, ink-2 7.6, ink-3 4.7, primary 5.2, relay 7.0
  */
 
 :root {
   /* Surfaces, lightest to most recessed. */
-  --paper-0: #fbfaf8;
+  --paper-0: #ffffff;
   --paper-1: #ffffff;
-  --paper-2: #f3f1ec;
-  --paper-3: #eae7e0;
+  --paper-2: #f7f9fc;
+  --paper-3: #eef2f7;
 
-  --line: #e5e1d9;
-  --line-strong: #d6d1c6;
+  --line: #e4e7ec;
+  --line-strong: #cbd5e1;
 
   /* Text, primary to tertiary. */
-  --ink: #1a1714;
-  --ink-2: #57514a;
-  --ink-3: #736c60;
+  --ink: #111827;
+  --ink-2: #475569;
+  --ink-3: #64748b;
 
-  --copper: #b4562a;
-  --copper-soft: #faf0e9;
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: #eff6ff;
+  --relay: #6d28d9;
+  --relay-soft: #f3e8ff;
 
-  --ok: #2f7a4f;
-  --ok-soft: #edf6f0;
-  --warn: #9a5a0b;
-  --warn-soft: #fbf3e6;
-  --danger: #b3261e;
-  --danger-soft: #fdf0ee;
+  /* Compatibility aliases for older component rules. */
+  --copper: #2563eb;
+  --copper-soft: #eff6ff;
 
-  --elev-1: 0 1px 2px rgba(26, 23, 20, 0.04);
-  --elev-2: 0 6px 20px rgba(26, 23, 20, 0.09);
-  --elev-3: 0 24px 60px rgba(26, 23, 20, 0.22);
-  --scrim: rgba(26, 23, 20, 0.28);
+  --ok: #15803d;
+  --ok-soft: #ecfdf3;
+  --warn: #a16207;
+  --warn-soft: #fff7e6;
+  --danger: #b42318;
+  --danger-soft: #fff1f0;
+
+  --platform-apple: #4f46e5;
+  --platform-apple-soft: #eef2ff;
+  --platform-windows: #0078d4;
+  --platform-windows-soft: #eaf6ff;
+  --platform-android: #16833f;
+  --platform-android-soft: #eaf8ef;
+  --platform-linux: #111827;
+  --platform-linux-soft: #f7f9fc;
+  --platform-debian: #a80030;
+  --platform-debian-soft: #fff0f4;
+  --platform-ubuntu: #c2410c;
+  --platform-ubuntu-soft: #fff2eb;
+  --platform-fedora: #294172;
+  --platform-fedora-soft: #eef3fb;
+  --platform-arch: #087ea4;
+  --platform-arch-soft: #eaf8fc;
+  --platform-manjaro: #168448;
+  --platform-manjaro-soft: #eaf8ef;
+  --platform-opensuse: #4b7f24;
+  --platform-opensuse-soft: #f0f8e9;
+  --platform-linuxmint: #4f7f2b;
+  --platform-linuxmint-soft: #f0f8e9;
+  --platform-redhat: #c91920;
+  --platform-redhat-soft: #fff0f0;
+
+  --elev-1: 0 1px 3px rgba(15, 23, 42, 0.07);
+  --elev-2: 0 8px 24px rgba(15, 23, 42, 0.11);
+  --elev-3: 0 24px 60px rgba(15, 23, 42, 0.24);
+  --scrim: rgba(15, 23, 42, 0.3);
 
   /* Type. Three weights only: 400, 500, 600. */
   --text-micro: 11px;
@@ -84,27 +115,57 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper-0: #14120f;
-    --paper-1: #1c1a16;
-    --paper-2: #23201b;
-    --paper-3: #2c2822;
+    --paper-0: #0d111b;
+    --paper-1: #131a28;
+    --paper-2: #192233;
+    --paper-3: #243044;
 
-    --line: #302c25;
-    --line-strong: #3e392f;
+    --line: #263247;
+    --line-strong: #3b4a63;
 
-    --ink: #f2efe9;
-    --ink-2: #a9a296;
-    --ink-3: #8f877a;
+    --ink: #f8fafc;
+    --ink-2: #cbd5e1;
+    --ink-3: #94a3b8;
 
-    --copper: #e08b5c;
-    --copper-soft: #2a1e16;
+    --primary: #60a5fa;
+    --primary-strong: #93c5fd;
+    --primary-soft: #172b4f;
+    --relay: #c4b5fd;
+    --relay-soft: #2b2147;
+    --copper: #60a5fa;
+    --copper-soft: #172b4f;
 
-    --ok: #5fb483;
-    --ok-soft: #17261d;
-    --warn: #d9a036;
-    --warn-soft: #2a2113;
-    --danger: #e8776b;
-    --danger-soft: #2c1a18;
+    --ok: #6ee7a0;
+    --ok-soft: #153323;
+    --warn: #fbbf59;
+    --warn-soft: #362811;
+    --danger: #fda29b;
+    --danger-soft: #3a1c21;
+
+    --platform-apple: #a5b4fc;
+    --platform-apple-soft: #24284e;
+    --platform-windows: #67c3ff;
+    --platform-windows-soft: #142f45;
+    --platform-android: #71dfa0;
+    --platform-android-soft: #173526;
+    --platform-linux: #f8fafc;
+    --platform-linux-soft: #192233;
+    --platform-debian: #ff7aa2;
+    --platform-debian-soft: #3b1724;
+    --platform-ubuntu: #ff9a6c;
+    --platform-ubuntu-soft: #3b2118;
+    --platform-fedora: #8ab4f8;
+    --platform-fedora-soft: #1b2c49;
+    --platform-arch: #67d0f1;
+    --platform-arch-soft: #15323f;
+    --platform-manjaro: #6ee7a0;
+    --platform-manjaro-soft: #173526;
+    --platform-opensuse: #a3d977;
+    --platform-opensuse-soft: #23351a;
+    --platform-linuxmint: #a3d977;
+    --platform-linuxmint-soft: #23351a;
+    --platform-redhat: #ff8a8f;
+    --platform-redhat-soft: #3b1d21;
 
     --elev-1: 0 1px 2px rgba(0, 0, 0, 0.3);
     --elev-2: 0 6px 20px rgba(0, 0, 0, 0.42);

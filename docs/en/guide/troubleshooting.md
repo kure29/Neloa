@@ -6,9 +6,9 @@ title: Troubleshooting
 
 Start with the summary at the top of Settings → Connection. It reports either "connection is healthy" or "N items need attention", lists the items that need attention, and gives a suggested action for each.
 
-## Diagnostics
+## Connection status
 
-Expand Settings → Connection → Technical details to see six checks:
+Expand Settings → Connection → Connection status to see six checks:
 
 | Check | What it covers |
 | --- | --- |
@@ -19,12 +19,10 @@ Expand Settings → Connection → Technical details to see six checks:
 | Clipboard sync | Whether it is enabled and usable |
 | Self-hosted relay | Whether it is enabled and connected |
 
-Copy diagnostics at the bottom generates a report that **contains no clipboard bodies**, suitable for pasting into an issue.
-
 ## No devices found
 
 1. Confirm both devices are on the same network and both have Neloa open.
-2. Look at the devices screen hint. "Searching for nearby and relay devices" means discovery is still running; "device discovery is unavailable" means it is not, so check Device discovery in the diagnostics.
+2. Look at the devices screen hint. "Searching for nearby and relay devices" means discovery is still running; "device discovery is unavailable" means it is not, so check Device discovery under Connection status.
 3. On Windows, check whether the firewall allows Neloa on private and public networks.
 4. iOS asks for Local Network permission on first run; if it was declined, re-enable it in system settings.
 5. Android needs working Wi-Fi. Neloa holds the mDNS multicast lock while the app is alive, but local discovery cannot work when the device is only on cellular.
@@ -45,7 +43,7 @@ The two protocol ranges do not overlap, or the peer lacks a capability this oper
 - Confirm the address starts with `wss://` and ends with `/v1/ws`.
 - Confirm both devices use exactly the same token.
 - Confirm the reverse proxy forwards HTTPS to `127.0.0.1:8787` with a valid certificate.
-- Check the Self-hosted relay entry under Technical details. Even when the relay fails, local transfers keep working.
+- Check the Self-hosted relay entry under Connection status. Even when the relay fails, local transfers keep working.
 
 ## Clipboard sync does nothing
 

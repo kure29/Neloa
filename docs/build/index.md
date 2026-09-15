@@ -40,5 +40,5 @@ npm run tauri dev
 
 ## 分平台说明
 
-- [Windows 安装程序](/build/windows) — 双击 `build-windows.bat` 的完整前置条件。
+- [Windows 安装程序](/build/windows) — 使用 GitHub Actions 或在 Windows 本机构建 NSIS 安装程序。
 - [Android 与 iOS](/build/mobile) — 签名配置、真机构建与真机验收顺序。

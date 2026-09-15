@@ -50,10 +50,6 @@ enum ClipboardCommand {
         text: String,
         response: oneshot::Sender<Result<bool, String>>,
     },
-    WriteLocal {
-        text: String,
-        response: oneshot::Sender<Result<(), String>>,
-    },
 }
 
 #[derive(Clone)]
@@ -147,16 +143,6 @@ impl ClipboardService {
             .await
             .map_err(|_| "系统剪贴板服务没有返回写入结果".to_string())?
     }
-
-    pub(crate) async fn write_local(&self, text: String) -> Result<(), String> {
-        let (response, result) = oneshot::channel();
-        self.sender
-            .send(ClipboardCommand::WriteLocal { text, response })
-            .map_err(|_| "系统剪贴板服务未运行".to_string())?;
-        result
-            .await
-            .map_err(|_| "系统剪贴板服务没有返回写入结果".to_string())?
-    }
 }
 
 fn persist_settings(path: &PathBuf, enabled: bool) -> Result<(), String> {
@@ -211,17 +197,6 @@ fn run_clipboard(
                         last_text = Some(canonical_text(&text));
                         baseline_ready = true;
                         true
-                    });
-                let _ = response.send(outcome);
-            }
-            Ok(ClipboardCommand::WriteLocal { text, response }) => {
-                let outcome = app
-                    .clipboard()
-                    .write_text(text.clone())
-                    .map_err(|error| format!("无法写入系统剪贴板：{error}"))
-                    .map(|_| {
-                        last_text = Some(canonical_text(&text));
-                        baseline_ready = true;
                     });
                 let _ = response.send(outcome);
             }

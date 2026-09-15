@@ -40,5 +40,5 @@ Installers are produced by `.github/workflows/build-installers.yml`, triggered m
 
 ## Per-platform pages
 
-- [Windows installer](/en/build/windows) — the full prerequisites for the `build-windows.bat` flow.
+- [Windows installer](/en/build/windows) — build the NSIS installer with GitHub Actions or on Windows itself.
 - [Android and iOS](/en/build/mobile) — signing setup, device builds, and device acceptance order.

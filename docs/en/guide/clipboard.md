@@ -19,7 +19,7 @@ Enabling it records the current clipboard as a local baseline, but does **not** 
 | Content type | Plain text only |
 | Per-item limit | 8 KB |
 | Sensitive content | Blocked on common key and credential markers such as `-----BEGIN PRIVATE KEY-----` |
-| Persistence | The body is never written to history or to a diagnostics report |
+| Persistence | The body is never written to history; Connection status shows service state only |
 | Targets | Only currently online, already paired devices |
 
 Text that exceeds the size limit or matches a sensitive-content marker **stays on this device** and is not sent.

@@ -14,7 +14,7 @@ export interface Tab {
 }
 
 export const TABS: Tab[] = [
-  { id: "radar", label: "雷达", short: "雷达", icon: "radio" },
+  { id: "radar", label: "设备", short: "设备", icon: "radio" },
   { id: "history", label: "传输记录", short: "记录", icon: "clock" },
   { id: "settings", label: "设置", short: "设置", icon: "sliders" },
 ];

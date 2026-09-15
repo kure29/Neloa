@@ -14,7 +14,7 @@ const ShellContext = createContext<Shell>("desktop");
 export const ShellProvider = ShellContext.Provider;
 export const useShell = () => useContext(ShellContext);
 
-export type Tone = "neutral" | "ok" | "warn" | "danger";
+export type Tone = "neutral" | "ok" | "warn" | "danger" | "relay";
 
 /* ---------- buttons ---------- */
 
@@ -138,9 +138,33 @@ export function DeviceAvatar({
   trusted?: boolean;
   incompatible?: boolean;
 }) {
+  const normalizedPlatform = platform.toLowerCase();
+  const platformClass = [
+    "macos",
+    "ios",
+    "windows",
+    "android",
+    "linux",
+    "debian",
+    "ubuntu",
+    "fedora",
+    "arch",
+    "manjaro",
+    "opensuse",
+    "linuxmint",
+    "redhat",
+  ].includes(normalizedPlatform)
+    ? `platform-${normalizedPlatform}`
+    : "platform-other";
+
   return (
     <span
-      className={cx("device-avatar", incompatible && "incompatible", trusted && "trusted")}
+      className={cx(
+        "device-avatar",
+        platformClass,
+        incompatible && "incompatible",
+        trusted && "trusted",
+      )}
       style={{ width: size, height: size }}
     >
       <Icon name={deviceIcon(platform)} size={Math.round(size * 0.48)} />

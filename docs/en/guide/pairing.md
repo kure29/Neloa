@@ -40,7 +40,7 @@ The device's own name is edited under Settings → This device, and that is the 
 
 ## Revoking trust
 
-Under Settings → Paired devices, press Remove on a device to revoke trust. Afterwards:
+The devices screen only shows devices that are currently online. Settings → Device trust also keeps offline devices so you can revoke their access at any time. Press Remove there to revoke trust. Afterwards:
 
 - The device disappears from your trusted list and can no longer send you files or clipboard content.
 - Re-establishing trust requires both devices to go through the six-digit flow again.

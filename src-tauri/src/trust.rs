@@ -5,6 +5,7 @@ use parking_lot::{Mutex, RwLock};
 use crate::model::TrustedDevice;
 
 const TOUCH_PERSIST_INTERVAL_MS: u128 = 30_000;
+pub(crate) const MAX_DEVICE_ALIAS_CHARS: usize = 32;
 
 #[derive(Clone)]
 pub(crate) struct TrustStore {
@@ -51,9 +52,37 @@ impl TrustStore {
         self.devices.read().get(id).cloned()
     }
 
-    pub(crate) fn upsert(&self, device: TrustedDevice) -> Result<(), String> {
-        self.devices.write().insert(device.id.clone(), device);
+    pub(crate) fn upsert(&self, mut device: TrustedDevice) -> Result<(), String> {
+        let mut devices = self.devices.write();
+        if device.alias.is_none() {
+            device.alias = devices
+                .get(&device.id)
+                .and_then(|existing| existing.alias.clone());
+        }
+        devices.insert(device.id.clone(), device);
+        drop(devices);
         self.persist()
+    }
+
+    pub(crate) fn set_alias(&self, id: &str, value: &str) -> Result<TrustedDevice, String> {
+        let value = value.trim();
+        if value.chars().count() > MAX_DEVICE_ALIAS_CHARS {
+            return Err(format!("设备备注最多 {MAX_DEVICE_ALIAS_CHARS} 个字符"));
+        }
+        if value.chars().any(char::is_control) {
+            return Err("设备备注不能包含换行或控制字符".into());
+        }
+        let alias = (!value.is_empty()).then(|| value.to_string());
+        let updated = {
+            let mut devices = self.devices.write();
+            let device = devices
+                .get_mut(id)
+                .ok_or_else(|| "只能为已配对设备设置备注名".to_string())?;
+            device.alias = alias;
+            device.clone()
+        };
+        self.persist()?;
+        Ok(updated)
     }
 
     pub(crate) fn remove(&self, id: &str) -> Result<bool, String> {
@@ -133,6 +162,7 @@ mod tests {
         TrustedDevice {
             id: "device-1".into(),
             name: "Test device".into(),
+            alias: None,
             platform: "test".into(),
             public_key: "public-key".into(),
             fingerprint: "fingerprint".into(),
@@ -162,5 +192,52 @@ mod tests {
 
         store.touch("device-1", 60_000).await.unwrap();
         assert_eq!(persisted_timestamp(&path), 60_000);
+    }
+
+    #[test]
+    fn loads_legacy_devices_without_alias() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("trusted-devices.json");
+        fs::write(
+            &path,
+            r#"[{"id":"legacy","name":"Old Mac","platform":"macos","publicKey":"key","fingerprint":"fp","pairedAtMs":1,"lastVerifiedMs":2}]"#,
+        )
+        .unwrap();
+
+        let store = TrustStore::load(path).unwrap();
+        assert_eq!(store.find("legacy").unwrap().alias, None);
+    }
+
+    #[test]
+    fn persists_alias_and_preserves_it_when_device_refreshes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("trusted-devices.json");
+        let store = TrustStore::load(path.clone()).unwrap();
+        store.upsert(trusted_device(1)).unwrap();
+
+        let renamed = store.set_alias("device-1", "  客厅 Mac  ").unwrap();
+        assert_eq!(renamed.alias.as_deref(), Some("客厅 Mac"));
+
+        let mut refreshed = trusted_device(2);
+        refreshed.name = "Updated system name".into();
+        store.upsert(refreshed).unwrap();
+        assert_eq!(
+            store.find("device-1").unwrap().alias.as_deref(),
+            Some("客厅 Mac")
+        );
+        assert_eq!(
+            TrustStore::load(path.clone())
+                .unwrap()
+                .find("device-1")
+                .unwrap()
+                .alias
+                .as_deref(),
+            Some("客厅 Mac")
+        );
+
+        assert_eq!(store.set_alias("device-1", "  ").unwrap().alias, None);
+        assert!(store
+            .set_alias("device-1", &"a".repeat(MAX_DEVICE_ALIAS_CHARS + 1))
+            .is_err());
     }
 }

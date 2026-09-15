@@ -24,11 +24,13 @@ export function MobileShell({ app }: { app: NeloaState }) {
             {app.statusLabel}
           </span>
         </div>
-        <IconButton
-          icon="scan"
-          label="重新扫描局域网设备"
-          onClick={() => void app.refreshDiscovery(true)}
-        />
+        {app.view === "radar" && (
+          <IconButton
+            icon="scan"
+            label="重新查找设备"
+            onClick={() => void app.refreshDiscovery(true)}
+          />
+        )}
       </header>
 
       <main className="content" id="main" tabIndex={-1}>

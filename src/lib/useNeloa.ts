@@ -4,7 +4,6 @@ import {
   beginPairing,
   cancelFileTransfer,
   chooseFiles,
-  copyDiagnosticReport,
   decideFileOffer,
   decidePairing,
   detectShell,
@@ -36,6 +35,7 @@ import {
   setClipboardEnabled,
   setDeviceName,
   setRelayConfig,
+  setTrustedDeviceAlias,
   startFileTransfer,
 } from "../bridge";
 import type {
@@ -55,7 +55,8 @@ import { fileTransferRecord, transferRecord } from "./format";
 import { resolvePrimaryAction } from "./primaryAction";
 
 export type ViewName = "radar" | "history" | "settings";
-export type BusyAction = "pair" | "file" | "clipboard" | "deviceName" | "relay" | "diagnostics" | null;
+export type BusyAction = "pair" | "file" | "clipboard" | "deviceName" | "alias" | "relay" | "diagnostics" | null;
+export type ToastTone = "neutral" | "ok" | "warn" | "danger";
 
 const EMPTY_DISCOVERY: DiscoverySnapshot = { active: false, error: null, peers: [] };
 const EMPTY_SECURITY: SecuritySnapshot = {
@@ -86,7 +87,6 @@ const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   checks: [],
   peers: [],
   firewallGuidance: "正在读取本机网络建议…",
-  reportPrivacy: "报告不含 IP、完整设备 ID、公钥、文件路径或剪贴板正文",
 };
 const MAX_QUEUED_FILES = 20;
 
@@ -120,11 +120,13 @@ export function useNeloa() {
   const [fileTransfers, setFileTransfers] = useState<Record<string, FileTransferProgress>>({});
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [toast, setToast] = useState("");
+  const [toastTone, setToastTone] = useState<ToastTone>("neutral");
   const [history, setHistory] = useState<TransferRecord[]>([]);
   const toastTimer = useRef<number | undefined>(undefined);
 
-  const showToast = useCallback((message: string) => {
+  const showToast = useCallback((message: string, tone: ToastTone = "neutral") => {
     window.clearTimeout(toastTimer.current);
+    setToastTone(tone);
     setToast(message);
     toastTimer.current = window.setTimeout(() => setToast(""), 3000);
   }, []);
@@ -164,19 +166,22 @@ export function useNeloa() {
     const unreadable = rejected + omitted;
     const skipped = queued.duplicates + queued.overflow + unreadable;
     if (queued.added > 0) {
-      showToast(skipped > 0
-        ? `已添加 ${queued.added} 个文件，${skipped} 个未添加`
-        : `已添加 ${queued.added} 个文件`);
+      showToast(
+        skipped > 0
+          ? `已添加 ${queued.added} 个文件，${skipped} 个未添加`
+          : `已添加 ${queued.added} 个文件`,
+        skipped > 0 ? "warn" : "ok",
+      );
       return;
     }
     if (selectedFilesRef.current.length >= MAX_QUEUED_FILES || queued.overflow > 0) {
-      showToast(`发送列表已满，最多 ${MAX_QUEUED_FILES} 个文件`);
+      showToast(`发送列表已满，最多 ${MAX_QUEUED_FILES} 个文件`, "warn");
     } else if (unreadable > 0) {
-      showToast("未添加：文件夹或文件不可读取");
+      showToast("未添加：文件夹或文件不可读取", "danger");
     } else if (queued.duplicates > 0) {
-      showToast("所选文件已在发送列表中");
+      showToast("所选文件已在发送列表中", "warn");
     } else {
-      showToast("没有可添加的文件");
+      showToast("没有可添加的文件", "warn");
     }
   }, [showToast]);
 
@@ -207,14 +212,14 @@ export function useNeloa() {
             reportQueuedFiles(queueSelectedFiles(result.files), result.rejected, result.omitted);
           })
           .catch((error) => {
-            if (!disposed) showToast(`无法读取拖入的文件：${String(error)}`);
+            if (!disposed) showToast(`无法读取拖入的文件：${String(error)}`, "danger");
           });
       }
     }).then((unlisten) => {
       if (disposed) unlisten();
       else stop = unlisten;
     }).catch((error) => {
-      if (!disposed) showToast(`无法启用文件拖放：${String(error)}`);
+      if (!disposed) showToast(`无法启用文件拖放：${String(error)}`, "danger");
     });
 
     return () => {
@@ -248,9 +253,9 @@ export function useNeloa() {
     try {
       const snapshot = await getDiagnosticsSnapshot();
       setDiagnostics(snapshot);
-      if (announce) showToast("诊断已刷新");
+      if (announce) showToast("连接检查已完成", "ok");
     } catch (error) {
-      if (announce) showToast(String(error));
+      if (announce) showToast(String(error), "danger");
     } finally {
       if (announce) setBusyAction(null);
     }
@@ -286,7 +291,7 @@ export function useNeloa() {
         setDiagnostics(diagnosticsSnapshot);
       })
       .catch((error) => {
-        if (!disposed) showToast(String(error));
+        if (!disposed) showToast(String(error), "danger");
       });
 
     const listeners = [
@@ -311,7 +316,7 @@ export function useNeloa() {
         if (disposed) return;
         setBusyAction(null);
         setPairing((current) => (current?.sessionId === result.sessionId ? null : current));
-        showToast(result.message);
+        showToast(result.message, result.accepted ? "ok" : "warn");
         if (result.accepted) void refreshSecurity();
       }),
       onTrustedDevicesChanged((trustedDevices) => {
@@ -323,7 +328,7 @@ export function useNeloa() {
         showToast(`收到 ${message.peerName} 的加密文本`);
       }),
       onNetworkError((message) => {
-        if (!disposed) showToast(message);
+        if (!disposed) showToast(message, "danger");
       }),
       onClipboardSettingsChanged((snapshot) => {
         if (!disposed) setClipboard(snapshot);
@@ -333,11 +338,14 @@ export function useNeloa() {
         setLastClipboardEvent(event);
         if (event.status === "waiting") return;
         if (event.status === "synced") {
-          showToast(event.direction === "received"
-            ? `已从 ${event.peerName} 同步剪贴板`
-            : `剪贴板已同步至 ${event.peerName}`);
+          showToast(
+            event.direction === "received"
+              ? `已从 ${event.peerName} 同步剪贴板`
+              : `剪贴板已同步至 ${event.peerName}`,
+            "ok",
+          );
         } else {
-          showToast(event.message);
+          showToast(event.message, event.status === "failed" ? "danger" : "warn");
         }
       }),
       onFileOffer((offer) => {
@@ -357,7 +365,10 @@ export function useNeloa() {
         });
         setFileOffers((current) => current.filter((offer) => offer.transferId !== result.transferId));
         setHistory((current) => [fileTransferRecord(result), ...current]);
-        showToast(result.message);
+        showToast(
+          result.message,
+          result.status === "completed" ? "ok" : result.status === "failed" ? "danger" : "warn",
+        );
       }),
     ];
 
@@ -378,9 +389,8 @@ export function useNeloa() {
   }, [view, refreshDiagnostics]);
 
   useEffect(() => {
-    if (!selectedPeerId && discovery.peers[0]) setSelectedPeerId(discovery.peers[0].id);
     if (selectedPeerId && !discovery.peers.some((peer) => peer.id === selectedPeerId)) {
-      setSelectedPeerId(discovery.peers[0]?.id ?? null);
+      setSelectedPeerId(null);
     }
   }, [discovery.peers, selectedPeerId]);
 
@@ -388,21 +398,30 @@ export function useNeloa() {
     () => discovery.peers.find((peer) => peer.id === selectedPeerId) ?? null,
     [discovery.peers, selectedPeerId],
   );
-  const trustedIds = useMemo(
-    () => new Set(security.trustedDevices.map((device) => device.id)),
+  const trustedDevicesById = useMemo(
+    () => new Map(security.trustedDevices.map((device) => [device.id, device])),
     [security.trustedDevices],
   );
+  const trustedIds = useMemo(
+    () => new Set(trustedDevicesById.keys()),
+    [trustedDevicesById],
+  );
   const selectedPeerTrusted = selectedPeer ? trustedIds.has(selectedPeer.id) : false;
+  const selectedPeerForAction = useMemo(() => {
+    if (!selectedPeer) return null;
+    const alias = trustedDevicesById.get(selectedPeer.id)?.alias?.trim();
+    return alias ? { ...selectedPeer, name: alias } : selectedPeer;
+  }, [selectedPeer, trustedDevicesById]);
 
   const primaryAction = useMemo(
     () => resolvePrimaryAction({
-      peer: selectedPeer,
+      peer: selectedPeerForAction,
       trusted: selectedPeerTrusted,
       files: selectedFiles,
       busyPairing: busyAction === "pair",
       busyFile: busyAction === "file",
     }),
-    [selectedPeer, selectedPeerTrusted, selectedFiles, busyAction],
+    [selectedPeerForAction, selectedPeerTrusted, selectedFiles, busyAction],
   );
 
   const pickFiles = useCallback(async () => {
@@ -428,14 +447,14 @@ export function useNeloa() {
 
   const startPairing = useCallback(async (peerId: string) => {
     if (!security.network.active) {
-      showToast(security.network.error ?? "加密网络服务正在启动，请稍后再试");
+      showToast(security.network.error ?? "加密网络服务正在启动，请稍后再试", "warn");
       return;
     }
     setBusyAction("pair");
     try {
       setPairing(await beginPairing(peerId));
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
     } finally {
       setBusyAction(null);
     }
@@ -448,7 +467,7 @@ export function useNeloa() {
   ) => {
     const peer = discovery.peers.find((item) => item.id === peerId);
     if (!peer) {
-      showToast("目标设备已离线，请重新扫描");
+      showToast("目标设备已离线，请重新扫描", "warn");
       return;
     }
     setBusyAction("file");
@@ -484,11 +503,17 @@ export function useNeloa() {
         );
       }
       if (startedPaths.size === files.length) {
-        showToast(files.length === 1 ? "文件已加入发送队列" : `${files.length} 个文件已加入发送队列`);
+        showToast(
+          files.length === 1 ? "文件已加入发送队列" : `${files.length} 个文件已加入发送队列`,
+          "ok",
+        );
       } else if (startedPaths.size > 0) {
-        showToast(`已开始 ${startedPaths.size} 个文件，${files.length - startedPaths.size} 个启动失败`);
+        showToast(
+          `已开始 ${startedPaths.size} 个文件，${files.length - startedPaths.size} 个启动失败`,
+          "warn",
+        );
       } else {
-        showToast(lastError || "无法开始文件传输");
+        showToast(lastError || "无法开始文件传输", "danger");
       }
     } finally {
       setBusyAction(null);
@@ -497,7 +522,7 @@ export function useNeloa() {
 
   const runPrimaryAction = useCallback(() => {
     if (primaryAction.disabled) {
-      showToast(primaryAction.hint);
+      showToast(primaryAction.hint, "warn");
       return;
     }
     if (!selectedPeer) return;
@@ -528,9 +553,12 @@ export function useNeloa() {
     try {
       await decidePairing(request.sessionId, accepted);
       setPairing(null);
-      showToast(accepted ? "本机已确认，等待对方…" : "已取消配对");
+      showToast(
+        accepted ? "本机已确认，等待对方…" : "已取消配对",
+        accepted ? "ok" : "neutral",
+      );
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
     } finally {
       setBusyAction(null);
     }
@@ -558,25 +586,25 @@ export function useNeloa() {
           },
         }));
       } else {
-        showToast("已拒绝接收");
+        showToast("已拒绝接收", "neutral");
       }
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
     }
   }, [fileOffers, showToast]);
 
   const cancelTransfer = useCallback(async (transferId: string) => {
     try {
       const cancelled = await cancelFileTransfer(transferId);
-      showToast(cancelled ? "正在取消…" : "该传输已结束");
+      showToast(cancelled ? "正在取消…" : "该传输已结束", "warn");
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
     }
   }, [showToast]);
 
   const retryTransfer = useCallback((record: TransferRecord) => {
     if (!record.peerId || !record.path) {
-      showToast("缺少重试所需的文件信息");
+      showToast("缺少重试所需的文件信息", "danger");
       return;
     }
     void beginFileTransfers(record.peerId, [{
@@ -604,10 +632,10 @@ export function useNeloa() {
           ...current,
           trustedDevices: current.trustedDevices.filter((item) => item.id !== device.id),
         }));
-        showToast(`已撤销对 ${device.name} 的信任`);
+        showToast(`已撤销对 ${device.alias?.trim() || device.name} 的信任`, "warn");
       }
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
     }
   }, [showToast]);
 
@@ -616,11 +644,14 @@ export function useNeloa() {
     try {
       const snapshot = await setClipboardEnabled(!clipboard.enabled);
       setClipboard(snapshot);
-      showToast(snapshot.enabled
-        ? "已开启；当前剪贴板内容不会发送，等待下一次复制"
-        : "剪贴板同步已暂停");
+      showToast(
+        snapshot.enabled
+          ? "已开启；当前剪贴板内容不会发送，等待下一次复制"
+          : "剪贴板同步已暂停",
+        snapshot.enabled ? "ok" : "neutral",
+      );
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
     } finally {
       setBusyAction(null);
     }
@@ -631,10 +662,13 @@ export function useNeloa() {
     try {
       const snapshot = await setRelayConfig(enabled, url, token);
       setRelay(snapshot);
-      showToast(enabled ? "中继设置已保存，正在连接…" : "中继已关闭，继续使用局域网直连");
+      showToast(
+        enabled ? "中继设置已保存，正在连接…" : "中继已关闭，继续使用局域网直连",
+        "ok",
+      );
       void refreshDiagnostics();
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
       throw error;
     } finally {
       setBusyAction(null);
@@ -646,24 +680,35 @@ export function useNeloa() {
     try {
       const device = await setDeviceName(name);
       setLocal(device);
-      showToast("设备名称已更新");
+      showToast("设备名称已更新", "ok");
       void refreshDiagnostics();
       return device;
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
       throw error;
     } finally {
       setBusyAction(null);
     }
   }, [refreshDiagnostics, showToast]);
 
-  const copyDiagnostics = useCallback(async () => {
-    setBusyAction("diagnostics");
+  const renameTrustedDevice = useCallback(async (peerId: string, alias: string) => {
+    setBusyAction("alias");
     try {
-      showToast(await copyDiagnosticReport());
-      setDiagnostics(await getDiagnosticsSnapshot());
+      const device = await setTrustedDeviceAlias(peerId, alias);
+      setSecurity((current) => ({
+        ...current,
+        trustedDevices: current.trustedDevices.map((item) => (
+          item.id === device.id ? device : item
+        )),
+      }));
+      showToast(
+        device.alias?.trim() ? `已备注为 ${device.alias.trim()}` : "已恢复设备原名称",
+        "ok",
+      );
+      return device;
     } catch (error) {
-      showToast(String(error));
+      showToast(String(error), "danger");
+      throw error;
     } finally {
       setBusyAction(null);
     }
@@ -696,6 +741,7 @@ export function useNeloa() {
     setSelectedPeerId,
     selectedPeer,
     selectedPeerTrusted,
+    trustedDevicesById,
     trustedIds,
     selectedFiles,
     pickFiles,
@@ -714,15 +760,17 @@ export function useNeloa() {
     clearHistory,
     busyAction,
     toast,
+    toastTone,
     showToast,
     primaryAction,
     runPrimaryAction,
+    pairPeer: startPairing,
     refreshDiscovery,
     refreshDiagnostics,
-    copyDiagnostics,
     revoke,
     toggleClipboard,
     configureDeviceName,
+    renameTrustedDevice,
     configureRelay,
   };
 }

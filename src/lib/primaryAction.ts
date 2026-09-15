@@ -29,7 +29,7 @@ export function resolvePrimaryAction(input: {
     return { label: "正在加入队列…", disabled: true, hint: "正在为所选文件建立加密传输", tone: "neutral" };
   }
   if (!peer) {
-    return { label: "发送", disabled: true, hint: "先在雷达中选择一台设备", tone: "neutral" };
+    return { label: "请选择设备", disabled: true, hint: "找到设备后，选择一台开始传输", tone: "neutral" };
   }
   if (!peerIsCompatible(peer)) {
     return {

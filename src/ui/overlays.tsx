@@ -1,5 +1,5 @@
 import { formatBytes, transferPercent, transferStageLabel } from "../lib/format";
-import type { NeloaState } from "../lib/useNeloa";
+import type { NeloaState, ToastTone } from "../lib/useNeloa";
 import { Icon, deviceIcon } from "./icons";
 import { Button, IconButton, Sheet, cx, useShell } from "./kit";
 
@@ -153,10 +153,18 @@ export function TransferTray({ app }: { app: NeloaState }) {
   );
 }
 
-export function Toast({ message }: { message: string }) {
+export function Toast({ message, tone }: { message: string; tone: ToastTone }) {
+  const icon = tone === "ok" ? "check" : tone === "neutral" ? "pulse" : "alert";
   return (
-    <div className={cx("toast", message && "visible")} role="status" aria-live="polite">
-      {message}
+    <div
+      className={cx("toast", `tone-${tone}`, message && "visible")}
+      role={tone === "danger" ? "alert" : "status"}
+      aria-live={tone === "danger" ? "assertive" : "polite"}
+    >
+      <span className="toast-icon" aria-hidden="true">
+        <Icon name={icon} size={14} />
+      </span>
+      <span>{message}</span>
     </div>
   );
 }
@@ -186,7 +194,7 @@ export function Overlays({ app }: { app: NeloaState }) {
       <TransferTray app={app} />
       <PairingSheet app={app} />
       <FileOfferSheet app={app} />
-      <Toast message={app.toast} />
+      <Toast message={app.toast} tone={app.toastTone} />
     </>
   );
 }
