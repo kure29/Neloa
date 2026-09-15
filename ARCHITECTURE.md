@@ -15,7 +15,7 @@ Neloa is local-first. Every client should remain useful without an account or an
 - Explicit confirmation on both devices before persisting the peer public key.
 - Trusted-device verification and revocation.
 - End-to-end encrypted test text with application-level acknowledgement.
-- Native file selection and file metadata inspection. Android content URIs are opened through the platform file-descriptor bridge, staged only when sending, and deleted after the transfer; iOS uses sandbox copies.
+- Native multi-file selection, desktop drag and drop, bounded send queues, and file metadata inspection. Android content URIs are opened through the platform file-descriptor bridge, staged only when sending, and deleted after the transfer; iOS uses sandbox copies.
 - File offer/accept flow tied to a trusted device identity.
 - Encrypted binary chunks with strict offsets, size limits, progress, and cancellation.
 - SHA-256 verification before publication and an authenticated completion receipt.

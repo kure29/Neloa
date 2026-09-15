@@ -1,7 +1,8 @@
 {
   "name": "neloa",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
