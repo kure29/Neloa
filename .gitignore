@@ -1,6 +1,8 @@
 node_modules/
 dist/
 target/
+# VitePress 构建缓存（dist 已被上面的 dist/ 覆盖）
+docs/.vitepress/cache/
 /crates/*/Cargo.lock
 releases/
 .DS_Store
