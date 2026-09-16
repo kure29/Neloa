@@ -6,6 +6,10 @@ import type {
   TransferRecord,
 } from "../types";
 
+export function errorMessage(error: unknown): string {
+  return String(error).replace(/^Error:\s*/, "");
+}
+
 export function formatBytes(size: number): string {
   if (size < 1024) return `${size} B`;
   const units = ["KB", "MB", "GB", "TB"];
@@ -21,6 +25,16 @@ export function formatBytes(size: number): string {
 export function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" })
     .format(new Date(timestamp));
+}
+
+export function formatRecordTime(timestamp: number): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 export function peerIsCompatible(peer: PeerDevice): boolean {
@@ -55,7 +69,7 @@ export function transferRecord(message: TestMessageEvent): TransferRecord {
     name: condensed.length > 28 ? `“${condensed.slice(0, 28)}…”` : `“${condensed}”`,
     detail: "加密文本",
     peer: message.peerName,
-    time: formatTime(message.atMs),
+    atMs: message.atMs,
     direction: message.direction,
     kind: "text",
     status: "completed",
@@ -68,7 +82,7 @@ export function fileTransferRecord(result: FileTransferResult): TransferRecord {
     name: result.name,
     detail: `${formatBytes(result.size)} · ${result.message}`,
     peer: result.peerName,
-    time: formatTime(result.atMs),
+    atMs: result.atMs,
     direction: result.direction,
     kind: "file",
     status: result.status,

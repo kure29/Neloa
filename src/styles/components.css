@@ -115,7 +115,7 @@
 .btn-primary {
   border-color: var(--primary);
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .btn-danger {
@@ -568,7 +568,7 @@
   width: 16px;
   height: 16px;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .device-incompatible {
@@ -771,7 +771,7 @@
   height: 28px;
   border-radius: 50%;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .peer-selected-mark:active:not(:disabled) {
@@ -781,7 +781,7 @@
 @media (hover: hover) and (pointer: fine) {
   .peer-selected-mark:hover:not(:disabled) {
     background: var(--primary-strong);
-    color: #ffffff;
+    color: var(--on-primary);
   }
 }
 
@@ -1069,6 +1069,13 @@
 }
 
 .record-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex: none;
+}
+
+.trusted-device-actions {
   display: flex;
   align-items: center;
   gap: var(--s2);
@@ -1525,6 +1532,11 @@ small.tone-warn {
   font-size: var(--text-small);
 }
 
+.sheet-head .offer-queue-status {
+  color: var(--warn);
+  font-weight: 500;
+}
+
 .sas-code {
   display: flex;
   align-items: center;
@@ -1749,6 +1761,7 @@ small.tone-warn {
 .toast.visible {
   opacity: 1;
   transform: translate(-50%, 0);
+  pointer-events: auto;
 }
 
 .toast-icon {
@@ -1762,6 +1775,14 @@ small.tone-warn {
   color: var(--tone);
 }
 
-.toast > span:last-child {
+.toast-message {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.toast-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-inline-end: calc(var(--s1) * -1);
 }

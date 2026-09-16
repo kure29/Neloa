@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
-import { formatBytes, formatTime, platformLabel } from "../lib/format";
+import { errorMessage, formatBytes, formatTime, platformLabel } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
-import type { DiagnosticState } from "../types";
+import type { DiagnosticState, TrustedDevice } from "../types";
 import { Icon } from "../ui/icons";
 import {
   Badge,
@@ -10,6 +10,7 @@ import {
   Card,
   DeviceAvatar,
   SectionTitle,
+  Sheet,
   StatusDot,
   Switch,
   cx,
@@ -70,6 +71,9 @@ export function SettingsView({ app }: { app: NeloaState }) {
   const [relayFormError, setRelayFormError] = useState("");
   const [relaySaved, setRelaySaved] = useState(false);
   const [relayEditing, setRelayEditing] = useState(!(relay.hasToken && relay.url));
+  const [trustedDeviceEditor, setTrustedDeviceEditor] = useState<TrustedDevice | null>(null);
+  const [trustedAlias, setTrustedAlias] = useState("");
+  const [trustedAliasError, setTrustedAliasError] = useState("");
   const problemChecks = diagnostics.checks.filter(
     (check) => check.state === "warning" || check.state === "error",
   );
@@ -122,7 +126,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
       setDeviceName(device.name);
       setDeviceNameSaved(true);
     } catch (error) {
-      setDeviceNameError(String(error).replace(/^Error:\s*/, ""));
+      setDeviceNameError(errorMessage(error));
     }
   };
 
@@ -135,7 +139,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
       setRelaySaved(true);
       setRelayEditing(false);
     } catch (error) {
-      setRelayFormError(String(error).replace(/^Error:\s*/, ""));
+      setRelayFormError(errorMessage(error));
     }
   };
 
@@ -172,6 +176,33 @@ export function SettingsView({ app }: { app: NeloaState }) {
     setRelayFormError("");
     setRelaySaved(false);
     setRelayEditing(!relayConfigured);
+  };
+
+  const openTrustedAliasEditor = (device: TrustedDevice) => {
+    setTrustedDeviceEditor(device);
+    setTrustedAlias(device.alias?.trim() ?? "");
+    setTrustedAliasError("");
+  };
+
+  const submitTrustedAlias = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!trustedDeviceEditor) return;
+    const normalized = trustedAlias.trim();
+    setTrustedAliasError("");
+    if ([...normalized].length > 32) {
+      setTrustedAliasError("设备备注最多 32 个字符");
+      return;
+    }
+    if (/\p{Cc}/u.test(normalized)) {
+      setTrustedAliasError("设备备注不能包含控制字符");
+      return;
+    }
+    try {
+      await app.renameTrustedDevice(trustedDeviceEditor.id, normalized);
+      setTrustedDeviceEditor(null);
+    } catch (error) {
+      setTrustedAliasError(errorMessage(error));
+    }
   };
 
   return (
@@ -529,10 +560,16 @@ export function SettingsView({ app }: { app: NeloaState }) {
                     {formatTime(device.lastVerifiedMs)}
                   </span>
                 </div>
-                <Button variant="danger" size="sm" onClick={() => void app.revoke(device)}>
-                  <Icon name="trash" size={14} />
-                  移除
-                </Button>
+                <div className="trusted-device-actions">
+                  <Button size="sm" onClick={() => openTrustedAliasEditor(device)}>
+                    <Icon name="pencil" size={14} />
+                    备注
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => void app.revoke(device)}>
+                    <Icon name="trash" size={14} />
+                    移除
+                  </Button>
+                </div>
               </div>
             );
           })
@@ -543,6 +580,77 @@ export function SettingsView({ app }: { app: NeloaState }) {
         <p className="page-error">局域网连接暂不可用：{security.network.error}</p>
       )}
       <p className="page-footnote">Neloa {app.local?.version ?? "0.1.11"}</p>
+
+      {trustedDeviceEditor && !app.pairing && app.fileOffers.length === 0 && (
+        <Sheet labelledBy="settings-alias-sheet-title" className="sheet-alias">
+          <div className="sheet-head">
+            <DeviceAvatar platform={trustedDeviceEditor.platform} size={42} />
+            <div>
+              <h2 id="settings-alias-sheet-title">设备备注</h2>
+              <p>{trustedDeviceEditor.name} · {platformLabel(trustedDeviceEditor.platform)}</p>
+            </div>
+          </div>
+          <form
+            className="alias-form"
+            aria-busy={app.busyAction === "alias"}
+            onSubmit={(event) => void submitTrustedAlias(event)}
+          >
+            <label className="setting-field">
+              <span>在这台设备上显示为</span>
+              <input
+                value={trustedAlias}
+                autoComplete="off"
+                maxLength={32}
+                placeholder={trustedDeviceEditor.name}
+                aria-describedby="settings-alias-hint"
+                aria-invalid={Boolean(trustedAliasError)}
+                onChange={(event) => {
+                  setTrustedAlias(event.target.value);
+                  setTrustedAliasError("");
+                }}
+              />
+              <small id="settings-alias-hint">设备离线时也可以修改；备注只保存在本机。</small>
+              {trustedAliasError && (
+                <small className="setting-field-error" role="alert">{trustedAliasError}</small>
+              )}
+            </label>
+            {trustedDeviceEditor.alias?.trim() && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="alias-reset"
+                disabled={app.busyAction === "alias" || trustedAlias.length === 0}
+                onClick={() => {
+                  setTrustedAlias("");
+                  setTrustedAliasError("");
+                }}
+              >
+                恢复原名称
+              </Button>
+            )}
+            <div className="sheet-actions">
+              <Button
+                type="button"
+                disabled={app.busyAction === "alias"}
+                onClick={() => setTrustedDeviceEditor(null)}
+              >
+                取消
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={
+                  app.busyAction === "alias"
+                  || trustedAlias.trim() === (trustedDeviceEditor.alias?.trim() ?? "")
+                }
+              >
+                {app.busyAction === "alias" ? "保存中…" : "保存备注"}
+              </Button>
+            </div>
+          </form>
+        </Sheet>
+      )}
     </div>
   );
 }

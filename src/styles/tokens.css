@@ -10,6 +10,8 @@
  *
  * Contrast against --paper-0 / --paper-1 (WCAG AA body text needs 4.5:1):
  *   light ink 17.7, ink-2 7.6, ink-3 4.7, primary 5.2, relay 7.0
+ * Contrast of --on-primary against primary / primary-strong:
+ *   light 5.2 / 6.7, dark 7.4 / 10.5
  */
 
 :root {
@@ -29,6 +31,7 @@
 
   --primary: #2563eb;
   --primary-strong: #1d4ed8;
+  --on-primary: #ffffff;
   --primary-soft: #eff6ff;
   --relay: #6d28d9;
   --relay-soft: #f3e8ff;
@@ -129,6 +132,7 @@
 
     --primary: #60a5fa;
     --primary-strong: #93c5fd;
+    --on-primary: #0d111b;
     --primary-soft: #172b4f;
     --relay: #c4b5fd;
     --relay-soft: #2b2147;

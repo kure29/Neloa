@@ -31,6 +31,7 @@ import {
   onTestMessageReceived,
   onTrustedDevicesChanged,
   previewPlatform,
+  revealFileInFolder,
   revokeTrustedDevice,
   setClipboardEnabled,
   setDeviceName,
@@ -51,7 +52,12 @@ import type {
   TransferRecord,
   TrustedDevice,
 } from "../types";
-import { fileTransferRecord, transferRecord } from "./format";
+import { errorMessage, fileTransferRecord, transferRecord } from "./format";
+import {
+  loadTransferHistory,
+  prependTransferRecord,
+  saveTransferHistory,
+} from "./historyStorage";
 import { resolvePrimaryAction } from "./primaryAction";
 
 export type ViewName = "radar" | "history" | "settings";
@@ -121,15 +127,36 @@ export function useNeloa() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [toast, setToast] = useState("");
   const [toastTone, setToastTone] = useState<ToastTone>("neutral");
-  const [history, setHistory] = useState<TransferRecord[]>([]);
+  const [history, setHistory] = useState<TransferRecord[]>(loadTransferHistory);
   const toastTimer = useRef<number | undefined>(undefined);
+  const historyStorageFailed = useRef(false);
+
+  const dismissToast = useCallback(() => {
+    window.clearTimeout(toastTimer.current);
+    setToast("");
+  }, []);
 
   const showToast = useCallback((message: string, tone: ToastTone = "neutral") => {
     window.clearTimeout(toastTimer.current);
     setToastTone(tone);
     setToast(message);
-    toastTimer.current = window.setTimeout(() => setToast(""), 3000);
+    toastTimer.current = window.setTimeout(
+      () => setToast(""),
+      tone === "danger" ? 10_000 : 4_000,
+    );
   }, []);
+
+  useEffect(() => {
+    try {
+      saveTransferHistory(history);
+      historyStorageFailed.current = false;
+    } catch {
+      if (!historyStorageFailed.current) {
+        historyStorageFailed.current = true;
+        showToast("无法保存传输记录；本次关闭应用后记录会丢失", "danger");
+      }
+    }
+  }, [history, showToast]);
 
   const replaceSelectedFiles = useCallback((files: SelectedFile[]) => {
     selectedFilesRef.current = files;
@@ -212,14 +239,14 @@ export function useNeloa() {
             reportQueuedFiles(queueSelectedFiles(result.files), result.rejected, result.omitted);
           })
           .catch((error) => {
-            if (!disposed) showToast(`无法读取拖入的文件：${String(error)}`, "danger");
+            if (!disposed) showToast(`无法读取拖入的文件：${errorMessage(error)}`, "danger");
           });
       }
     }).then((unlisten) => {
       if (disposed) unlisten();
       else stop = unlisten;
     }).catch((error) => {
-      if (!disposed) showToast(`无法启用文件拖放：${String(error)}`, "danger");
+      if (!disposed) showToast(`无法启用文件拖放：${errorMessage(error)}`, "danger");
     });
 
     return () => {
@@ -233,7 +260,7 @@ export function useNeloa() {
     try {
       setDiscovery(await getDiscoverySnapshot());
     } catch (error) {
-      setDiscovery({ active: false, peers: [], error: String(error) });
+      setDiscovery({ active: false, peers: [], error: errorMessage(error) });
     }
   }, [showToast]);
 
@@ -243,7 +270,7 @@ export function useNeloa() {
     } catch (error) {
       setSecurity((current) => ({
         ...current,
-        network: { ...current.network, active: false, error: String(error) },
+        network: { ...current.network, active: false, error: errorMessage(error) },
       }));
     }
   }, []);
@@ -255,7 +282,7 @@ export function useNeloa() {
       setDiagnostics(snapshot);
       if (announce) showToast("连接检查已完成", "ok");
     } catch (error) {
-      if (announce) showToast(String(error), "danger");
+      if (announce) showToast(errorMessage(error), "danger");
     } finally {
       if (announce) setBusyAction(null);
     }
@@ -291,7 +318,7 @@ export function useNeloa() {
         setDiagnostics(diagnosticsSnapshot);
       })
       .catch((error) => {
-        if (!disposed) showToast(String(error), "danger");
+        if (!disposed) showToast(errorMessage(error), "danger");
       });
 
     const listeners = [
@@ -324,7 +351,7 @@ export function useNeloa() {
       }),
       onTestMessageReceived((message) => {
         if (disposed) return;
-        setHistory((current) => [transferRecord(message), ...current]);
+        setHistory((current) => prependTransferRecord(current, transferRecord(message)));
         showToast(`收到 ${message.peerName} 的加密文本`);
       }),
       onNetworkError((message) => {
@@ -364,7 +391,7 @@ export function useNeloa() {
           return next;
         });
         setFileOffers((current) => current.filter((offer) => offer.transferId !== result.transferId));
-        setHistory((current) => [fileTransferRecord(result), ...current]);
+        setHistory((current) => prependTransferRecord(current, fileTransferRecord(result)));
         showToast(
           result.message,
           result.status === "completed" ? "ok" : result.status === "failed" ? "danger" : "warn",
@@ -454,7 +481,7 @@ export function useNeloa() {
     try {
       setPairing(await beginPairing(peerId));
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
     } finally {
       setBusyAction(null);
     }
@@ -476,24 +503,12 @@ export function useNeloa() {
     try {
       for (const file of files) {
         try {
-          const transferId = await startFileTransfer(peerId, file.path);
+          // Progress and terminal events own transfer state: they can arrive
+          // before this command response, including for an immediate failure.
+          await startFileTransfer(peerId, file.path);
           startedPaths.add(file.path);
-          setFileTransfers((current) => ({
-            ...current,
-            [transferId]: {
-              transferId,
-              peerId,
-              peerName: peer.name,
-              name: file.name,
-              direction: "sent",
-              stage: "hashing",
-              transferred: 0,
-              size: file.size,
-              bytesPerSecond: 0,
-            },
-          }));
         } catch (error) {
-          lastError = String(error);
+          lastError = errorMessage(error);
         }
       }
 
@@ -558,7 +573,7 @@ export function useNeloa() {
         accepted ? "ok" : "neutral",
       );
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
     } finally {
       setBusyAction(null);
     }
@@ -569,27 +584,12 @@ export function useNeloa() {
     if (!offer) return;
     try {
       await decideFileOffer(offer.transferId, accepted);
-      setFileOffers((current) => current.slice(1));
-      if (accepted) {
-        setFileTransfers((current) => ({
-          ...current,
-          [offer.transferId]: {
-            transferId: offer.transferId,
-            peerId: offer.peerId,
-            peerName: offer.peerName,
-            name: offer.name,
-            direction: "received",
-            stage: "waiting",
-            transferred: 0,
-            size: offer.size,
-            bytesPerSecond: 0,
-          },
-        }));
-      } else {
+      setFileOffers((current) => current.filter((item) => item.transferId !== offer.transferId));
+      if (!accepted) {
         showToast("已拒绝接收", "neutral");
       }
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
     }
   }, [fileOffers, showToast]);
 
@@ -598,7 +598,7 @@ export function useNeloa() {
       const cancelled = await cancelFileTransfer(transferId);
       showToast(cancelled ? "正在取消…" : "该传输已结束", "warn");
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
     }
   }, [showToast]);
 
@@ -613,6 +613,18 @@ export function useNeloa() {
       size: record.size ?? 0,
     }], false);
   }, [beginFileTransfers, showToast]);
+
+  const revealHistoryItem = useCallback(async (record: TransferRecord) => {
+    if (!record.path) {
+      showToast("找不到该文件的保存位置", "danger");
+      return;
+    }
+    try {
+      await revealFileInFolder(record.path);
+    } catch (error) {
+      showToast(`无法在文件管理器中显示：${errorMessage(error)}`, "danger");
+    }
+  }, [showToast]);
 
   const removeHistoryRecord = useCallback((recordId: string) => {
     setHistory((current) => current.filter((record) => record.id !== recordId));
@@ -635,7 +647,7 @@ export function useNeloa() {
         showToast(`已撤销对 ${device.alias?.trim() || device.name} 的信任`, "warn");
       }
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
     }
   }, [showToast]);
 
@@ -651,7 +663,7 @@ export function useNeloa() {
         snapshot.enabled ? "ok" : "neutral",
       );
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
     } finally {
       setBusyAction(null);
     }
@@ -668,7 +680,7 @@ export function useNeloa() {
       );
       void refreshDiagnostics();
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
       throw error;
     } finally {
       setBusyAction(null);
@@ -684,7 +696,7 @@ export function useNeloa() {
       void refreshDiagnostics();
       return device;
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
       throw error;
     } finally {
       setBusyAction(null);
@@ -707,7 +719,7 @@ export function useNeloa() {
       );
       return device;
     } catch (error) {
-      showToast(String(error), "danger");
+      showToast(errorMessage(error), "danger");
       throw error;
     } finally {
       setBusyAction(null);
@@ -756,11 +768,13 @@ export function useNeloa() {
     cancelTransfer,
     history,
     retryTransfer,
+    revealHistoryItem,
     removeHistoryRecord,
     clearHistory,
     busyAction,
     toast,
     toastTone,
+    dismissToast,
     showToast,
     primaryAction,
     runPrimaryAction,

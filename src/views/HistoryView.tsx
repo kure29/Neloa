@@ -1,4 +1,4 @@
-import { TRANSFER_STATUS_LABELS } from "../lib/format";
+import { TRANSFER_STATUS_LABELS, formatRecordTime } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
 import type { TransferRecord } from "../types";
 import { Icon } from "../ui/icons";
@@ -39,6 +39,11 @@ export function HistoryView({ app }: { app: NeloaState }) {
               && record.status !== "completed"
               && record.direction === "sent"
               && Boolean(record.path);
+            const revealable = app.shell === "desktop"
+              && record.kind === "file"
+              && record.status === "completed"
+              && record.direction === "received"
+              && Boolean(record.path);
 
             return (
               <li className="record" key={record.id}>
@@ -48,13 +53,23 @@ export function HistoryView({ app }: { app: NeloaState }) {
                 <div className="record-body">
                   <strong className="truncate">{record.name}</strong>
                   <span className="truncate">
-                    {record.peer} · {record.detail} · {record.time}
+                    {record.peer} · {record.detail} · {formatRecordTime(record.atMs)}
                   </span>
                 </div>
                 <div className="record-actions">
                   {retryable && (
                     <Button size="sm" onClick={() => app.retryTransfer(record)}>
                       重试
+                    </Button>
+                  )}
+                  {revealable && (
+                    <Button
+                      size="sm"
+                      aria-label={`在文件管理器中显示 ${record.name}`}
+                      onClick={() => void app.revealHistoryItem(record)}
+                    >
+                      <Icon name="folder" size={14} />
+                      显示
                     </Button>
                   )}
                   <Badge tone={statusTone(record)}>

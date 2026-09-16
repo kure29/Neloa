@@ -47,6 +47,8 @@ export type IconName =
   | "text"
   | "noTrace"
   | "more"
+  | "pencil"
+  | "folder"
   | "info"
   | "minimize"
   | "maximize";
@@ -274,6 +276,15 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="10" cy="10" r="1.15" fill="currentColor" stroke="none" />
       <circle cx="15.8" cy="10" r="1.15" fill="currentColor" stroke="none" />
     </>
+  ),
+  pencil: (
+    <>
+      <path d="M4 16l3.1-.7 8.5-8.5a1.8 1.8 0 0 0 0-2.5 1.8 1.8 0 0 0-2.5 0l-8.5 8.5z" />
+      <path d="m11.8 5.6 2.6 2.6M3.7 16.3h4.2" />
+    </>
+  ),
+  folder: (
+    <path d="M2.8 5.8A1.8 1.8 0 0 1 4.6 4h3l1.8 2h6a1.8 1.8 0 0 1 1.8 1.8v6.4a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8z" />
   ),
   info: (
     <>

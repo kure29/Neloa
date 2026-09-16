@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, type MouseEvent as ReactMouseEvent } from "react";
 
 import { performWindowAction, startWindowDragging } from "../bridge";
 import type { NeloaState } from "../lib/useNeloa";
@@ -25,6 +25,31 @@ function beginDrag(event: ReactMouseEvent<HTMLElement>) {
  */
 export function DesktopShell({ app }: { app: NeloaState }) {
   const isMac = app.platform !== "windows";
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+
+      const view = event.key === "1"
+        ? "radar"
+        : event.key === "2"
+          ? "history"
+          : event.key === "3" || event.key === ","
+            ? "settings"
+            : null;
+      if (!view) return;
+      event.preventDefault();
+      app.setView(view);
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [app.setView]);
 
   return (
     <div className={cx("app", "shell-desktop", `platform-${app.platform}`)}>
@@ -61,11 +86,12 @@ export function DesktopShell({ app }: { app: NeloaState }) {
         </div>
 
         <nav className="tabs" aria-label="主导航">
-          {TABS.map((tab) => (
+          {TABS.map((tab, index) => (
             <button
               key={tab.id}
               className={cx("tab", app.view === tab.id && "active")}
               aria-current={app.view === tab.id ? "page" : undefined}
+              aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}${tab.id === "settings" ? " Meta+, Control+," : ""}`}
               onClick={() => app.setView(tab.id)}
             >
               {tab.label}

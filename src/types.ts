@@ -54,7 +54,7 @@ export interface TransferRecord {
   name: string;
   detail: string;
   peer: string;
-  time: string;
+  atMs: number;
   direction: "sent" | "received";
   kind?: "text" | "file";
   status?: FileTransferStatus;

@@ -1,7 +1,7 @@
 import {
   createContext,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useRef,
   type ButtonHTMLAttributes,
   type ReactNode,
@@ -203,8 +203,69 @@ export function Sheet({
   const shell = useShell();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    cardRef.current?.focus();
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const scrim = card.parentElement;
+    const appRoot = scrim?.closest(".app");
+    const background: HTMLElement[] = [];
+    let modalBranch = scrim;
+    while (appRoot && modalBranch && modalBranch !== appRoot) {
+      const parent = modalBranch.parentElement;
+      if (!parent) break;
+      background.push(...Array.from(parent.children).filter(
+        (element): element is HTMLElement => (
+          element instanceof HTMLElement && element !== modalBranch
+        ),
+      ));
+      modalBranch = parent;
+    }
+    const previousInert = background.map((element) => element.inert);
+
+    background.forEach((element) => {
+      element.inert = true;
+    });
+    card.focus();
+
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(card.querySelectorAll<HTMLElement>(
+        "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])",
+      )).filter((element) => !element.inert && element.getAttribute("aria-hidden") !== "true");
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        card.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === card || !card.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    card.addEventListener("keydown", trapFocus);
+    return () => {
+      card.removeEventListener("keydown", trapFocus);
+      background.forEach((element, index) => {
+        element.inert = previousInert[index];
+      });
+      const restoreTarget = previousFocus && previousFocus !== document.body && previousFocus.isConnected
+        ? previousFocus
+        : appRoot?.querySelector<HTMLElement>("#main");
+      restoreTarget?.focus();
+    };
   }, []);
 
   return (

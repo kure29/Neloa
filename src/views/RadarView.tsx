@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type MouseEvent } from "react";
 
-import { formatBytes, peerIsCompatible, platformLabel } from "../lib/format";
+import { errorMessage, formatBytes, peerIsCompatible, platformLabel } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
 import { Badge, Button, DeviceAvatar, IconButton, Sheet, cx } from "../ui/kit";
 import { Icon } from "../ui/icons";
@@ -22,7 +22,6 @@ export function RadarView({ app }: { app: NeloaState }) {
     ? `${app.selectedFiles[0].name} · ${formatBytes(selectedSize)}`
     : `${app.selectedFiles.length} 个文件 · ${formatBytes(selectedSize)}`;
   const showFileSelection = app.selectedFiles.length > 0;
-  const canSend = Boolean(app.selectedPeer && app.selectedPeerTrusted);
   const trustedPeersOnline = peers.filter((peer) => app.trustedIds.has(peer.id)).length;
 
   const openAliasEditor = (peerId: string, name: string, platform: string, alias = "") => {
@@ -48,7 +47,7 @@ export function RadarView({ app }: { app: NeloaState }) {
       await app.renameTrustedDevice(aliasEditor.peerId, normalized);
       setAliasEditor(null);
     } catch (error) {
-      setAliasError(String(error).replace(/^Error:\s*/, ""));
+      setAliasError(errorMessage(error));
     }
   };
 
@@ -75,10 +74,12 @@ export function RadarView({ app }: { app: NeloaState }) {
                 ? `${peers.length} 台设备在线${trustedPeersOnline > 0 ? "，选择已配对设备开始传输" : ""}`
                 : app.discovery.error
                   ? "设备发现暂不可用"
-                  : "正在查找附近和中继设备"}
+                  : app.discovery.active
+                    ? "正在查找附近和中继设备"
+                    : "正在启动设备发现"}
             </p>
           </div>
-          <span className="device-count" aria-label={`${peers.length} 台设备在线`}>
+          <span className="device-count" aria-hidden="true">
             {peers.length}
           </span>
         </div>
@@ -156,7 +157,7 @@ export function RadarView({ app }: { app: NeloaState }) {
                         )}
                         <IconButton
                           className="peer-more"
-                          icon="more"
+                          icon="pencil"
                           label={`重命名 ${displayName}`}
                           onClick={() => openAliasEditor(
                             peer.id,
@@ -190,95 +191,89 @@ export function RadarView({ app }: { app: NeloaState }) {
             <span className="device-empty-icon" aria-hidden="true">
               <Icon name={app.discovery.error ? "alert" : "radio"} size={20} />
             </span>
-            <strong>{app.discovery.error ? "无法发现设备" : "还没有找到设备"}</strong>
+            <strong>
+              {app.discovery.error
+                ? "无法发现设备"
+                : app.discovery.active
+                  ? "正在查找设备"
+                  : "设备发现正在启动"}
+            </strong>
             <span>
-              {app.discovery.error ?? "请在另一台设备上打开 Neloa；跨网络时请确认中继已连接。"}
+              {app.discovery.error
+                ?? (app.discovery.active
+                  ? "请在另一台设备上打开 Neloa；跨网络时请确认中继已连接。"
+                  : "请稍候，Neloa 正在启动局域网与中继发现服务。")}
             </span>
           </div>
         )}
       </section>
 
-      {canSend ? (
-        <div className={cx("send-dock", !showFileSelection && "single-action")}>
-          {showFileSelection && (
-            <div className="dock-selection">
-              <div className="dock-file">
-                <button
-                  className="file-picker has-file"
-                  disabled={app.busyAction === "file"}
-                  aria-describedby="send-file-hint"
-                  onClick={() => void app.pickFiles()}
-                >
-                  <Icon name="file" />
-                  <span className="truncate">{fileSummary}</span>
-                </button>
-                <IconButton
-                  className="file-clear"
-                  icon="trash"
-                  label="清空待发送文件"
-                  disabled={app.busyAction === "file"}
-                  onClick={app.clearSelectedFiles}
-                />
-              </div>
-
-              <ul className="selected-file-list" aria-label="待发送文件" aria-live="polite">
-                {app.selectedFiles.map((file) => (
-                  <li key={file.path}>
-                    <Icon name="file" size={15} />
-                    <span className="truncate" title={file.name}>{file.name}</span>
-                    <small>{formatBytes(file.size)}</small>
-                    <IconButton
-                      className="selected-file-remove"
-                      icon="close"
-                      label={`移除 ${file.name}`}
-                      disabled={app.busyAction === "file"}
-                      onClick={() => app.removeSelectedFile(file.path)}
-                    />
-                  </li>
-                ))}
-              </ul>
+      <div className={cx("send-dock", !showFileSelection && "single-action")}>
+        {showFileSelection && (
+          <div className="dock-selection">
+            <div className="dock-file">
+              <button
+                className="file-picker has-file"
+                disabled={app.busyAction === "file"}
+                aria-describedby="file-picker-hint"
+                onClick={() => void app.pickFiles()}
+              >
+                <Icon name="file" />
+                <span className="truncate">{fileSummary}</span>
+              </button>
+              <span className="sr-only" id="file-picker-hint">
+                打开文件选择器，继续向待发送列表添加文件
+              </span>
+              <IconButton
+                className="file-clear"
+                icon="trash"
+                label="清空待发送文件"
+                disabled={app.busyAction === "file"}
+                onClick={app.clearSelectedFiles}
+              />
             </div>
-          )}
 
-          <Button
-            variant="primary"
-            className="dock-send"
-            disabled={app.primaryAction.disabled}
-            onClick={app.runPrimaryAction}
-          >
-            {!showFileSelection && <Icon name="plus" size={16} />}
-            {app.primaryAction.label}
-          </Button>
+            <ul className="selected-file-list" aria-label="待发送文件">
+              {app.selectedFiles.map((file) => (
+                <li key={file.path}>
+                  <Icon name="file" size={15} />
+                  <span className="truncate" title={file.name}>{file.name}</span>
+                  <small>{formatBytes(file.size)}</small>
+                  <IconButton
+                    className="selected-file-remove"
+                    icon="close"
+                    label={`移除 ${file.name}`}
+                    disabled={app.busyAction === "file"}
+                    onClick={() => app.removeSelectedFile(file.path)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-          <p id="send-file-hint" className={cx("dock-hint", `tone-${app.primaryAction.tone}`)}>
-            {app.primaryAction.hint}
-          </p>
-        </div>
-      ) : (
-        <div className="device-guidance" aria-live="polite">
-          <span className="device-guidance-icon" aria-hidden="true">
-            <Icon name="info" size={18} />
-          </span>
-          <span className="device-guidance-copy">
-            <strong>{showFileSelection
-              ? `已选择 ${app.selectedFiles.length} 个文件`
-              : trustedPeersOnline > 0
-                ? "选择接收设备"
-                : peers.length > 0
-                  ? "先与设备配对"
-                  : "等待设备出现"}</strong>
-            <small>{showFileSelection
-              ? "选择一台已配对设备后即可发送"
-              : trustedPeersOnline > 0
-                ? "从上方列表选择一台已配对设备"
-                : peers.length > 0
-                  ? "点击设备旁的“配对”，确认六位数字"
-                  : "发现设备后，可先配对再发送文件"}</small>
-          </span>
-        </div>
-      )}
+        <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {showFileSelection
+            ? `待发送列表共 ${app.selectedFiles.length} 个文件`
+            : "待发送列表为空"}
+        </span>
 
-      {aliasEditor && (
+        <Button
+          variant="primary"
+          className="dock-send"
+          disabled={app.primaryAction.disabled}
+          onClick={app.runPrimaryAction}
+        >
+          {!showFileSelection && <Icon name="plus" size={16} />}
+          {app.primaryAction.label}
+        </Button>
+
+        <p id="send-file-hint" className={cx("dock-hint", `tone-${app.primaryAction.tone}`)}>
+          {app.primaryAction.hint}
+        </p>
+      </div>
+
+      {aliasEditor && !app.pairing && app.fileOffers.length === 0 && (
         <Sheet labelledBy="alias-sheet-title" className="sheet-alias">
           <div className="sheet-head">
             <DeviceAvatar platform={aliasEditor.platform} size={42} />

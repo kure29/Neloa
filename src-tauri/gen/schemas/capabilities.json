@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Permissions required by the Neloa desktop window","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-start-dragging","dialog:allow-open"]}}
+{"default":{"identifier":"default","description":"Permissions required by the Neloa desktop window","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-start-dragging","dialog:allow-open","opener:allow-reveal-item-in-dir"]}}

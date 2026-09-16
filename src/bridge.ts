@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 import type {
   ClipboardSnapshot,
@@ -671,6 +672,11 @@ export async function performWindowAction(
 ): Promise<void> {
   if (!isDesktopRuntime) return;
   await invoke("window_action", { action });
+}
+
+export async function revealFileInFolder(path: string): Promise<void> {
+  if (!isDesktopRuntime) return;
+  await revealItemInDir(path);
 }
 
 export async function startWindowDragging(): Promise<void> {

@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import { formatBytes, transferPercent, transferStageLabel } from "../lib/format";
 import type { NeloaState, ToastTone } from "../lib/useNeloa";
 import { Icon, deviceIcon } from "./icons";
@@ -61,6 +63,11 @@ export function FileOfferSheet({ app }: { app: NeloaState }) {
         <div>
           <h2 id="offer-title">{offer.peerName} 想发送文件</h2>
           <p>接受后保存到下载目录的 Neloa 文件夹；校验通过前不会出现最终文件。</p>
+          {app.fileOffers.length > 1 && (
+            <p className="offer-queue-status" role="status">
+              另有 {app.fileOffers.length - 1} 个文件请求等待处理
+            </p>
+          )}
         </div>
       </div>
 
@@ -153,7 +160,15 @@ export function TransferTray({ app }: { app: NeloaState }) {
   );
 }
 
-export function Toast({ message, tone }: { message: string; tone: ToastTone }) {
+export function Toast({
+  message,
+  tone,
+  onDismiss,
+}: {
+  message: string;
+  tone: ToastTone;
+  onDismiss: () => void;
+}) {
   const icon = tone === "ok" ? "check" : tone === "neutral" ? "pulse" : "alert";
   return (
     <div
@@ -164,7 +179,15 @@ export function Toast({ message, tone }: { message: string; tone: ToastTone }) {
       <span className="toast-icon" aria-hidden="true">
         <Icon name={icon} size={14} />
       </span>
-      <span>{message}</span>
+      <span className="toast-message">{message}</span>
+      {message && (
+        <IconButton
+          className="toast-close"
+          icon="close"
+          label="关闭通知"
+          onClick={onDismiss}
+        />
+      )}
     </div>
   );
 }
@@ -186,15 +209,31 @@ export function FileDropOverlay({ app }: { app: NeloaState }) {
   );
 }
 
+function DecisionSheet({ app }: { app: NeloaState }) {
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const pairingKey = app.pairing ? `pairing:${app.pairing.sessionId}` : null;
+  const offerKey = app.fileOffers[0] ? `offer:${app.fileOffers[0].transferId}` : null;
+  const activeStillExists = activeKey !== null
+    && (activeKey === pairingKey || activeKey === offerKey);
+  const displayedKey = activeStillExists ? activeKey : pairingKey ?? offerKey;
+
+  useEffect(() => {
+    if (displayedKey !== activeKey) setActiveKey(displayedKey);
+  }, [activeKey, displayedKey]);
+
+  if (displayedKey?.startsWith("pairing:")) return <PairingSheet app={app} />;
+  if (displayedKey?.startsWith("offer:")) return <FileOfferSheet app={app} />;
+  return null;
+}
+
 /** Every overlay layer, so both shells mount the same set in the same order. */
 export function Overlays({ app }: { app: NeloaState }) {
   return (
     <>
       <FileDropOverlay app={app} />
       <TransferTray app={app} />
-      <PairingSheet app={app} />
-      <FileOfferSheet app={app} />
-      <Toast message={app.toast} tone={app.toastTone} />
+      <DecisionSheet app={app} />
+      <Toast message={app.toast} tone={app.toastTone} onDismiss={app.dismissToast} />
     </>
   );
 }

@@ -204,6 +204,7 @@ fn platform_name() -> String {
     "linux".into()
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn linux_platform_from_os_release(contents: &str) -> &'static str {
     let id = contents
         .lines()
@@ -1303,7 +1304,7 @@ fn inspect_file(app: tauri::AppHandle, path: String) -> Result<SelectedFile, Str
 #[cfg(all(desktop, not(target_os = "macos")))]
 static TRAY_READY: AtomicBool = AtomicBool::new(false);
 
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 fn reveal_main_window(app: &tauri::AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -1354,8 +1355,9 @@ fn install_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Hiding the window is only recoverable while a tray icon is live. macOS has
-/// no tray here and no close button that hides, so it minimises instead.
+/// Hiding the window is only recoverable while a tray icon is live. macOS uses
+/// its Dock icon to reopen a hidden main window, while Windows and Linux need a
+/// successfully installed tray icon.
 #[cfg(desktop)]
 fn hiding_is_recoverable() -> bool {
     #[cfg(not(target_os = "macos"))]
@@ -1364,7 +1366,7 @@ fn hiding_is_recoverable() -> bool {
     }
     #[cfg(target_os = "macos")]
     {
-        false
+        true
     }
 }
 
@@ -1408,6 +1410,16 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
+        .on_window_event(|_window, _event| {
+            #[cfg(target_os = "macos")]
+            if _window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = _event {
+                    api.prevent_close();
+                    let _ = _window.hide();
+                }
+            }
+        })
         .setup(|app| {
             #[cfg(not(mobile))]
             migrate_legacy_app_data(app.handle())?;
@@ -1487,8 +1499,18 @@ pub fn run() {
             inspect_file,
             window_action,
         ])
-        .run(tauri::generate_context!())
-        .expect("Neloa failed to start");
+        .build(tauri::generate_context!())
+        .expect("Neloa failed to start")
+        .run(|_app, _event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = _event
+            {
+                reveal_main_window(_app);
+            }
+        });
 }
 
 #[cfg(all(test, not(mobile)))]

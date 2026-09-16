@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    future::Future,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
@@ -10,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use futures_util::{stream::FuturesUnordered, StreamExt};
 use parking_lot::{Mutex, RwLock};
 use quinn::{crypto::rustls::QuicClientConfig, ClientConfig, Endpoint, RecvStream, SendStream};
 use rustls::{
@@ -1255,7 +1257,21 @@ async fn run_outgoing_file_transfer(
         context.active_transfers.lock().remove(&transfer_id);
         return;
     };
-    let outcome = outgoing_file_transfer(connector, &context, &peer, &path, &info, &cancel).await;
+    emit_transfer_progress(&context.app, &info, "hashing", 0, Instant::now());
+    // Dropping this future drops the entire session. Never reuse a Noise stream
+    // after interrupting a partially written encrypted frame.
+    let outcome = cancel_transfer_operation(
+        &cancel,
+        outgoing_file_transfer(connector, &context, &peer, &path, &info, &cancel),
+    )
+    .await;
+    context.active_transfers.lock().remove(&transfer_id);
+    // Once the authenticated receipt arrives, cancellation cannot undo delivery.
+    if outcome.is_ok() {
+        if let Err(error) = context.trust.touch(&peer.id, unix_millis()).await {
+            let _ = context.app.emit("network-error", error);
+        }
+    }
     let result_path = (!info.cleanup_source).then(|| path.clone());
 
     match outcome {
@@ -1279,7 +1295,6 @@ async fn run_outgoing_file_transfer(
     if info.cleanup_source {
         let _ = tokio::fs::remove_file(&path).await;
     }
-    context.active_transfers.lock().remove(&transfer_id);
 }
 
 async fn outgoing_file_transfer(
@@ -1360,18 +1375,7 @@ async fn outgoing_file_transfer(
     let mut last_progress = Instant::now() - PROGRESS_INTERVAL;
 
     loop {
-        if is_cancelled(cancel) {
-            let _ = write_encrypted(
-                &mut session.send,
-                &mut session.transport,
-                &WireMessage::FileCancel {
-                    message: "发送方已取消".into(),
-                },
-            )
-            .await;
-            let _ = finish_stream(&mut session.send);
-            return Err(TransferFailure::cancelled("文件发送已取消"));
-        }
+        ensure_not_cancelled(cancel)?;
         let read = file
             .read(&mut buffer)
             .await
@@ -1447,11 +1451,6 @@ async fn outgoing_file_transfer(
         }
         _ => return Err(TransferFailure::failed("接收端返回了错误的文件校验结果")),
     }
-    context
-        .trust
-        .touch(&peer.id, unix_millis())
-        .await
-        .map_err(TransferFailure::failed)?;
     Ok(sent_sha256)
 }
 
@@ -1501,116 +1500,112 @@ async fn handle_incoming_file_transfer(
         active.insert(transfer_id.clone(), cancel_sender);
     }
 
-    let result = async {
+    let mut can_send_failure = false;
+    let result: Result<(PathBuf, String), TransferFailure> = async {
         let (confirmation, decision) = oneshot::channel();
-        context
-            .pending_offers
-            .lock()
-            .insert(transfer_id.clone(), confirmation);
-        context
-            .app
-            .emit(
-                "file-offer",
-                FileOfferEvent {
-                    transfer_id: transfer_id.clone(),
-                    peer_id: info.peer_id.clone(),
-                    peer_name: info.peer_name.clone(),
-                    name: name.clone(),
-                    size,
-                    sha256: sha256.clone(),
-                },
-            )
-            .map_err(|error| format!("无法显示文件接收请求：{error}"))?;
+        context.pending_offers.lock().insert(transfer_id.clone(), confirmation);
+        context.app.emit("file-offer", FileOfferEvent {
+            transfer_id: transfer_id.clone(),
+            peer_id: info.peer_id.clone(),
+            peer_name: info.peer_name.clone(),
+            name,
+            size,
+            sha256: sha256.clone(),
+        }).map_err(|error| TransferFailure::failed(format!("无法显示文件接收请求：{error}")))?;
 
-        let accepted = match timeout(FILE_OFFER_TIMEOUT, decision).await {
-            Ok(Ok(accepted)) => accepted,
-            _ => {
-                context.pending_offers.lock().remove(&transfer_id);
-                false
-            }
+        let accepted = tokio::select! {
+            biased;
+            _ = wait_for_cancel(cancel.clone()) => return Err(TransferFailure::cancelled("文件接收已取消")),
+            result = timeout(FILE_OFFER_TIMEOUT, decision) => matches!(result, Ok(Ok(true))),
         };
-        write_encrypted(
+        context.pending_offers.lock().remove(&transfer_id);
+        let response = write_encrypted(
             &mut session.send,
             &mut session.transport,
             &WireMessage::FileDecision {
                 accepted,
                 reason: (!accepted).then(|| "接收端已拒绝或请求超时".to_string()),
             },
-        )
-        .await?;
-
+        ).await;
         if !accepted {
             let _ = finish_stream(&mut session.send);
+            return Err(TransferFailure::rejected("已拒绝接收文件"));
+        }
+        response.map_err(TransferFailure::failed)?;
+        can_send_failure = true;
+
+        emit_transfer_progress(&context.app, &info, "transferring", 0, Instant::now());
+        let path = receive_file_payload(&context.app, &info, &sha256, &cancel, &mut session).await?;
+        // Publication is the local commit point. A lost receipt or metadata write
+        // must never hide a file that has already been verified and saved.
+        let receipt = async {
+            write_encrypted(
+                &mut session.send,
+                &mut session.transport,
+                &WireMessage::FileReceipt {
+                    accepted: true,
+                    message: "大小和 SHA-256 校验通过".into(),
+                },
+            ).await?;
+            finish_stream(&mut session.send)?;
+            let _ = timeout(Duration::from_secs(1), wait_stream_stopped(&mut session.send)).await;
+            Ok::<(), String>(())
+        };
+        let completed = finalize_received_file(path, receipt).await;
+        if let Err(error) = context.trust.touch(&info.peer_id, unix_millis()).await {
+            let _ = context.app.emit("network-error", error);
+        }
+        Ok(completed)
+    }.await;
+
+    // Every registered offer has exactly one terminal event, including failures
+    // before payload reception. Remove runtime state before notifying the UI.
+    context.pending_offers.lock().remove(&transfer_id);
+    context.active_transfers.lock().remove(&transfer_id);
+    match result {
+        Ok((path, message)) => emit_transfer_result(
+            &context.app,
+            &info,
+            "completed",
+            &message,
+            Some(path),
+            Some(sha256),
+        ),
+        Err(failure) => {
             emit_transfer_result(
                 &context.app,
                 &info,
-                "rejected",
-                "已拒绝接收文件",
+                failure.status,
+                &failure.message,
                 None,
                 Some(sha256),
             );
-            return Ok(());
-        }
-
-        emit_transfer_progress(&context.app, &info, "transferring", 0, Instant::now());
-        let outcome =
-            receive_file_payload(&context.app, &info, &sha256, &cancel, &mut session).await;
-        match outcome {
-            Ok(path) => {
-                write_encrypted(
+            if failure.status == "failed" && can_send_failure {
+                let _ = write_encrypted(
                     &mut session.send,
                     &mut session.transport,
                     &WireMessage::FileReceipt {
-                        accepted: true,
-                        message: "大小和 SHA-256 校验通过".into(),
+                        accepted: false,
+                        message: failure.message,
                     },
                 )
-                .await?;
-                finish_stream(&mut session.send)?;
-                let _ = timeout(
-                    Duration::from_secs(1),
-                    wait_stream_stopped(&mut session.send),
-                )
                 .await;
-                context.trust.touch(&info.peer_id, unix_millis()).await?;
-                emit_transfer_result(
-                    &context.app,
-                    &info,
-                    "completed",
-                    "文件已校验并保存",
-                    Some(path),
-                    Some(sha256),
-                );
-            }
-            Err(failure) => {
-                if failure.status == "failed" {
-                    let _ = write_encrypted(
-                        &mut session.send,
-                        &mut session.transport,
-                        &WireMessage::FileReceipt {
-                            accepted: false,
-                            message: failure.message.clone(),
-                        },
-                    )
-                    .await;
-                    let _ = finish_stream(&mut session.send);
-                }
-                emit_transfer_result(
-                    &context.app,
-                    &info,
-                    failure.status,
-                    &failure.message,
-                    None,
-                    Some(sha256),
-                );
+                let _ = finish_stream(&mut session.send);
             }
         }
-        Ok(())
     }
-    .await;
-    context.pending_offers.lock().remove(&transfer_id);
-    context.active_transfers.lock().remove(&transfer_id);
-    result
+    Ok(())
+}
+
+async fn finalize_received_file(
+    path: PathBuf,
+    receipt: impl Future<Output = Result<(), String>>,
+) -> (PathBuf, String) {
+    let message = match receipt.await {
+        Ok(()) => "文件已校验并保存".into(),
+        Err(error) => format!("文件已校验并保存，但无法向发送方确认：{error}"),
+    };
+    (path, message)
 }
 
 async fn receive_file_payload(
@@ -1863,6 +1858,17 @@ async fn wait_for_cancel(mut cancel: TransferCancellation) {
         if *cancel.borrow_and_update() {
             return;
         }
+    }
+}
+
+async fn cancel_transfer_operation<T>(
+    cancel: &TransferCancellation,
+    operation: impl Future<Output = Result<T, TransferFailure>>,
+) -> Result<T, TransferFailure> {
+    tokio::select! {
+        biased;
+        _ = wait_for_cancel(cancel.clone()) => Err(TransferFailure::cancelled("文件发送已取消")),
+        result = operation => result,
     }
 }
 
@@ -2364,12 +2370,16 @@ async fn write_frame(send: &mut SessionSend, bytes: &[u8]) -> Result<(), String>
     if bytes.len() > FRAME_LIMIT {
         return Err("协议消息超过大小限制".to_string());
     }
-    send.write_u32(bytes.len() as u32)
-        .await
-        .map_err(|error| format!("无法写入消息长度：{error}"))?;
-    send.write_all(bytes)
-        .await
-        .map_err(|error| format!("无法写入消息：{error}"))?;
+    timeout(FILE_IDLE_TIMEOUT, async {
+        send.write_u32(bytes.len() as u32)
+            .await
+            .map_err(|error| format!("无法写入消息长度：{error}"))?;
+        send.write_all(bytes)
+            .await
+            .map_err(|error| format!("无法写入消息：{error}"))
+    })
+    .await
+    .map_err(|_| "发送数据长时间没有进展".to_string())??;
     Ok(())
 }
 
@@ -2446,23 +2456,45 @@ async fn connect_quic(
     endpoint: &Endpoint,
     peer: &PeerDevice,
 ) -> Result<(SendStream, RecvStream), String> {
-    let ip = peer
+    let mut addresses = peer
         .addresses
         .iter()
-        .find_map(|address| address.parse::<IpAddr>().ok())
-        .ok_or_else(|| "设备没有可用的局域网 IP 地址".to_string())?;
-    let address = SocketAddr::new(ip, peer.port);
-    let connecting = endpoint
-        .connect(address, "neloa.local")
-        .map_err(|error| format!("无法创建 QUIC 连接：{error}"))?;
-    let connection = timeout(CONNECT_TIMEOUT, connecting)
-        .await
-        .map_err(|_| "连接设备超时".to_string())?
-        .map_err(|error| format!("无法连接设备：{error}"))?;
-    timeout(CONNECT_TIMEOUT, connection.open_bi())
-        .await
-        .map_err(|_| "打开加密数据流超时".to_string())?
-        .map_err(|error| format!("无法打开加密数据流：{error}"))
+        .filter_map(|address| address.parse::<IpAddr>().ok())
+        .map(|ip| SocketAddr::new(ip, peer.port))
+        .collect::<Vec<_>>();
+    addresses.sort_unstable();
+    addresses.dedup();
+    if addresses.is_empty() {
+        return Err("设备没有可用的局域网 IP 地址".into());
+    }
+    // Race all advertised addresses under one deadline so an unreachable VPN
+    // or secondary interface does not delay a reachable LAN connection.
+    let mut attempts = addresses
+        .into_iter()
+        .map(|address| async move {
+            let connection = endpoint
+                .connect(address, "neloa.local")
+                .map_err(|error| format!("无法创建 QUIC 连接：{error}"))?
+                .await
+                .map_err(|error| format!("无法连接设备：{error}"))?;
+            connection
+                .open_bi()
+                .await
+                .map_err(|error| format!("无法打开加密数据流：{error}"))
+        })
+        .collect::<FuturesUnordered<_>>();
+    timeout(CONNECT_TIMEOUT, async {
+        let mut last_error = "设备没有可用的局域网连接".to_string();
+        while let Some(result) = attempts.next().await {
+            match result {
+                Ok(streams) => return Ok(streams),
+                Err(error) => last_error = error,
+            }
+        }
+        Err(last_error)
+    })
+    .await
+    .map_err(|_| "连接设备超时".to_string())?
 }
 
 fn make_endpoint(port: u16) -> Result<Endpoint, String> {
@@ -2636,6 +2668,93 @@ mod tests {
             .await
             .expect("cancellation should wake immediately")
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_a_backpressured_frame_write() {
+        let (stream, mut blocked_peer) = tokio::io::duplex(1);
+        let (_, writer) = tokio::io::split(stream);
+        let (cancel, receiver) = watch::channel(false);
+        let writing = tokio::spawn(async move {
+            let mut send = SessionSend::Relay(writer);
+            cancel_transfer_operation(&receiver, async {
+                write_frame(&mut send, &[42; 1024])
+                    .await
+                    .map_err(TransferFailure::failed)
+            })
+            .await
+        });
+        // Read one byte of the length prefix, then stop reading. The writer
+        // cannot finish even the header, so cancellation must wake it itself.
+        blocked_peer.read_u8().await.unwrap();
+        cancel.send_replace(true);
+        let outcome = timeout(Duration::from_secs(1), writing)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(outcome.unwrap_err().status, "cancelled");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn backpressured_frame_write_has_a_deadline() {
+        let (stream, _blocked_peer) = tokio::io::duplex(1);
+        let (_, writer) = tokio::io::split(stream);
+        let mut send = SessionSend::Relay(writer);
+        let error = write_frame(&mut send, &[42; 1024]).await.unwrap_err();
+        assert!(error.contains("长时间没有进展"));
+    }
+
+    #[tokio::test]
+    async fn lost_receipt_preserves_published_file_and_completion_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("received.txt");
+        tokio::fs::write(&path, b"verified data").await.unwrap();
+        let (completed_path, message) =
+            finalize_received_file(path.clone(), async { Err("connection reset".into()) }).await;
+        assert_eq!(completed_path, path);
+        assert_eq!(
+            tokio::fs::read(completed_path).await.unwrap(),
+            b"verified data"
+        );
+        assert!(message.contains("文件已校验并保存"));
+        assert!(message.contains("connection reset"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn quic_tries_reachable_address_when_first_address_is_unreachable() {
+        let server = make_endpoint(0).unwrap();
+        let port = server.local_addr().unwrap().port();
+        let responder = tokio::spawn(async move {
+            let connection = server.accept().await.unwrap().await.unwrap();
+            let (mut send, mut receive) = connection.accept_bi().await.unwrap();
+            assert_eq!(receive.read_u8().await.unwrap(), 42);
+            send.write_u8(43).await.unwrap();
+            send.finish().unwrap();
+            let _ = send.stopped().await;
+        });
+        let mut client = make_endpoint(0).unwrap();
+        client.set_default_client_config(insecure_quic_client_config().unwrap());
+        let peer = PeerDevice {
+            id: "test".into(),
+            name: "test".into(),
+            platform: "test".into(),
+            version: "test".into(),
+            protocol_version: PROTOCOL_VERSION,
+            min_protocol_version: MIN_PROTOCOL_VERSION,
+            capabilities: vec![],
+            addresses: vec!["::1".into(), "invalid".into(), "127.0.0.1".into()],
+            port,
+            last_seen_ms: 0,
+            relay_available: false,
+            service_fullname: String::new(),
+        };
+        let (mut send, mut receive) = timeout(Duration::from_secs(2), connect_quic(&client, &peer))
+            .await
+            .expect("a dead interface must not delay the reachable address")
+            .unwrap();
+        send.write_u8(42).await.unwrap();
+        assert_eq!(receive.read_u8().await.unwrap(), 43);
+        responder.await.unwrap();
     }
 
     #[test]
