@@ -102,9 +102,12 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
    生成用于 GitHub Release、由下载者自行重签的未签名 IPA：
 
    ```bash
-   env PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH" \
+   env CARGO_BUILD_RUSTFLAGS="--remap-path-prefix=$HOME=/Users/build" \
+     PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH" \
      npm run tauri -- ios build --no-sign --ci
    ```
+
+   `CARGO_BUILD_RUSTFLAGS` 会把 Rust 二进制中的本机主目录重映射为通用路径，避免发布包携带构建机用户名。
 
 不要再次运行 `tauri ios init` 或 `tauri android init`，除非准备重新合并生成目录中的原生改动；Android 多播锁、iOS Bonjour 适配层和 Xcode 构建脚本都在生成工程内有定制。
 

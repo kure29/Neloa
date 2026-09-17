@@ -104,9 +104,12 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
    To generate the unsigned IPA published on GitHub Releases for downstream re-signing:
 
    ```bash
-   env PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH" \
+   env CARGO_BUILD_RUSTFLAGS="--remap-path-prefix=$HOME=/Users/build" \
+     PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH" \
      npm run tauri -- ios build --no-sign --ci
    ```
+
+   `CARGO_BUILD_RUSTFLAGS` remaps the local home directory embedded in Rust binaries to a generic path so the release package does not expose the build account name.
 
 Do not run `tauri ios init` or `tauri android init` again unless you intend to re-merge the native changes in the generated directories: the Android multicast lock, the iOS Bonjour adapter, and the Xcode build script all live in there.
 
