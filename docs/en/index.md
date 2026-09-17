@@ -42,7 +42,7 @@ The current stable version is **0.1.12**, with a universal macOS DMG, Windows x6
 
 ## How this documentation is organised
 
-The user documentation lives in the `docs/` directory. [Architecture and security](/en/reference/architecture) and [Relay service and wire protocol](/en/reference/relay) are pulled straight from the repository's original documents rather than being retyped, so each topic has exactly one source of truth and the documentation cannot drift away from what the repository says.
+User, build, and architecture documentation lives in the `docs/` directory. [Relay service and wire protocol](/en/reference/relay) is pulled directly from `relay/README.md`, avoiding a second copy of the protocol reference. Each topic has one source of truth, so the published documentation cannot drift away from the repository.
 
 ## What it deliberately does not do
 

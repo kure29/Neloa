@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build manual
+    name: Build documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -44,13 +44,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build manual
+      - name: Build documentation
         run: npm run docs:build
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
 
-      - name: Upload manual
+      - name: Upload documentation
         uses: actions/upload-pages-artifact@v5
         with:
           path: docs/.vitepress/dist
@@ -64,6 +64,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Deploy manual
+      - name: Deploy documentation
         id: deployment
         uses: actions/deploy-pages@v5

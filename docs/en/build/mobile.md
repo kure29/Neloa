@@ -4,7 +4,7 @@ title: Android and iOS
 
 # Mobile builds and on-device verification
 
-Translated from `MOBILE_BUILD.md` in the repository root, which remains the original. If the two disagree, the original wins.
+Translated from the [Chinese source document](/build/mobile). If the two disagree, the Chinese source wins.
 
 ## Current delivery status
 
@@ -63,7 +63,6 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 export NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 export ANDROID_NDK_HOME="$NDK_HOME"
-export RUSTC=/Users/example/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc
 export ANDROID_KEYSTORE_PATH="$HOME/Documents/Neloa-signing/neloa-release.p12"
 read -s ANDROID_KEYSTORE_PASSWORD
 export ANDROID_KEYSTORE_PASSWORD

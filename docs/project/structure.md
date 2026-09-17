@@ -36,12 +36,12 @@ src/
 | 主题 | 真源 |
 | --- | --- |
 | 使用手册（安装、配对、传输、剪贴板、中继、排查） | `docs/guide/` |
-| 架构与威胁模型 | `ARCHITECTURE.md` |
+| 架构与威胁模型 | `docs/en/reference/architecture.md`（英文原文） |
 | 中继部署与线协议 | `relay/README.md` |
-| 移动端构建与验收 | `MOBILE_BUILD.md` |
-| Windows 构建 | `WINDOWS_BUILD.md` |
+| 移动端构建与验收 | `docs/build/mobile.md`（中文原文） |
+| Windows 构建 | `docs/build/windows.md`（中文原文） |
 
-文档站通过 `<!--@include-->` 引入后四个文件。修改它们时，站点会跟着变，不需要同步第二份。
+架构、移动端与 Windows 构建文档现在直接位于 VitePress 对应页面，不再通过额外的包装文件引入。中继文档仍从 `relay/README.md` 引入，以避免维护第二份协议说明。
 
 ## 本地预览文档
 

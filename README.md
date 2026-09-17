@@ -62,10 +62,10 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 | 主题 | 位置 |
 | --- | --- |
 | 使用手册 | [docs/guide/](docs/guide/index.md) |
-| 架构与威胁模型 | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| 架构与威胁模型 | [docs/reference/architecture.md](docs/reference/architecture.md) |
 | 自建中继部署与线协议 | [relay/README.md](relay/README.md) |
-| 移动端构建与真机验收 | [MOBILE_BUILD.md](MOBILE_BUILD.md) |
-| Windows 安装程序 | [WINDOWS_BUILD.md](WINDOWS_BUILD.md) |
+| 移动端构建与真机验收 | [docs/build/mobile.md](docs/build/mobile.md) |
+| Windows 安装程序 | [docs/build/windows.md](docs/build/windows.md) |
 
 ### 本地开发
 
@@ -94,7 +94,7 @@ npm install
 npm run tauri dev
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the threat model and [relay/README.md](relay/README.md) for relay deployment.
+See the [architecture and threat model](docs/en/reference/architecture.md) and [relay deployment guide](relay/README.md) for implementation details.
 
 ## License
 

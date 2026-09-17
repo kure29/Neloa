@@ -1,14 +1,13 @@
 import { defineConfig } from "vitepress";
 
 /**
- * Neloa 说明书。
+ * Neloa 文档。
  *
  * 语言：`/Neloa/` 是简体中文，`/Neloa/en/` 是英文。两个 locale 各自完整，
  * 页面上不会出现中英混排。
  *
- * 内容分工：`docs/` 承载使用手册。`ARCHITECTURE.md`、`relay/README.md`、
- * `MOBILE_BUILD.md`、`WINDOWS_BUILD.md` 是各自主题的唯一真源；在它们本身的语言里
- * 用 VitePress 的文件引入（`<!--@include-->`）原样呈现，另一种语言使用译文。
+ * 内容分工：`docs/` 承载用户与构建文档；中继协议由 `relay/README.md`
+ * 作为唯一真源，并通过 VitePress 文件引入呈现。每个主题的另一种语言使用译文。
  */
 
 type Lang = "zh" | "en";

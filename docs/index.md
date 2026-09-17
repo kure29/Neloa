@@ -42,7 +42,7 @@ features:
 
 ## 这份文档的组织方式
 
-用户手册（指南、构建、项目三部分）写在 `docs/` 目录里；而 [架构与安全边界](/reference/architecture)、[中继服务与线协议](/reference/relay)、[Windows 构建](/build/windows)、[移动端构建](/build/mobile) 直接引入仓库中的原始文档，不做二次转写。这样每个主题只有一个真源，文档站不会和仓库里的描述各自漂移。
+用户文档、构建说明和架构参考都写在 `docs/` 目录里；[中继服务与线协议](/reference/relay) 直接引入 `relay/README.md`，避免重复维护协议说明。每个主题只有一个真源，文档站不会和仓库里的描述各自漂移。
 
 ## 它不做什么
 

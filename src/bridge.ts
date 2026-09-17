@@ -635,12 +635,12 @@ export async function chooseFiles(): Promise<FileInspectionResult | null> {
     return {
       files: [
         {
-          path: "/Users/example/Downloads/Neloa Demo.zip",
+          path: "/Downloads/Neloa Demo.zip",
           name: "Neloa Demo.zip",
           size: 18_874_368,
         },
         {
-          path: "/Users/example/Downloads/产品交付说明.pdf",
+          path: "/Downloads/产品交付说明.pdf",
           name: "产品交付说明.pdf",
           size: 2_416_640,
         },

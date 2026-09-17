@@ -4,7 +4,7 @@ title: Windows installer
 
 # Building the Neloa Windows installer
 
-Translated from `WINDOWS_BUILD.md` in the repository root, which remains the original. If the two disagree, the original wins.
+Translated from the [Chinese source document](/build/windows). If the two disagree, the Chinese source wins.
 
 Official Windows x64 NSIS installers are built by the **Build Installers** GitHub Actions workflow on `windows-latest` and uploaded to the matching draft Release. No separate source archive or batch wrapper is required.
 
@@ -19,7 +19,7 @@ Pushing a `v*` tag starts the same workflow automatically.
 
 ## Build locally on Windows
 
-## Install these before the first build
+### Install these before the first build
 
 1. Node.js 20 or later.
 2. Rust stable, with the default `x86_64-pc-windows-msvc` toolchain.
