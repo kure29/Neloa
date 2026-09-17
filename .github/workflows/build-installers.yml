@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Draft release tag used for the generated installers
+        description: Release tag used for the generated installers
         required: true
-        default: v0.1.11-rc.1
+        default: v0.1.12
   push:
     tags:
       - v*
@@ -36,7 +36,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "Neloa $RELEASE_TAG" \
-              --notes "Automated macOS, Windows, and signed ABI-specific Android packages for real-device validation. macOS uses ad-hoc signing; Windows is unsigned." \
+              --notes "Neloa $RELEASE_TAG release packages. macOS uses ad-hoc signing; Windows is unsigned; Android APKs use the project release key. The unsigned iOS IPA is uploaded separately after a local Xcode build." \
               --draft \
               --prerelease
           fi
@@ -98,7 +98,7 @@ jobs:
           args: ${{ matrix.args }}
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: "Automated macOS, Windows, and signed ABI-specific Android packages for real-device validation. macOS uses ad-hoc signing; Windows is unsigned."
+          releaseBody: "Neloa release packages for macOS, Windows, Android, and iOS. See the final release notes for downloads, signing status, and checksums."
           releaseDraft: true
           prerelease: true
 
@@ -192,6 +192,6 @@ jobs:
           args: --target ${{ matrix.tauri_target }} --split-per-abi --apk --ci
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Neloa ${{ env.RELEASE_TAG }}
-          releaseBody: "Automated macOS, Windows, and signed ABI-specific Android packages for real-device validation. macOS uses ad-hoc signing; Windows is unsigned."
+          releaseBody: "Neloa release packages for macOS, Windows, Android, and iOS. See the final release notes for downloads, signing status, and checksums."
           releaseDraft: true
           prerelease: true

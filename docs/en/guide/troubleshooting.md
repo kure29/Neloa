@@ -24,8 +24,14 @@ Expand Settings → Connection → Connection status to see six checks:
 1. Confirm both devices are on the same network and both have Neloa open.
 2. Look at the devices screen hint. "Searching for nearby and relay devices" means discovery is still running; "device discovery is unavailable" means it is not, so check Device discovery under Connection status.
 3. On Windows, check whether the firewall allows Neloa on private and public networks.
-4. iOS asks for Local Network permission on first run; if it was declined, re-enable it in system settings.
+4. iOS and recent macOS releases ask for Local Network permission on first run; if it was declined, re-enable it in system settings. Seeing a device followed by a pairing timeout usually means discovery is visible while Local Network privacy or the firewall blocks UDP 48631.
 5. Android needs working Wi-Fi. Neloa holds the mDNS multicast lock while the app is alive, but local discovery cannot work when the device is only on cellular.
+
+## A device appears, but pairing times out
+
+- Initial pairing uses the local network only and never switches to the relay. Confirm both devices use the same Wi-Fi and that the router has neither guest isolation nor client isolation enabled.
+- Allow Neloa to access the Local Network in iOS/macOS settings, and allow inbound Neloa connections in the macOS/Windows firewall.
+- Local transfers use UDP 48631. Successful mDNS/Bonjour discovery only proves that UDP 5353 works; it does not prove that the transfer port is allowed.
 
 ## A device shows "incompatible version"
 

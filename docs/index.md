@@ -9,11 +9,11 @@ hero:
   tagline: 无需账号，在你的设备之间安全传输文件与剪贴板。文件与剪贴板内容始终由客户端端到端加密，中继只转发无法解读的加密数据。
   actions:
     - theme: brand
+      text: 下载 0.1.12
+      link: https://github.com/kure29/Neloa/releases/latest
+    - theme: alt
       text: 第一次使用
       link: /guide/
-    - theme: alt
-      text: 安全边界
-      link: /reference/architecture
 
 features:
   - title: 第一次使用
@@ -32,7 +32,13 @@ features:
 
 ## 当前状态
 
-Neloa 仍在积极开发中，当前开发版本为 **0.1.11**。macOS 和 Windows 安装包没有商业代码签名，iOS IPA 需要使用你自己的 Apple 证书重签后才能安装——这些都会在[下载与安装](/guide/install)里逐项说明。
+当前稳定版本为 **0.1.12**，提供 macOS Universal DMG、Windows x64 安装包、Android ARM64/x86_64 APK 和未签名 iOS IPA。macOS 和 Windows 安装包没有商业代码签名，iOS IPA 需要使用你自己的 Apple 证书重签后才能安装——这些都会在[下载与安装](/guide/install)里逐项说明。
+
+## 0.1.12 更新
+
+- 发现到局域网地址的设备固定使用 QUIC 直连，不再因为本地错误静默绕到中继。
+- 首次配对仅允许通过局域网完成，中继只连接已经配对的设备。
+- macOS 包新增本地网络与 Bonjour 权限声明，并补充配对超时的可操作提示。
 
 ## 这份说明书的组织方式
 

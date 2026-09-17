@@ -4,8 +4,8 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 固定签名、双架构、图标和校验和已完成包内核验 | 0.1.11 的多文件、局域网与中继真机回归 |
-| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 重签安装、原生 Bonjour/Rust 启动桥和真机基础流程已验证 | 0.1.11 的多文件、长时间传输与前后台回归 |
+| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 固定签名、双架构、图标和校验和已完成包内核验 | 0.1.12 的局域网路由修复真机回归 |
+| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 重签安装、原生 Bonjour/Rust 启动桥和真机基础流程已验证 | 0.1.12 的 macOS 配对与局域网路由修复真机回归 |
 
 Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。APK 由项目固定的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 使用完整 Xcode 生成无签名 IPA；安装到真机前仍需使用 Apple 开发证书和匹配的描述文件签名。
 
@@ -96,6 +96,13 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
    APPLE_DEVELOPMENT_TEAM=你的TeamID npm run tauri -- ios build --export-method debugging
    ```
 
+   生成用于 GitHub Release、由下载者自行重签的未签名 IPA：
+
+   ```bash
+   env PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH" \
+     npm run tauri -- ios build --no-sign --ci
+   ```
+
 不要再次运行 `tauri ios init` 或 `tauri android init`，除非准备重新合并生成目录中的原生改动；Android 多播锁、iOS Bonjour 适配层和 Xcode 构建脚本都在生成工程内有定制。
 
 ## 真机验收顺序
@@ -126,6 +133,6 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
 
 - Android Release APK 使用同一永久证书；首次从旧 Debug 签名迁移仍需卸载重装。
 - iOS 发现层使用原生 Bonjour 适配器，不依赖需要 Apple 额外批准的多播 entitlement。`DefunctConnection` 生命周期恢复和 Swift/Rust 静态启动桥已通过 P12 重签后的真机基础验证。
-- 0.1.11 新增多文件选择与批量发送；发布前应在 Android 和 iOS 上分别验证多选、连续接受、拒绝、取消与中继传输。
+- 0.1.12 修正局域网路由优先级和首次配对路径；发布后应在 Android/iOS 与 macOS/Windows 之间分别回归直连配对，并确认存在局域网路由时中继没有承载业务流量。
 - 移动系统不允许把剪贴板同步做成与桌面端完全相同的无限后台轮询。后续可增加“回到前台自动检查”和用户主动粘贴入口。
 - iOS 与 Android 应用标识统一为 `com.kure29.neloa`。首次从旧标识迁移时，系统会将其视为一个新应用。

@@ -9,11 +9,11 @@ hero:
   tagline: Transfer files and clipboard content between your own devices, without an account. Files and text are always end-to-end encrypted by the clients, and the relay only forwards data it cannot read.
   actions:
     - theme: brand
+      text: Download 0.1.12
+      link: https://github.com/kure29/Neloa/releases/latest
+    - theme: alt
       text: First time here
       link: /en/guide/
-    - theme: alt
-      text: Security model
-      link: /en/reference/architecture
 
 features:
   - title: First time here
@@ -32,7 +32,13 @@ features:
 
 ## Current status
 
-Neloa is under active development; the current version is **0.1.11**. The macOS and Windows packages are not commercially code-signed, and the iOS IPA must be re-signed with your own Apple certificate before it can be installed. [Download and install](/en/guide/install) covers each of these.
+The current stable version is **0.1.12**, with a universal macOS DMG, Windows x64 installer, Android ARM64/x86_64 APKs, and an unsigned iOS IPA. The desktop packages are not commercially code-signed, and the IPA must be re-signed with your own Apple certificate. [Download and install](/en/guide/install) covers each of these.
+
+## What changed in 0.1.12
+
+- A peer with a discovered LAN address stays on direct QUIC instead of silently switching to the relay after a local error.
+- Initial pairing is LAN-only; the relay accepts previously paired devices only.
+- The macOS package now declares Local Network and Bonjour usage and connection timeouts provide actionable guidance.
 
 ## How this manual is organised
 

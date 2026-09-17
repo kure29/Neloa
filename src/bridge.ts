@@ -141,7 +141,7 @@ function previewDevice(): LocalDevice {
     id: "preview-device",
     name: previewDeviceName ?? names[platform],
     platform,
-    version: "0.1.11-preview",
+    version: "0.1.12-preview",
   };
 }
 
@@ -175,7 +175,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
       id,
       name,
       platform: peerPlatform,
-      version: "0.1.11",
+      version: "0.1.12",
       protocolVersion: 1,
       minProtocolVersion: 1,
       capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],

@@ -34,7 +34,7 @@ Windows 10 1803 及更高版本通常已经包含 WebView2；如果系统缺失�
 本地构建成功后，安装程序位于：
 
 ```text
-src-tauri\target\release\bundle\nsis\Neloa_0.1.11_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Neloa_0.1.12_x64-setup.exe
 ```
 
 最终文件名可能随 Tauri 版本略有不同，以该目录内的 `.exe` 为准。构建产物不会提交到 Git；正式交付以 GitHub Release 中的文件为准。

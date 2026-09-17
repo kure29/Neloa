@@ -85,7 +85,7 @@ const EMPTY_RELAY: RelaySnapshot = {
 };
 const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   generatedAtMs: 0,
-  appVersion: "0.1.11",
+  appVersion: "0.1.12",
   platform: "macos",
   protocolVersion: 1,
   minProtocolVersion: 1,

@@ -2764,7 +2764,7 @@ dependencies = [
 
 [[package]]
 name = "neloa"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "android-native-keyring-store",
  "apple-native-keyring-store",

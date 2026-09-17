@@ -10,8 +10,8 @@ Translated from `MOBILE_BUILD.md` in the repository root, which remains the orig
 
 | Platform | Current artifact | Verified | Not yet verified |
 | --- | --- | --- | --- |
-| Android | Split ARM64 / x86_64 signed release APKs on GitHub Releases | Fixed signing, both ABIs, icons, and checksums confirmed inside the packages | Multi-file, local-network, and relay regression on real devices for 0.1.11 |
-| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 re-signing and installation, the native Bonjour/Rust startup bridge, and a basic on-device flow | Multi-file, long transfers, and foreground/background regression for 0.1.11 |
+| Android | Split ARM64 / x86_64 signed release APKs on GitHub Releases | Fixed signing, both ABIs, icons, and checksums confirmed inside the packages | On-device regression for the 0.1.12 LAN routing fix |
+| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 re-signing and installation, the native Bonjour/Rust startup bridge, and a basic on-device flow | On-device regression for 0.1.12 macOS pairing and LAN routing fixes |
 
 Android APKs are split per ABI: ARM64 for mainstream phones, x86_64 for emulators such as MuMu. The APKs are signed with the project's fixed Android PKCS#12 key and built with Rust release mode, symbol stripping, Thin LTO, and Android code shrinking. iOS produces an unsigned IPA through the full Xcode flow; installing it on a device still requires an Apple development certificate and a matching provisioning profile.
 
@@ -102,6 +102,13 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
    APPLE_DEVELOPMENT_TEAM=yourTeamID npm run tauri -- ios build --export-method debugging
    ```
 
+   To generate the unsigned IPA published on GitHub Releases for downstream re-signing:
+
+   ```bash
+   env PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$PATH" \
+     npm run tauri -- ios build --no-sign --ci
+   ```
+
 Do not run `tauri ios init` or `tauri android init` again unless you intend to re-merge the native changes in the generated directories: the Android multicast lock, the iOS Bonjour adapter, and the Xcode build script all live in there.
 
 ## On-device acceptance order
@@ -132,6 +139,6 @@ The relay never replaces the first pairing. Complete the local pairing above fir
 
 - Android release APKs use one permanent certificate; a first migration from an older debug signature still requires uninstalling and reinstalling.
 - The iOS discovery layer uses a native Bonjour adapter and does not depend on the multicast entitlement that requires extra Apple approval. `DefunctConnection` lifecycle recovery and the Swift/Rust static startup bridge have passed basic on-device verification after P12 re-signing.
-- 0.1.11 adds multi-file selection and batch sending; multi-select, consecutive accepts, rejections, cancellation, and relay transfers should each be verified on Android and iOS before release.
+- 0.1.12 corrects LAN route priority and the initial pairing path. After release, regress direct pairing between Android/iOS and macOS/Windows, and confirm the relay carries no application traffic while a LAN route is present.
 - Mobile systems do not allow clipboard sync to become the same unlimited background polling the desktop uses. "Check again on returning to the foreground" and an explicit paste entry point are candidates for a later release.
 - The iOS and Android application identifier is `com.kure29.neloa`. On the first migration from the old identifier, the system treats it as a new app.

@@ -126,36 +126,36 @@ struct TransportConnector {
 }
 
 impl TransportConnector {
-    async fn connect(&self, peer: &PeerDevice) -> Result<(SessionSend, SessionReceive), String> {
-        let lan_error = if peer.addresses.is_empty() {
-            None
-        } else {
-            match connect_quic(&self.quic, peer).await {
-                Ok((send, receive)) => {
-                    return Ok((SessionSend::Quic(send), SessionReceive::Quic(receive)));
-                }
-                Err(error) => Some(error),
-            }
-        };
+    async fn connect_lan(
+        &self,
+        peer: &PeerDevice,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        let (send, receive) = connect_quic(&self.quic, peer).await?;
+        Ok((SessionSend::Quic(send), SessionReceive::Quic(receive)))
+    }
+
+    async fn connect_trusted(
+        &self,
+        peer: &PeerDevice,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        // A live Bonjour/mDNS route is authoritative. Silently switching an
+        // actively visible LAN peer to the relay makes the route badge lie and
+        // can send local traffic over the Internet after a firewall or local
+        // permission failure. Relay is reserved for peers with no LAN route.
+        if !peer.addresses.is_empty() {
+            return self.connect_lan(peer).await.map_err(|error| {
+                format!("局域网直连失败：{error}。请检查两端的本地网络权限、防火墙和客户端隔离设置")
+            });
+        }
         if peer.relay_available {
             match self.relay.open_tunnel(peer.id.clone()).await {
                 Ok(RelayTunnel { send, receive }) => {
                     return Ok((SessionSend::Relay(send), SessionReceive::Relay(receive)));
                 }
-                Err(relay_error) => {
-                    if let Some(lan_error) = lan_error {
-                        return Err(format!(
-                            "局域网连接失败：{lan_error}；中继回退失败：{relay_error}"
-                        ));
-                    }
-                    return Err(relay_error);
-                }
+                Err(relay_error) => return Err(relay_error),
             }
         }
-        match lan_error {
-            Some(error) => Err(error),
-            _ => Err("设备当前没有可用的局域网或中继连接".into()),
-        }
+        Err("设备当前没有可用的局域网或中继连接".into())
     }
 }
 
@@ -796,10 +796,14 @@ async fn begin_outgoing_pairing(
     peer: PeerDevice,
     response: oneshot::Sender<Result<PairingRequest, String>>,
 ) {
-    let (send, receive) = match connector.connect(&peer).await {
+    // Pairing establishes the trust that the relay requires, so it must never
+    // use a relay tunnel itself.
+    let (send, receive) = match connector.connect_lan(&peer).await {
         Ok(streams) => streams,
         Err(error) => {
-            let _ = response.send(Err(error));
+            let _ = response.send(Err(format!(
+                "{error}。首次配对只能通过局域网完成，请检查两端的本地网络权限、防火墙和客户端隔离设置"
+            )));
             return;
         }
     };
@@ -998,7 +1002,7 @@ async fn outgoing_test_message(
         .ok_or_else(|| "请先完成设备配对".to_string())?;
     let expected_key = decode_public_key(&trusted.public_key)?;
 
-    let (send, receive) = connector.connect(&peer).await?;
+    let (send, receive) = connector.connect_trusted(&peer).await?;
     let mut session = initiator_handshake(
         send,
         receive,
@@ -1113,7 +1117,7 @@ async fn outgoing_clipboard_update(
         .ok_or_else(|| "请先完成设备配对".to_string())?;
     let expected_key = decode_public_key(&trusted.public_key)?;
 
-    let (send, receive) = connector.connect(peer).await?;
+    let (send, receive) = connector.connect_trusted(peer).await?;
     let mut session = initiator_handshake(
         send,
         receive,
@@ -1314,7 +1318,7 @@ async fn outgoing_file_transfer(
     ensure_not_cancelled(cancel)?;
 
     let (send, receive) = connector
-        .connect(peer)
+        .connect_trusted(peer)
         .await
         .map_err(TransferFailure::failed)?;
     let mut session = initiator_handshake(send, receive, &context.identity, &context.local, "file")
