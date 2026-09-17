@@ -9,7 +9,7 @@
     <a href="LICENSE"><img src="https://img.shields.io/github/license/kure29/Neloa" alt="Apache License 2.0" /></a>
     <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2" />
   </p>
-  <p><a href="https://github.com/kure29/Neloa/releases/latest"><strong>下载最新版</strong></a> · <a href="https://kure29.github.io/Neloa/"><strong>在线说明书</strong></a> · <a href="#english">English</a></p>
+  <p><a href="https://github.com/kure29/Neloa/releases/latest"><strong>下载最新版</strong></a> · <a href="https://kure29.github.io/Neloa/"><strong>在线文档</strong></a> · <a href="#english">English</a></p>
 </div>
 
 > [!IMPORTANT]
@@ -42,7 +42,6 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 | macOS | `Neloa_0.1.12_universal.dmg` | Apple Silicon / Intel 通用包，ad-hoc 签名 |
 | Windows | `Neloa_0.1.12_x64-setup.exe` | Windows x64 NSIS，未商业签名 |
 | Android 真机 | `Neloa_0.1.12_arm64.apk` | 使用项目固定密钥签名 |
-| Android 模拟器 | `Neloa_0.1.12_x86_64.apk` | 面向 x86_64 模拟器 |
 | iOS | `Neloa_0.1.12_unsigned.ipa` | 未签名，必须自行重签 |
 
 > macOS/iOS 首次启动请允许“本地网络”权限。Neloa 用 Bonjour/mDNS 发现设备，并使用 UDP 48631 建立 QUIC 直连。
@@ -58,7 +57,7 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 
 ### 文档
 
-完整的安装、配对、传输、中继部署与排错步骤见[中文说明书](https://kure29.github.io/Neloa/)；[English manual](https://kure29.github.io/Neloa/en/)。仓库内的主要资料：
+完整的安装、配对、传输、中继部署与排错步骤见[中文文档](https://kure29.github.io/Neloa/)；[English documentation](https://kure29.github.io/Neloa/en/)。仓库内的主要资料：
 
 | 主题 | 位置 |
 | --- | --- |
@@ -75,7 +74,7 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 ```bash
 npm install
 npm run tauri dev     # 桌面客户端
-npm run docs:dev      # 本地预览说明书
+npm run docs:dev      # 本地预览文档
 ```
 
 移动端生成工程包含 Android 多播锁、iOS Bonjour 适配层等自定义代码，不要随意重新运行 `tauri android init` 或 `tauri ios init`。
@@ -86,7 +85,7 @@ Neloa is a local-first file and plain-text clipboard transfer app for your own d
 
 Version **0.1.12** keeps visible LAN peers on the direct path, restricts initial pairing to the LAN, adds the macOS Local Network/Bonjour declarations, and provides actionable connection errors.
 
-Download macOS, Windows, Android, and unsigned iOS packages from the [latest GitHub Release](https://github.com/kure29/Neloa/releases/latest). Desktop packages are not commercially signed, and the iOS IPA must be re-signed with your own Apple certificate and provisioning profile. The full [English manual](https://kure29.github.io/Neloa/en/) covers installation, pairing, transfers, relay deployment, and troubleshooting.
+Download macOS, Windows, Android, and unsigned iOS packages from the [latest GitHub Release](https://github.com/kure29/Neloa/releases/latest). Desktop packages are not commercially signed, and the iOS IPA must be re-signed with your own Apple certificate and provisioning profile. The full [English documentation](https://kure29.github.io/Neloa/en/) covers installation, pairing, transfers, relay deployment, and troubleshooting.
 
 For development, install Node.js 20+, npm, Rust stable, and the platform-specific Tauri 2 prerequisites:
 

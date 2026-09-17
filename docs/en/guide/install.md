@@ -11,7 +11,6 @@ Stable builds live on the [latest GitHub Release](https://github.com/kure29/Nelo
 | macOS | `Neloa_0.1.12_universal.dmg` | Apple Silicon and Intel; ad-hoc signed, so the system may ask you to confirm before opening |
 | Windows | `Neloa_0.1.12_x64-setup.exe` | x64 NSIS; not commercially signed, so SmartScreen may report an unknown publisher |
 | Android device | `Neloa_0.1.12_arm64.apk` | ARM64; signed with the project's fixed key |
-| Android emulator | `Neloa_0.1.12_x86_64.apk` | For selected x86_64 emulators |
 | iOS | `Neloa_0.1.12_unsigned.ipa` | Must be re-signed with your own P12 certificate and provisioning profile |
 
 ## About signing

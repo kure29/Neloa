@@ -4,10 +4,10 @@
 
 | 平台 | 当前产物 | 已验证 | 尚未验证 |
 | --- | --- | --- | --- |
-| Android | GitHub Release 中的 ARM64 / x86_64 独立签名 Release APK | 固定签名、双架构、图标和校验和已完成包内核验 | 0.1.12 的局域网路由修复真机回归 |
+| Android | GitHub Release 中的 ARM64 签名 Release APK | 固定签名、ARM64 架构、图标和校验和已完成包内核验 | 0.1.12 的局域网路由修复真机回归 |
 | iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 重签安装、原生 Bonjour/Rust 启动桥和真机基础流程已验证 | 0.1.12 的 macOS 配对与局域网路由修复真机回归 |
 
-Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuMu 等模拟器。APK 由项目固定的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 使用完整 Xcode 生成无签名 IPA；安装到真机前仍需使用 Apple 开发证书和匹配的描述文件签名。
+Android 发布包仅提供面向主流真机的 ARM64 APK。APK 由项目固定的 Android PKCS#12 密钥签名，并使用 Rust Release、符号剥离、Thin LTO 与 Android 代码压缩。iOS 使用完整 Xcode 生成无签名 IPA；安装到真机前仍需使用 Apple 开发证书和匹配的描述文件签名。
 
 ## 已接入的移动端能力
 
@@ -22,7 +22,7 @@ Android APK 按架构拆分：ARM64 用于主流安卓真机，x86_64 用于 MuM
 
 ## Android 真机安装
 
-要求：ARM64 手机或平板，或 x86_64 模拟器；Android 7.0（API 24）或更新版本。
+要求：ARM64 手机或平板；Android 7.0（API 24）或更新版本。
 
 最方便的方式是把 APK 发送到手机，允许当前文件管理器“安装未知应用”，然后点 APK 安装。也可以打开 USB 调试后运行：
 
@@ -61,7 +61,7 @@ export RUSTC=/Users/example/.rustup/toolchains/stable-aarch64-apple-darwin/bin/r
 export ANDROID_KEYSTORE_PATH="$HOME/Documents/Neloa-signing/neloa-release.p12"
 read -s ANDROID_KEYSTORE_PASSWORD
 export ANDROID_KEYSTORE_PASSWORD
-npm run tauri -- android build --target aarch64 x86_64 --split-per-abi --apk --ci
+npm run tauri -- android build --target aarch64 --split-per-abi --apk --ci
 unset ANDROID_KEYSTORE_PASSWORD
 ```
 

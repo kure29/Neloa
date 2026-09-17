@@ -20,7 +20,7 @@ Neloa 在你自己的设备之间传输文件和纯文本剪贴板内容。它�
 | --- | --- | --- |
 | macOS | Universal DMG | 兼容 Apple Silicon 与 Intel |
 | Windows | x64 NSIS | Windows 10 1803 及以上通常已带 WebView2 |
-| Android | ARM64 / x86_64 APK | ARM64 用于真机，x86_64 用于部分模拟器 |
+| Android | ARM64 APK | 用于主流 Android 真机 |
 | iOS | 未签名 IPA | 需要用自己的证书与描述文件重签 |
 
 ## 30 秒上手

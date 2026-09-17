@@ -20,7 +20,7 @@ Neloa transfers files and plain-text clipboard content between your own devices.
 | --- | --- | --- |
 | macOS | Universal DMG | Apple Silicon and Intel |
 | Windows | x64 NSIS | Windows 10 1803 and later usually ship WebView2 |
-| Android | ARM64 / x86_64 APK | ARM64 for physical devices, x86_64 for some emulators |
+| Android | ARM64 APK | For mainstream physical Android devices |
 | iOS | Unsigned IPA | Must be re-signed with your own certificate and profile |
 
 ## A first transfer in 30 seconds

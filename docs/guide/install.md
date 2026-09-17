@@ -11,7 +11,6 @@ title: 下载与安装
 | macOS | `Neloa_0.1.12_universal.dmg` | Apple Silicon 与 Intel；ad-hoc 签名，系统可能要求手动确认打开 |
 | Windows | `Neloa_0.1.12_x64-setup.exe` | x64 NSIS；没有商业签名，SmartScreen 可能显示“未知发布者” |
 | Android 真机 | `Neloa_0.1.12_arm64.apk` | ARM64；使用项目固定密钥签名 |
-| Android 模拟器 | `Neloa_0.1.12_x86_64.apk` | 适用于部分 x86_64 模拟器 |
 | iOS | `Neloa_0.1.12_unsigned.ipa` | 需要使用自己的 P12 证书与描述文件重签，不能直接安装 |
 
 ## 关于签名

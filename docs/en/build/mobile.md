@@ -10,10 +10,10 @@ Translated from `MOBILE_BUILD.md` in the repository root, which remains the orig
 
 | Platform | Current artifact | Verified | Not yet verified |
 | --- | --- | --- | --- |
-| Android | Split ARM64 / x86_64 signed release APKs on GitHub Releases | Fixed signing, both ABIs, icons, and checksums confirmed inside the packages | On-device regression for the 0.1.12 LAN routing fix |
+| Android | ARM64 signed release APK on GitHub Releases | Fixed signing, ARM64 architecture, icon, and checksum confirmed inside the package | On-device regression for the 0.1.12 LAN routing fix |
 | iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 re-signing and installation, the native Bonjour/Rust startup bridge, and a basic on-device flow | On-device regression for 0.1.12 macOS pairing and LAN routing fixes |
 
-Android APKs are split per ABI: ARM64 for mainstream phones, x86_64 for emulators such as MuMu. The APKs are signed with the project's fixed Android PKCS#12 key and built with Rust release mode, symbol stripping, Thin LTO, and Android code shrinking. iOS produces an unsigned IPA through the full Xcode flow; installing it on a device still requires an Apple development certificate and a matching provisioning profile.
+Android releases provide an ARM64 APK for mainstream physical devices. The APK is signed with the project's fixed Android PKCS#12 key and built with Rust release mode, symbol stripping, Thin LTO, and Android code shrinking. iOS produces an unsigned IPA through the full Xcode flow; installing it on a device still requires an Apple development certificate and a matching provisioning profile.
 
 ## Mobile capabilities that are wired up
 
@@ -28,7 +28,7 @@ Android APKs are split per ABI: ARM64 for mainstream phones, x86_64 for emulator
 
 ## Installing on an Android device
 
-Requirements: an ARM64 phone or tablet, or an x86_64 emulator; Android 7.0 (API 24) or later.
+Requirements: an ARM64 phone or tablet running Android 7.0 (API 24) or later.
 
 The easiest route is to send the APK to the phone, allow the current file manager to install unknown apps, and tap the APK. With USB debugging enabled you can also run:
 
@@ -67,7 +67,7 @@ export RUSTC=/Users/example/.rustup/toolchains/stable-aarch64-apple-darwin/bin/r
 export ANDROID_KEYSTORE_PATH="$HOME/Documents/Neloa-signing/neloa-release.p12"
 read -s ANDROID_KEYSTORE_PASSWORD
 export ANDROID_KEYSTORE_PASSWORD
-npm run tauri -- android build --target aarch64 x86_64 --split-per-abi --apk --ci
+npm run tauri -- android build --target aarch64 --split-per-abi --apk --ci
 unset ANDROID_KEYSTORE_PASSWORD
 ```
 

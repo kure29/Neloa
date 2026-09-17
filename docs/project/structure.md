@@ -9,7 +9,7 @@ src/                         React 界面与 Tauri 调用桥
 src-tauri/                   客户端 Rust 核心及原生工程
 relay/                       自建中继服务与 Docker Compose
 crates/neloa-relay-protocol/ 客户端和中继共享协议
-docs/                        本说明书（VitePress）
+docs/                        本文档站（VitePress）
 .github/workflows/           持续集成与安装包构建
 ```
 
@@ -27,7 +27,7 @@ src/
 
 `views/` 与 `ui/` 里没有平台分支，唯一的例外是通过 `useShell()` 让弹层在桌面端显示为居中对话框、在移动端显示为底部面板。外壳由前端根据 `?platform=`、指针类型、视口宽度和 user agent 选择；Rust 后端报告 `macos`、`windows`、`linux`、`ios` 或 `android`，协议行为与外壳无关。
 
-界面颜色只来自 `src/styles/tokens.css` 里的一套自定义属性，每个变量都有一个亮色值和一个暗色值，因此组件规则从不判断配色方案。本说明书也沿用这同一套 token。
+界面颜色只来自 `src/styles/tokens.css` 里的一套自定义属性，每个变量都有一个亮色值和一个暗色值，因此组件规则从不判断配色方案。本文档站也沿用这同一套 token。
 
 ## 文档是真源在哪里
 
