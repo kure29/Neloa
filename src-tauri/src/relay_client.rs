@@ -33,7 +33,7 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use crate::{
-    model::{LocalDevice, PeerDevice, RelaySnapshot, CAPABILITIES},
+    model::{local_capabilities, LocalDevice, PeerDevice, RelaySnapshot},
     relay_settings::{RelayConnectionConfig, RelayDirective},
     unix_millis,
 };
@@ -312,10 +312,7 @@ async fn run_connection(
             app_version: local.version.clone(),
             protocol_version: crate::model::PROTOCOL_VERSION,
             min_protocol_version: crate::model::MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
-                .iter()
-                .map(|value| (*value).to_string())
-                .collect(),
+            capabilities: local_capabilities(),
         },
     };
     if let Err(error) = send_control(&mut writer, &registration).await {
@@ -627,7 +624,7 @@ fn apply_relay_presence(
     peers.retain(|id, peer| {
         if peer.relay_available && !online_ids.contains(id) {
             peer.relay_available = false;
-            return !peer.addresses.is_empty();
+            return !peer.addresses.is_empty() || peer.peer_to_peer_available;
         }
         true
     });
@@ -659,6 +656,9 @@ fn apply_relay_presence(
                     port: 0,
                     last_seen_ms: now,
                     relay_available: true,
+                    peer_to_peer_available: false,
+                    peer_to_peer_device_address: None,
+                    peer_to_peer_address: None,
                     service_fullname: String::new(),
                 },
             );
@@ -670,7 +670,7 @@ fn apply_relay_presence(
 fn clear_relay_presence(peers: &Arc<RwLock<HashMap<String, PeerDevice>>>) {
     peers.write().retain(|_, peer| {
         peer.relay_available = false;
-        !peer.addresses.is_empty()
+        !peer.addresses.is_empty() || peer.peer_to_peer_available
     });
 }
 
@@ -702,7 +702,7 @@ mod tests {
             app_version: "test".into(),
             protocol_version: crate::model::PROTOCOL_VERSION,
             min_protocol_version: crate::model::MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
+            capabilities: crate::model::CAPABILITIES
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),

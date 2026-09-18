@@ -34,8 +34,9 @@ Neloa is local-first. Every client should remain useful without an account or an
 - A user-readable local connection status for QUIC, mDNS, identity, clipboard, peer capability, and firewall checks.
 - An optional self-hosted relay client with persistent authenticated WebSocket connections, same-token device presence, and bounded virtual streams.
 - An explicit per-device route choice. An unset route rejects the connection instead of recommending, automatically selecting, or silently changing paths.
+- Native Android Wi-Fi Direct service discovery, group formation, and address rendezvous. It is enabled only when a nearby Android peer is actually visible and reuses the same QUIC, Noise, pairing, and transfer protocols.
 
-Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and `capabilities=discovery,pairing,noise-xx,test-message,file-transfer,clipboard-text`. The same protocol range and capability list is authenticated inside the Noise XX handshake; mDNS values are presentation and early-filtering hints only.
+Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and the base capabilities `discovery,pairing,noise-xx,test-message,file-transfer,streaming-file-hash,clipboard-text`; Android also declares `transport-peer-to-peer-wifi`. The same protocol range and capability list is authenticated inside the Noise XX handshake; discovery values are presentation and early-filtering hints only.
 
 ## Interface layout
 
@@ -69,7 +70,9 @@ Peers that advertise `streaming-file-hash` offer only the sanitized base name an
 
 Clipboard synchronization is fail-closed and disabled by default. Enabling it records the current clipboard as a local baseline without transmitting it. Subsequent text updates receive UUIDs, are checked for size and strong credential markers, and are sent only to currently discovered trusted peers. Remote updates are acknowledged only after the OS clipboard write succeeds. Received content becomes the new local baseline, preventing it from being sent back; CRLF, CR, and LF are canonicalized for comparison across Windows and macOS. Events retain only peer, direction, byte count, status, and time—not clipboard text.
 
-Android requires `CHANGE_WIFI_MULTICAST_STATE` plus a held `WifiManager.MulticastLock` while the Activity is alive so mDNS packets are delivered reliably. iOS does not open a raw multicast socket: `NWBrowser` browses `_neloa._udp`, while `NetService` publishes and resolves the Bonjour service that points at the existing Rust QUIC listener on UDP 48631. Swift forwards resolved IPv4 addresses and TXT metadata to the shared Rust peer store. This path uses the declared Bonjour service and local-network privacy prompt without the restricted multicast entitlement.
+Android requires `CHANGE_WIFI_MULTICAST_STATE` plus a held `WifiManager.MulticastLock` while the Activity is alive so mDNS packets are delivered reliably. The Wi-Fi Direct adapter uses Android DNS-SD discovery, system group formation, and a local rendezvous port that exchanges only device IDs and group addresses. These are untrusted routing hints; the subsequent Noise XX handshake still authenticates the actual peer. Native device addresses and group IPs stay inside Rust and are not sent to the WebView. Android 13+ uses Nearby devices permission; earlier versions use location permission.
+
+iOS does not open a raw multicast socket: `NWBrowser` browses `_neloa._udp`, while `NetService` publishes and resolves the Bonjour service that points at the existing Rust QUIC listener on UDP 48631. Swift forwards resolved IPv4 addresses and TXT metadata to the shared Rust peer store. This path uses the declared Bonjour service and local-network privacy prompt without the restricted multicast entitlement.
 
 ## Architecture layers
 

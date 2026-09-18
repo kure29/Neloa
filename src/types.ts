@@ -37,6 +37,7 @@ export interface PeerDevice {
   port: number;
   lastSeenMs: number;
   relayAvailable: boolean;
+  peerToPeerAvailable: boolean;
 }
 
 export interface DiscoverySnapshot {

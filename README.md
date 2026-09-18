@@ -31,6 +31,7 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 - 每台设备都必须明确选择「局域网」或「中继」，选择会按设备保存。
 - Neloa 不会推荐、自动判断或在失败后静默切换路径；需要换路时由你手动选择。
 - 首次配对也可以通过中继完成，但仍必须在两端核对六位验证码并分别确认。
+- 当前源码还为附近的 Android 设备提供「点对点 Wi-Fi」；它不要求两端接入同一个局域网，仍复用 QUIC 与 Noise XX。该能力尚未包含在 0.1.13 Release 中。
 
 ### 下载与安装
 
@@ -83,7 +84,7 @@ npm run docs:dev      # 本地预览文档
 
 Neloa is a local-first file and plain-text clipboard transfer app for your own devices. It needs no account and uploads no files to a cloud drive. You explicitly select LAN QUIC or your self-hosted WebSocket relay for each peer. Noise XX protects pairing and application data end to end on either path.
 
-Neloa never recommends, automatically selects, or silently changes the route. Initial pairing can use the relay; both devices must still compare and confirm the same six-digit code.
+Neloa never recommends, automatically selects, or silently changes the route. Initial pairing can use the relay; both devices must still compare and confirm the same six-digit code. The current source tree also supports explicit Android-to-Android Wi-Fi Direct without a shared LAN, reusing the same QUIC and Noise XX stack; this is not included in the 0.1.13 release artifacts.
 
 Download macOS, Windows, Android, and unsigned iOS packages from the [latest GitHub Release](https://github.com/kure29/Neloa/releases/latest). Desktop packages are not commercially signed, and the iOS IPA must be re-signed with your own Apple certificate and provisioning profile. The full [English documentation](https://kure29.github.io/Neloa/en/) covers installation, pairing, transfers, relay deployment, and troubleshooting.
 

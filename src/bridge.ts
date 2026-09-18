@@ -185,6 +185,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
       port: 48631,
       lastSeenMs: Date.now(),
       relayAvailable: false,
+      peerToPeerAvailable: false,
     });
     const peers = platform === "windows"
       ? [

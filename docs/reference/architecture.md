@@ -36,8 +36,9 @@ Neloa 是本地优先的。每个客户端在没有账号、没有互联网连�
 - 面向用户的本地连接状态，覆盖 QUIC、mDNS、身份、剪贴板、对端能力和防火墙检查。
 - 可选的自建中继客户端，带持久化的经过认证的 WebSocket 连接、同一令牌下的设备在线状态和有界虚拟流。
 - 按设备保存的显式连接方式选择；未选择时拒绝连接，不推荐、自动判断或静默切换路径。
+- Android 原生 Wi-Fi Direct 服务发现、成组与地址交换；它只在 Android 对端实际位于附近时启用，并复用同一个 QUIC、Noise、配对与传输协议。
 
-广播会声明 `protocolVersion=1`、`minProtocolVersion=1` 和 `capabilities=discovery,pairing,noise-xx,test-message,file-transfer,clipboard-text`。同一份协议范围与能力列表也会在 Noise XX 握手中被认证；mDNS 里的值只是展示和早期过滤用的提示。
+广播会声明 `protocolVersion=1`、`minProtocolVersion=1` 和基础能力 `discovery,pairing,noise-xx,test-message,file-transfer,streaming-file-hash,clipboard-text`；Android 额外声明 `transport-peer-to-peer-wifi`。同一份协议范围与能力列表也会在 Noise XX 握手中被认证；发现记录里的值只是展示和早期过滤用的提示。
 
 ## 界面布局
 
@@ -71,7 +72,9 @@ Noise 静态私钥以应用服务名保存在 macOS Keychain、Windows 凭据管
 
 剪贴板同步是失败关闭的，并且默认禁用。启用时会记录当前剪贴板作为本地基线而不传输它。之后的文本更新会获得 UUID，经过大小和强凭据标记检查，并且只发送给当前已发现的已信任设备。远端更新只有在操作系统剪贴板写入成功之后才会被确认。收到的内容会成为新的本地基线，防止它被发回去；CRLF、CR 和 LF 会被归一化，以便在 Windows 与 macOS 之间比较。事件只保留对端、方向、字节数、状态和时间——不保留剪贴板文本。
 
-Android 需要 `CHANGE_WIFI_MULTICAST_STATE` 权限，并在 Activity 存活期间持有一个 `WifiManager.MulticastLock`，以便可靠地收到 mDNS 数据包。iOS 不打开原始多播套接字：`NWBrowser` 浏览 `_neloa._udp`，而 `NetService` 发布并解析指向既有 Rust QUIC 监听器（UDP 48631）的 Bonjour 服务。Swift 会把解析出的 IPv4 地址和 TXT 元数据转发给共享的 Rust 对端存储。这条路径使用已声明的 Bonjour 服务和本地网络隐私提示，不需要受限的多播 entitlement。
+Android 需要 `CHANGE_WIFI_MULTICAST_STATE` 权限，并在 Activity 存活期间持有一个 `WifiManager.MulticastLock`，以便可靠地收到 mDNS 数据包。Wi-Fi Direct 适配层使用 Android DNS-SD 发现、系统成组和一个仅交换设备 ID 与组内地址的本地会合端口；这些值是不可信路由提示，真正的对端身份仍由随后运行的 Noise XX 握手验证。原生设备地址与组内 IP 只保存在 Rust 内部，不发送给 WebView。Android 13 及以上使用“附近的设备”权限，更早版本使用位置权限。
+
+iOS 不打开原始多播套接字：`NWBrowser` 浏览 `_neloa._udp`，而 `NetService` 发布并解析指向既有 Rust QUIC 监听器（UDP 48631）的 Bonjour 服务。Swift 会把解析出的 IPv4 地址和 TXT 元数据转发给共享的 Rust 对端存储。这条路径使用已声明的 Bonjour 服务和本地网络隐私提示，不需要受限的多播 entitlement。
 
 ## 架构分层
 

@@ -39,6 +39,7 @@ The current stable version is **0.1.13**, with a universal macOS DMG, Windows x6
 - You must explicitly select **Local network** or **Relay** for each peer.
 - Neloa does not recommend, automatically select, or silently change the route.
 - Initial pairing can use either path; both devices must still compare and confirm the six-digit code.
+- The current source tree also lets Android clients select **Wi-Fi Direct** for a nearby Android peer without sharing a LAN. This is not included in the 0.1.13 downloads.
 
 ## How this documentation is organised
 

@@ -2771,6 +2771,7 @@ dependencies = [
  "futures-util",
  "hex",
  "hostname",
+ "jni",
  "keyring",
  "keyring-core",
  "mdns-sd",

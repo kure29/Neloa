@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) const PROTOCOL_VERSION: u16 = 1;
 pub(crate) const MIN_PROTOCOL_VERSION: u16 = 1;
+#[cfg(target_os = "android")]
+pub(crate) const CAPABILITY_PEER_TO_PEER_WIFI: &str = "transport-peer-to-peer-wifi";
 pub(crate) const CAPABILITIES: &[&str] = &[
     "discovery",
     "pairing",
@@ -11,6 +13,20 @@ pub(crate) const CAPABILITIES: &[&str] = &[
     "streaming-file-hash",
     "clipboard-text",
 ];
+
+pub(crate) fn local_capabilities() -> Vec<String> {
+    let capabilities = CAPABILITIES
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
+    #[cfg(target_os = "android")]
+    let capabilities = {
+        let mut capabilities = capabilities;
+        capabilities.push(CAPABILITY_PEER_TO_PEER_WIFI.to_string());
+        capabilities
+    };
+    capabilities
+}
 
 pub(crate) fn protocol_compatible(peer_version: u16, peer_min_version: u16) -> bool {
     peer_min_version > 0
@@ -46,6 +62,12 @@ pub(crate) struct PeerDevice {
     pub last_seen_ms: u128,
     #[serde(default)]
     pub relay_available: bool,
+    #[serde(default)]
+    pub peer_to_peer_available: bool,
+    #[serde(skip)]
+    pub peer_to_peer_device_address: Option<String>,
+    #[serde(skip)]
+    pub peer_to_peer_address: Option<String>,
     #[serde(skip)]
     pub service_fullname: String,
 }
@@ -269,7 +291,10 @@ pub(crate) struct DiagnosticsSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use super::{protocol_compatible, TransportPreference, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION};
+    use super::{
+        protocol_compatible, PeerDevice, TransportPreference, MIN_PROTOCOL_VERSION,
+        PROTOCOL_VERSION,
+    };
 
     #[test]
     fn protocol_ranges_must_overlap_and_be_well_formed() {
@@ -305,5 +330,31 @@ mod tests {
             serde_json::from_str::<TransportPreference>(r#""auto""#).unwrap(),
             TransportPreference::Ask
         );
+    }
+
+    #[test]
+    fn peer_snapshot_hides_native_peer_to_peer_addresses() {
+        let peer = PeerDevice {
+            id: "peer".into(),
+            name: "Peer".into(),
+            platform: "android".into(),
+            version: "test".into(),
+            protocol_version: PROTOCOL_VERSION,
+            min_protocol_version: MIN_PROTOCOL_VERSION,
+            capabilities: vec!["transport-peer-to-peer-wifi".into()],
+            addresses: vec![],
+            port: 48_631,
+            last_seen_ms: 0,
+            relay_available: false,
+            peer_to_peer_available: true,
+            peer_to_peer_device_address: Some("02:00:00:00:00:00".into()),
+            peer_to_peer_address: Some("192.168.49.2".into()),
+            service_fullname: String::new(),
+        };
+
+        let snapshot = serde_json::to_value(peer).unwrap();
+        assert_eq!(snapshot["peerToPeerAvailable"], true);
+        assert!(snapshot.get("peerToPeerDeviceAddress").is_none());
+        assert!(snapshot.get("peerToPeerAddress").is_none());
     }
 }

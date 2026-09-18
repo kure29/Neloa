@@ -20,6 +20,7 @@ Android 发布包仅提供面向主流真机的 ARM64 APK。APK 由项目固定�
 - 系统文件选择器返回的 Android `content://` 文件可被读取。选择时只读取信息，点击发送后才复制到应用缓存，传输完成、失败或取消后自动删除缓存副本。
 - iOS 文件选择器显式使用复制模式，避免安全作用域在异步传输期间失效。
 - Android 已声明网络、Wi-Fi 与多播权限，并在 Activity 存活期间持有 mDNS 多播锁。
+- 当前源码支持 Android 到 Android 的 Wi-Fi Direct：原生 DNS-SD 发现与系统成组后，继续使用现有 UDP 48631 QUIC 和 Noise XX。该模式不要求两台设备接入同一个局域网，不支持桌面端或 iOS。
 - iOS 已声明 `NSLocalNetworkUsageDescription` 与 `_neloa._udp` Bonjour 服务；发现由 `NWBrowser` 和 `NetService` 完成，不需要受限的多播网络 entitlement。
 - iOS 仅在应用处于前台活动状态时运行 Bonjour；进入后台会主动停止，返回前台会重建。若系统将 mDNS 会话标记为 `DefunctConnection`，浏览器会自动重连。
 - 移动端支持纯文本系统剪贴板，但当前产品定义为“应用在前台时同步”。Android 10 以后限制后台读取剪贴板；iOS 也可能显示系统粘贴授权提示。
@@ -124,6 +125,16 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
 7. 将手机应用切到后台，确认产品不会承诺持续剪贴板监听；重新回到前台后再继续测试。
 8. 如发现失败，先在两端打开“设置 → 连接 → 连接状态”，记录系统版本、网络类型、失败方向和错误提示。
 
+## Android 点对点 Wi-Fi 真机验收
+
+使用两台 Android 真机；模拟器不能代表 Wi-Fi Direct 行为。
+
+1. 两端打开 Wi-Fi 与 Neloa，允许“附近的设备”（Android 13 及以上）或位置权限（Android 12 及以下）。
+2. 不要求连接同一个路由器；等待设备卡片的「点对点 Wi-Fi」由不可用变为可选。
+3. 两端分别选择该连接方式并发起首次配对，处理系统连接确认，核对相同的六位验证码后确认。
+4. 双向发送小文件、较大文件和测试文本，再验证取消与重试。传输应继续显示为点对点 Wi-Fi，失败后不得自动改走局域网或中继。
+5. 关闭其中一端 Wi-Fi、撤销附近设备权限并拒绝一次系统连接请求，确认每种情况都有可读错误；等待建链超过 45 秒应超时结束。
+
 ## 自建中继真机验收
 
 中继可以承载首次配对和后续传输，按下面顺序验证：
@@ -138,6 +149,7 @@ src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-rele
 ## 平台限制与兼容说明
 
 - Android Release APK 使用同一永久证书；首次从旧 Debug 签名迁移仍需卸载重装。
+- Wi-Fi Direct 当前只支持 Android 到 Android；设备是否支持、系统成组策略以及连接确认界面由厂商实现决定。
 - iOS 发现层使用原生 Bonjour 适配器，不依赖需要 Apple 额外批准的多播 entitlement。`DefunctConnection` 生命周期恢复和 Swift/Rust 静态启动桥已通过 P12 重签后的真机基础验证。
 - 移动系统不允许把剪贴板同步做成与桌面端完全相同的无限后台轮询；当前仅在应用前台同步。
 - iOS 与 Android 应用标识统一为 `com.kure29.neloa`。首次从旧标识迁移时，系统会将其视为一个新应用。

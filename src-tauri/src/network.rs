@@ -39,10 +39,12 @@ use crate::{
     clipboard::{validate_clipboard_text, ClipboardService},
     identity::{fingerprint, NoiseIdentity},
     model::{
-        ClipboardSyncEvent, FileOfferEvent, FileTransferProgress, FileTransferResult, LocalDevice,
-        NetworkStatus, PairingPeer, PairingRequest, PairingResult, PeerDevice, TestMessageEvent,
-        TransportPreference, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+        local_capabilities, ClipboardSyncEvent, FileOfferEvent, FileTransferProgress,
+        FileTransferResult, LocalDevice, NetworkStatus, PairingPeer, PairingRequest, PairingResult,
+        PeerDevice, TestMessageEvent, TransportPreference, TrustedDevice, MIN_PROTOCOL_VERSION,
+        PROTOCOL_VERSION,
     },
+    peer_to_peer::PeerToPeerHandle,
     relay_client::{
         relay_client_channel, IncomingRelayTunnel, RelayClientHandle, RelayClientWorker,
         RelayTunnel,
@@ -130,6 +132,7 @@ impl AsyncRead for SessionReceive {
 struct TransportConnector {
     quic: Endpoint,
     relay: RelayClientHandle,
+    peer_to_peer: PeerToPeerHandle,
 }
 
 impl TransportConnector {
@@ -152,6 +155,19 @@ impl TransportConnector {
         Ok((SessionSend::Relay(send), SessionReceive::Relay(receive)))
     }
 
+    async fn connect_peer_to_peer(
+        &self,
+        peer: &PeerDevice,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        let address = self.peer_to_peer.connect(peer).await?;
+        let mut direct_peer = peer.clone();
+        direct_peer.addresses = vec![address];
+        direct_peer.port = crate::SERVICE_PORT;
+        self.connect_lan(&direct_peer)
+            .await
+            .map_err(|error| format!("点对点 Wi-Fi 直连失败：{error}"))
+    }
+
     async fn connect(
         &self,
         peer: &PeerDevice,
@@ -167,10 +183,7 @@ impl TransportConnector {
                 })
             }
             TransportPreference::Relay => self.connect_relay(peer).await,
-            TransportPreference::PeerToPeer => Err(
-                "点对点 Wi-Fi 尚未在当前平台启用；Neloa 不会改用局域网或中继，请选择其他连接方式"
-                    .into(),
-            ),
+            TransportPreference::PeerToPeer => self.connect_peer_to_peer(peer).await,
             TransportPreference::Bluetooth => Err(
                 "蓝牙传输尚未在当前平台启用；Neloa 不会改用局域网或中继，请选择其他连接方式".into(),
             ),
@@ -199,6 +212,7 @@ pub(crate) struct NetworkStartup {
     pub(crate) port: u16,
     pub(crate) peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     pub(crate) relay_directive: RelayDirective,
+    pub(crate) peer_to_peer: PeerToPeerHandle,
 }
 
 struct NetworkRuntime {
@@ -210,6 +224,7 @@ struct NetworkRuntime {
     relay: RelayClientHandle,
     relay_worker: RelayClientWorker,
     relay_incoming: mpsc::Receiver<IncomingRelayTunnel>,
+    peer_to_peer: PeerToPeerHandle,
 }
 
 #[derive(Clone)]
@@ -344,6 +359,7 @@ pub(crate) struct NetworkHandle {
     sender: mpsc::UnboundedSender<NetworkCommand>,
     status: Arc<RwLock<NetworkStatus>>,
     relay: RelayClientHandle,
+    peer_to_peer: PeerToPeerHandle,
 }
 
 impl NetworkHandle {
@@ -369,6 +385,7 @@ impl NetworkHandle {
                 identity_fingerprint: "不可用".to_string(),
             })),
             relay,
+            peer_to_peer: PeerToPeerHandle::unavailable(),
         }
     }
 
@@ -382,11 +399,13 @@ impl NetworkHandle {
             port,
             peers,
             relay_directive,
+            peer_to_peer,
         } = startup;
         let (sender, receiver) = mpsc::unbounded_channel();
         let (relay, relay_worker, relay_incoming) =
             relay_client_channel(relay_directive, local.clone());
         let thread_relay = relay.clone();
+        let thread_peer_to_peer = peer_to_peer.clone();
         let status = Arc::new(RwLock::new(NetworkStatus {
             active: false,
             error: None,
@@ -418,6 +437,7 @@ impl NetworkHandle {
                         relay: thread_relay,
                         relay_worker,
                         relay_incoming,
+                        peer_to_peer: thread_peer_to_peer,
                     };
                     if let Err(error) = runtime.block_on(run_network(network)) {
                         let mut current = thread_status.write();
@@ -435,6 +455,7 @@ impl NetworkHandle {
             sender,
             status,
             relay,
+            peer_to_peer,
         }
     }
 
@@ -452,6 +473,7 @@ impl NetworkHandle {
 
     pub(crate) fn update_local_device(&self, device: LocalDevice) -> Result<(), String> {
         self.relay.update_device(device.clone())?;
+        self.peer_to_peer.update_local_device(device.clone())?;
         self.sender
             .send(NetworkCommand::UpdateLocalDevice(device))
             .map_err(|_| "加密网络服务未运行".to_string())
@@ -584,6 +606,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
         relay,
         relay_worker,
         mut relay_incoming,
+        peer_to_peer,
     } = runtime;
     let NetworkContext {
         app,
@@ -597,6 +620,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
     let connector = TransportConnector {
         quic: endpoint.clone(),
         relay: relay.clone(),
+        peer_to_peer,
     };
     tokio::spawn(relay_worker.run(app.clone(), peers));
     status.write().active = true;
@@ -2401,10 +2425,7 @@ fn handshake_metadata(local: &LocalDevice, purpose: &str) -> HandshakeMetadata {
         version: local.version.clone(),
         protocol_version: PROTOCOL_VERSION,
         min_protocol_version: MIN_PROTOCOL_VERSION,
-        capabilities: CAPABILITIES
-            .iter()
-            .map(|value| (*value).to_string())
-            .collect(),
+        capabilities: local_capabilities(),
         purpose: purpose.to_string(),
     }
 }
@@ -2964,6 +2985,9 @@ mod tests {
             port,
             last_seen_ms: 0,
             relay_available: false,
+            peer_to_peer_available: false,
+            peer_to_peer_device_address: None,
+            peer_to_peer_address: None,
             service_fullname: String::new(),
         };
         let (mut send, mut receive) = timeout(Duration::from_secs(2), connect_quic(&client, &peer))
@@ -3388,7 +3412,7 @@ mod tests {
             version: "test".into(),
             protocol_version: PROTOCOL_VERSION,
             min_protocol_version: MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
+            capabilities: crate::model::CAPABILITIES
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),
@@ -3396,6 +3420,9 @@ mod tests {
             port: server_address.port(),
             last_seen_ms: 0,
             relay_available: false,
+            peer_to_peer_available: false,
+            peer_to_peer_device_address: None,
+            peer_to_peer_address: None,
             service_fullname: String::new(),
         };
         let (send, receive) = connect_quic(&client, &peer).await.unwrap();
@@ -3546,7 +3573,7 @@ mod tests {
             version: "test".into(),
             protocol_version: PROTOCOL_VERSION,
             min_protocol_version: MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
+            capabilities: crate::model::CAPABILITIES
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),
@@ -3554,6 +3581,9 @@ mod tests {
             port: server_address.port(),
             last_seen_ms: 0,
             relay_available: false,
+            peer_to_peer_available: false,
+            peer_to_peer_device_address: None,
+            peer_to_peer_address: None,
             service_fullname: String::new(),
         };
         let (send, receive) = connect_quic(&client, &peer).await.unwrap();
