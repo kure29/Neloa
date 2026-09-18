@@ -36,6 +36,7 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
+    bluetooth::BluetoothHandle,
     clipboard::{validate_clipboard_text, ClipboardService},
     identity::{fingerprint, NoiseIdentity},
     model::{
@@ -77,11 +78,13 @@ type ActiveTransfers = Arc<Mutex<HashMap<String, watch::Sender<bool>>>>;
 enum SessionSend {
     Quic(SendStream),
     Relay(tokio::io::WriteHalf<tokio::io::DuplexStream>),
+    Bluetooth(tokio::io::WriteHalf<tokio::io::DuplexStream>),
 }
 
 enum SessionReceive {
     Quic(RecvStream),
     Relay(tokio::io::ReadHalf<tokio::io::DuplexStream>),
+    Bluetooth(tokio::io::ReadHalf<tokio::io::DuplexStream>),
 }
 
 impl AsyncWrite for SessionSend {
@@ -95,6 +98,7 @@ impl AsyncWrite for SessionSend {
                 <SendStream as AsyncWrite>::poll_write(Pin::new(stream), context, buffer)
             }
             Self::Relay(stream) => Pin::new(stream).poll_write(context, buffer),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_write(context, buffer),
         }
     }
 
@@ -102,6 +106,7 @@ impl AsyncWrite for SessionSend {
         match self.get_mut() {
             Self::Quic(stream) => <SendStream as AsyncWrite>::poll_flush(Pin::new(stream), context),
             Self::Relay(stream) => Pin::new(stream).poll_flush(context),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_flush(context),
         }
     }
 
@@ -111,6 +116,7 @@ impl AsyncWrite for SessionSend {
                 <SendStream as AsyncWrite>::poll_shutdown(Pin::new(stream), context)
             }
             Self::Relay(stream) => Pin::new(stream).poll_shutdown(context),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_shutdown(context),
         }
     }
 }
@@ -124,12 +130,14 @@ impl AsyncRead for SessionReceive {
         match self.get_mut() {
             Self::Quic(stream) => Pin::new(stream).poll_read(context, buffer),
             Self::Relay(stream) => Pin::new(stream).poll_read(context, buffer),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_read(context, buffer),
         }
     }
 }
 
 #[derive(Clone)]
 struct TransportConnector {
+    bluetooth: BluetoothHandle,
     quic: Endpoint,
     relay: RelayClientHandle,
     peer_to_peer: PeerToPeerHandle,
@@ -168,6 +176,17 @@ impl TransportConnector {
             .map_err(|error| format!("点对点 Wi-Fi 直连失败：{error}"))
     }
 
+    async fn connect_bluetooth(
+        &self,
+        peer: &PeerDevice,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        let (send, receive) = self.bluetooth.connect(peer).await?;
+        Ok((
+            SessionSend::Bluetooth(send),
+            SessionReceive::Bluetooth(receive),
+        ))
+    }
+
     async fn connect(
         &self,
         peer: &PeerDevice,
@@ -184,9 +203,7 @@ impl TransportConnector {
             }
             TransportPreference::Relay => self.connect_relay(peer).await,
             TransportPreference::PeerToPeer => self.connect_peer_to_peer(peer).await,
-            TransportPreference::Bluetooth => Err(
-                "蓝牙传输尚未在当前平台启用；Neloa 不会改用局域网或中继，请选择其他连接方式".into(),
-            ),
+            TransportPreference::Bluetooth => self.connect_bluetooth(peer).await,
             TransportPreference::Ask => {
                 Err("请先为这台设备选择连接方式；Neloa 不会替你自动选择或切换路径".into())
             }
@@ -213,6 +230,7 @@ pub(crate) struct NetworkStartup {
     pub(crate) peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     pub(crate) relay_directive: RelayDirective,
     pub(crate) peer_to_peer: PeerToPeerHandle,
+    pub(crate) bluetooth: BluetoothHandle,
 }
 
 struct NetworkRuntime {
@@ -225,6 +243,7 @@ struct NetworkRuntime {
     relay_worker: RelayClientWorker,
     relay_incoming: mpsc::Receiver<IncomingRelayTunnel>,
     peer_to_peer: PeerToPeerHandle,
+    bluetooth: BluetoothHandle,
 }
 
 #[derive(Clone)]
@@ -400,6 +419,7 @@ impl NetworkHandle {
             peers,
             relay_directive,
             peer_to_peer,
+            bluetooth,
         } = startup;
         let (sender, receiver) = mpsc::unbounded_channel();
         let (relay, relay_worker, relay_incoming) =
@@ -438,6 +458,7 @@ impl NetworkHandle {
                         relay_worker,
                         relay_incoming,
                         peer_to_peer: thread_peer_to_peer,
+                        bluetooth,
                     };
                     if let Err(error) = runtime.block_on(run_network(network)) {
                         let mut current = thread_status.write();
@@ -607,6 +628,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
         relay_worker,
         mut relay_incoming,
         peer_to_peer,
+        bluetooth,
     } = runtime;
     let NetworkContext {
         app,
@@ -618,6 +640,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
     let mut endpoint = make_endpoint(port)?;
     endpoint.set_default_client_config(insecure_quic_client_config()?);
     let connector = TransportConnector {
+        bluetooth,
         quic: endpoint.clone(),
         relay: relay.clone(),
         peer_to_peer,
@@ -2644,7 +2667,7 @@ fn finish_stream(send: &mut SessionSend) -> Result<(), String> {
         SessionSend::Quic(stream) => stream
             .finish()
             .map_err(|error| format!("无法完成加密数据流：{error}")),
-        SessionSend::Relay(_) => Ok(()),
+        SessionSend::Relay(_) | SessionSend::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2655,7 +2678,7 @@ async fn wait_stream_stopped(send: &mut SessionSend) -> Result<(), String> {
             .await
             .map(|_| ())
             .map_err(|error| format!("等待对端完成数据流失败：{error}")),
-        SessionSend::Relay(_) => Ok(()),
+        SessionSend::Relay(_) | SessionSend::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2664,7 +2687,7 @@ fn stop_receive(receive: &mut SessionReceive) -> Result<(), String> {
         SessionReceive::Quic(stream) => stream
             .stop(0_u8.into())
             .map_err(|error| format!("无法停止接收数据流：{error}")),
-        SessionReceive::Relay(_) => Ok(()),
+        SessionReceive::Relay(_) | SessionReceive::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2673,7 +2696,7 @@ fn reset_send(send: &mut SessionSend) -> Result<(), String> {
         SessionSend::Quic(stream) => stream
             .reset(0_u8.into())
             .map_err(|error| format!("无法重置发送数据流：{error}")),
-        SessionSend::Relay(_) => Ok(()),
+        SessionSend::Relay(_) | SessionSend::Bluetooth(_) => Ok(()),
     }
 }
 

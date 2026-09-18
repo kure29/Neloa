@@ -30,6 +30,7 @@ use tauri_plugin_fs::FilePath;
 use tauri_plugin_fs::{FsExt, OpenOptions};
 use uuid::Uuid;
 
+mod bluetooth;
 mod clipboard;
 mod device_settings;
 mod identity;
@@ -1480,6 +1481,7 @@ pub fn run() {
                 local.clone(),
                 Arc::clone(&discovery.peers),
             );
+            let bluetooth = bluetooth::start(app.handle().clone());
             let network = match NoiseIdentity::load_or_create() {
                 Ok(identity) => NetworkHandle::start(NetworkStartup {
                     app: app.handle().clone(),
@@ -1491,6 +1493,7 @@ pub fn run() {
                     peers: Arc::clone(&discovery.peers),
                     relay_directive,
                     peer_to_peer,
+                    bluetooth,
                 }),
                 Err(error) => {
                     NetworkHandle::unavailable(error, SERVICE_PORT, relay_directive, local.clone())
