@@ -10,8 +10,8 @@ single-user deployment:
 - bounded queues close an overloaded tunnel instead of growing without limit.
 
 Current clients keep a persistent authenticated connection to this service.
-Each peer can use automatic routing, LAN QUIC, or the relay. Automatic routing
-uses LAN whenever an address is available and otherwise uses the relay. Relay
+Each peer stores an explicit user choice of LAN QUIC or relay. Neloa does not
+recommend, automatically select, or silently change the route. Relay
 presence includes unpaired devices so initial pairing can work across networks;
 every relayed session still performs the Noise XX identity check and end-to-end
 encryption.
@@ -53,16 +53,15 @@ WebSocket listener directly to the internet.
 2. On every client, open **设置 → 连接 → 自建中继**.
 3. Enter the public `wss://.../v1/ws` URL and the same token, enable the
    switch, then save.
-4. When the device appears, select relay to pair directly, or leave routing on
-   automatic.
+4. When the device appears, select relay and start pairing.
 
 The URL and enable flag are stored in app data. The token is stored separately
 in Keychain, Credential Manager, Android Keystore-backed storage, or iOS
 Keychain. A blank token field preserves the previously saved value. Public
 relay URLs must use `wss://`; `ws://` is accepted only for loopback testing.
 
-The devices screen lets you select automatic, LAN, or relay routing per peer.
-Closing the relay does not disable LAN transfer.
+The devices screen requires you to select LAN or relay routing per peer.
+Closing the relay does not disable LAN transfer or trigger an automatic switch.
 
 ## Wire protocol v1
 

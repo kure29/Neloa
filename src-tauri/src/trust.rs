@@ -218,7 +218,7 @@ mod tests {
             platform: "test".into(),
             public_key: "public-key".into(),
             fingerprint: "fingerprint".into(),
-            transport_preference: TransportPreference::Auto,
+            transport_preference: TransportPreference::Ask,
             paired_at_ms: 0,
             last_verified_ms,
         }
@@ -317,7 +317,7 @@ mod tests {
         let store = TrustStore::load(path).unwrap();
         let legacy = store.find("legacy").unwrap();
         assert_eq!(legacy.alias, None);
-        assert_eq!(legacy.transport_preference, TransportPreference::Auto);
+        assert_eq!(legacy.transport_preference, TransportPreference::Ask);
     }
 
     #[test]

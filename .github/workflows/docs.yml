@@ -11,6 +11,7 @@ on:
       - MOBILE_BUILD.md
       - WINDOWS_BUILD.md
       - relay/README.md
+      - relay-worker/README.md
       - package.json
       - package-lock.json
       - .github/workflows/docs.yml

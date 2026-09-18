@@ -167,16 +167,15 @@ impl TransportConnector {
                 })
             }
             TransportPreference::Relay => self.connect_relay(peer).await,
-            TransportPreference::Auto => {
-                if !peer.addresses.is_empty() {
-                    self.connect_lan(peer).await.map_err(|error| {
-                        format!("局域网直连失败：{error}。自动模式不会在连接失败后静默切换中继，可手动选择中继重试")
-                    })
-                } else if peer.relay_available {
-                    self.connect_relay(peer).await
-                } else {
-                    Err("设备当前没有可用的局域网或中继连接".into())
-                }
+            TransportPreference::PeerToPeer => Err(
+                "点对点 Wi-Fi 尚未在当前平台启用；Neloa 不会改用局域网或中继，请选择其他连接方式"
+                    .into(),
+            ),
+            TransportPreference::Bluetooth => Err(
+                "蓝牙传输尚未在当前平台启用；Neloa 不会改用局域网或中继，请选择其他连接方式".into(),
+            ),
+            TransportPreference::Ask => {
+                Err("请先为这台设备选择连接方式；Neloa 不会替你自动选择或切换路径".into())
             }
         }
     }

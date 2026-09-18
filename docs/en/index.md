@@ -36,8 +36,8 @@ The current stable version is **0.1.13**, with a universal macOS DMG, Windows x6
 
 ## Connection routing
 
-- Each peer can use **Automatic**, **Local network**, or **Relay** routing.
-- Automatic routing uses LAN QUIC when a local address is available and otherwise uses the configured relay.
+- You must explicitly select **Local network** or **Relay** for each peer.
+- Neloa does not recommend, automatically select, or silently change the route.
 - Initial pairing can use either path; both devices must still compare and confirm the six-digit code.
 
 ## How this documentation is organised

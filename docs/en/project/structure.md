@@ -8,6 +8,7 @@ title: Layout and commands
 src/                         React interface and the Tauri bridge
 src-tauri/                   Rust client core and native projects
 relay/                       Self-hosted relay service and Docker Compose
+relay-worker/                Cloudflare Workers / Durable Objects relay
 crates/neloa-relay-protocol/ Protocol shared by the client and the relay
 docs/                        Documentation site (VitePress)
 .github/workflows/           Continuous integration and installer builds
@@ -37,7 +38,8 @@ Each topic has exactly one original, and the manual does not copy it:
 | --- | --- |
 | User documentation (install, pairing, transfer, clipboard, relay, troubleshooting) | `docs/guide/` |
 | Architecture and threat model | `docs/en/reference/architecture.md` (English source) |
-| Relay deployment and wire protocol | `relay/README.md` |
+| Rust relay deployment and wire protocol | `relay/README.md` |
+| Cloudflare Workers relay | `relay-worker/README.md` and `docs/en/guide/relay-cloudflare.md` |
 | Mobile builds and acceptance | `docs/build/mobile.md` (Chinese source) |
 | Windows build | `docs/build/windows.md` (Chinese source) |
 

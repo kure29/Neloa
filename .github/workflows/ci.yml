@@ -48,11 +48,17 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Install Cloudflare relay dependencies
+        run: npm ci --prefix relay-worker
+
       - name: Build frontend
         run: npm run build
 
       - name: Test frontend transfer events
         run: npm test
+
+      - name: Verify Cloudflare relay bundle
+        run: npm run check --prefix relay-worker
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check

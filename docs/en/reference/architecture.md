@@ -33,7 +33,7 @@ Neloa is local-first. Every client should remain useful without an account or an
 - Explicit rejection of legacy, malformed, or feature-incompatible peers before application data is accepted.
 - A user-readable local connection status for QUIC, mDNS, identity, clipboard, peer capability, and firewall checks.
 - An optional self-hosted relay client with persistent authenticated WebSocket connections, same-token device presence, and bounded virtual streams.
-- Per-device automatic, LAN, or relay routing. Automatic mode uses QUIC when a local address exists and otherwise uses the relay.
+- An explicit per-device route choice. An unset route rejects the connection instead of recommending, automatically selecting, or silently changing paths.
 
 Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and `capabilities=discovery,pairing,noise-xx,test-message,file-transfer,clipboard-text`. The same protocol range and capability list is authenticated inside the Noise XX handshake; mDNS values are presentation and early-filtering hints only.
 

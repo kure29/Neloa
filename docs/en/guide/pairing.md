@@ -24,7 +24,7 @@ Do not confirm. Cancel the pairing, check that you selected the device you meant
 ## After pairing
 
 - Later sessions must match both the device ID and the stored public key, or the handshake is rejected.
-- Each device can use **Automatic**, **Local network**, or **Relay** routing from the devices screen.
+- Before pairing, explicitly select **Local network** or **Relay** on the devices screen. The choice is stored per peer.
 - Pairing survives a restart; you do not compare the code again.
 - Initial pairing can use LAN or relay. The relay only forwards Noise handshake bytes and never decides whether either side is trusted.
 

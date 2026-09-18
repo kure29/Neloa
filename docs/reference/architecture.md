@@ -35,7 +35,7 @@ Neloa 是本地优先的。每个客户端在没有账号、没有互联网连�
 - 对遗留、畸形或能力不兼容的对端，在接受应用数据之前显式拒绝。
 - 面向用户的本地连接状态，覆盖 QUIC、mDNS、身份、剪贴板、对端能力和防火墙检查。
 - 可选的自建中继客户端，带持久化的经过认证的 WebSocket 连接、同一令牌下的设备在线状态和有界虚拟流。
-- 按设备保存的自动、局域网或中继传输选择；自动模式有本地地址时使用 QUIC，否则使用中继。
+- 按设备保存的显式连接方式选择；未选择时拒绝连接，不推荐、自动判断或静默切换路径。
 
 广播会声明 `protocolVersion=1`、`minProtocolVersion=1` 和 `capabilities=discovery,pairing,noise-xx,test-message,file-transfer,clipboard-text`。同一份协议范围与能力列表也会在 Noise XX 握手中被认证；mDNS 里的值只是展示和早期过滤用的提示。
 

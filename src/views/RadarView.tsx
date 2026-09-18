@@ -5,6 +5,24 @@ import type { NeloaState } from "../lib/useNeloa";
 import { Badge, Button, DeviceAvatar, IconButton, cx } from "../ui/kit";
 import { Icon } from "../ui/icons";
 
+const PEER_TO_PEER_CAPABILITY = "transport-peer-to-peer-wifi";
+const BLUETOOTH_CAPABILITY = "transport-bluetooth";
+
+function routePresentation(preference: ReturnType<NeloaState["transportPreferenceFor"]>) {
+  switch (preference) {
+    case "lan":
+      return { label: "局域网", className: "route-lan" };
+    case "peerToPeer":
+      return { label: "点对点 Wi-Fi", className: "route-peer" };
+    case "bluetooth":
+      return { label: "蓝牙", className: "route-bluetooth" };
+    case "relay":
+      return { label: "中继", className: "route-relay" };
+    default:
+      return { label: "未选择", className: "route-unselected" };
+  }
+}
+
 export function RadarView({ app }: { app: NeloaState }) {
   const peers = app.discovery.peers;
   const selectedSize = app.selectedFiles.reduce((total, file) => total + file.size, 0);
@@ -54,11 +72,13 @@ export function RadarView({ app }: { app: NeloaState }) {
               const trustedDevice = app.trustedDevicesById.get(peer.id);
               const trusted = Boolean(trustedDevice);
               const compatible = peerIsCompatible(peer);
-              const relayOnly = peer.relayAvailable && peer.addresses.length === 0;
               const alias = trustedDevice?.alias?.trim() ?? "";
               const displayName = alias || peer.name;
               const pairBusy = app.busyAction === "pair" && peer.id === app.selectedPeerId;
               const transportPreference = app.transportPreferenceFor(peer.id);
+              const route = routePresentation(transportPreference);
+              const peerToPeerAvailable = peer.capabilities.includes(PEER_TO_PEER_CAPABILITY);
+              const bluetoothAvailable = peer.capabilities.includes(BLUETOOTH_CAPABILITY);
 
               return (
                 <div
@@ -92,8 +112,8 @@ export function RadarView({ app }: { app: NeloaState }) {
                       <span className="peer-row-name">
                         <strong className="truncate" title={displayName}>{displayName}</strong>
                         {trusted && compatible && (
-                          <span className={cx("peer-route", relayOnly ? "route-relay" : "route-lan")}>
-                            {relayOnly ? "中继" : "局域网"}
+                          <span className={cx("peer-route", route.className)}>
+                            {route.label}
                           </span>
                         )}
                       </span>
@@ -122,12 +142,18 @@ export function RadarView({ app }: { app: NeloaState }) {
                               event.stopPropagation();
                               void app.configureTransportPreference(
                                 peer.id,
-                                event.target.value as "auto" | "lan" | "relay",
+                                event.target.value as Parameters<typeof app.configureTransportPreference>[1],
                               );
                             }}
                           >
-                            <option value="auto">自动</option>
+                            <option value="ask" disabled>选择连接方式</option>
                             <option value="lan" disabled={peer.addresses.length === 0}>局域网</option>
+                            <option value="peerToPeer" disabled={!peerToPeerAvailable}>
+                              {peerToPeerAvailable ? "点对点 Wi-Fi" : "点对点 Wi-Fi（不可用）"}
+                            </option>
+                            <option value="bluetooth" disabled={!bluetoothAvailable}>
+                              {bluetoothAvailable ? "蓝牙" : "蓝牙（不可用）"}
+                            </option>
                             <option value="relay" disabled={!peer.relayAvailable}>中继</option>
                           </select>
                           <Icon name="chevron" size={13} />

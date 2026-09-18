@@ -336,8 +336,6 @@ async fn run_connection(
     let mut keepalive = interval(KEEPALIVE_INTERVAL);
     keepalive.set_missed_tick_behavior(MissedTickBehavior::Delay);
     keepalive.tick().await;
-    let mut nonce = 0_u64;
-
     loop {
         tokio::select! {
             changed = directive.changed() => {
@@ -504,9 +502,11 @@ async fn run_connection(
                 }
             }
             _ = keepalive.tick() => {
-                nonce = nonce.wrapping_add(1);
-                if let Err(error) = send_control(&mut writer, &ClientControl::Ping { nonce }).await {
-                    return ConnectionExit::Failed(error);
+                // Protocol-level pings are answered by both the Rust relay and
+                // Cloudflare's WebSocket edge without waking a hibernating
+                // Durable Object for an application JSON message.
+                if let Err(error) = writer.send(Message::Ping(Vec::new().into())).await {
+                    return ConnectionExit::Failed(format!("无法发送中继保活消息：{error}"));
                 }
             }
         }

@@ -440,7 +440,7 @@ export function useNeloa() {
   const transportPreferenceFor = useCallback((peerId: string): TransportPreference => (
     trustedDevicesById.get(peerId)?.transportPreference
       ?? untrustedTransportPreferences[peerId]
-      ?? "auto"
+      ?? "ask"
   ), [trustedDevicesById, untrustedTransportPreferences]);
   const selectedPeerForAction = useMemo(() => {
     if (!selectedPeer) return null;
@@ -485,6 +485,10 @@ export function useNeloa() {
       showToast(security.network.error ?? "加密网络服务正在启动，请稍后再试", "warn");
       return;
     }
+    if (transportPreferenceFor(peerId) === "ask") {
+      showToast("请先为这台设备选择连接方式", "warn");
+      return;
+    }
     setBusyAction("pair");
     try {
       setPairing(await beginPairing(peerId, transportPreferenceFor(peerId)));
@@ -518,9 +522,13 @@ export function useNeloa() {
       }));
       const label = transportPreference === "lan"
         ? "局域网直连"
-        : transportPreference === "relay"
-          ? "中继"
-          : "自动选择";
+        : transportPreference === "peerToPeer"
+          ? "点对点 Wi-Fi"
+          : transportPreference === "bluetooth"
+            ? "蓝牙"
+            : transportPreference === "relay"
+              ? "中继"
+              : "等待选择";
       showToast(`传输方式已设为${label}`, "ok");
     } catch (error) {
       showToast(errorMessage(error), "danger");
@@ -537,6 +545,10 @@ export function useNeloa() {
     const peer = discovery.peers.find((item) => item.id === peerId);
     if (!peer) {
       showToast("目标设备已离线，请重新扫描", "warn");
+      return;
+    }
+    if (transportPreferenceFor(peerId) === "ask") {
+      showToast("请先为这台设备选择连接方式", "warn");
       return;
     }
     setBusyAction("file");
@@ -575,7 +587,7 @@ export function useNeloa() {
     } finally {
       setBusyAction(null);
     }
-  }, [discovery.peers, replaceSelectedFiles, showToast]);
+  }, [discovery.peers, replaceSelectedFiles, showToast, transportPreferenceFor]);
 
   const runPrimaryAction = useCallback(() => {
     if (primaryAction.disabled) {

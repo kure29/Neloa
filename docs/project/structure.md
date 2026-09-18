@@ -8,6 +8,7 @@ title: 目录与命令
 src/                         React 界面与 Tauri 调用桥
 src-tauri/                   客户端 Rust 核心及原生工程
 relay/                       自建中继服务与 Docker Compose
+relay-worker/                Cloudflare Workers / Durable Objects 中继
 crates/neloa-relay-protocol/ 客户端和中继共享协议
 docs/                        本文档站（VitePress）
 .github/workflows/           持续集成与安装包构建
@@ -37,7 +38,8 @@ src/
 | --- | --- |
 | 使用手册（安装、配对、传输、剪贴板、中继、排查） | `docs/guide/` |
 | 架构与威胁模型 | `docs/en/reference/architecture.md`（英文原文） |
-| 中继部署与线协议 | `relay/README.md` |
+| Rust 中继部署与线协议 | `relay/README.md` |
+| Cloudflare Workers 中继 | `relay-worker/README.md` 与 `docs/guide/relay-cloudflare.md` |
 | 移动端构建与验收 | `docs/build/mobile.md`（中文原文） |
 | Windows 构建 | `docs/build/windows.md`（中文原文） |
 

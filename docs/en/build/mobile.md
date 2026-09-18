@@ -133,7 +133,7 @@ The relay can carry initial pairing and later transfers. Verify it in this order
 1. Deploy the relay behind a valid HTTPS certificate, and prepare a public `wss://.../v1/ws` address plus one token of at least 32 characters.
 2. On both devices open Settings → Connection → Self-hosted relay, enter the same address and token, save, and confirm the status reads connected.
 3. Move the phone to cellular or another Wi-Fi. When the peer appears, select **Relay**, compare the six-digit code, and complete an initial pairing.
-4. Switch among automatic, local-network, and relay routing. Send test text, a small file, and a larger file in both directions, then verify foreground clipboard sync; encryption, acknowledgement, verification, and cancellation should remain consistent.
+4. Explicitly select local-network and relay routing in turn. Send test text, a small file, and a larger file in both directions, then verify foreground clipboard sync; encryption, acknowledgement, verification, and cancellation should remain consistent, with no automatic route switching after a failure.
 5. Temporarily enter a wrong token, stop the relay, and start it again; confirm the client reports a readable error and reconnects automatically, and that local transfers keep working.
 6. Connections must fail with an invalid or expired TLS certificate. Never expose a plaintext WebSocket port to the internet.
 

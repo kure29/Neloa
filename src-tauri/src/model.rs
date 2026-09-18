@@ -53,9 +53,12 @@ pub(crate) struct PeerDevice {
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum TransportPreference {
+    #[serde(alias = "auto")]
     #[default]
-    Auto,
+    Ask,
     Lan,
+    PeerToPeer,
+    Bluetooth,
     Relay,
 }
 
@@ -266,7 +269,7 @@ pub(crate) struct DiagnosticsSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use super::{protocol_compatible, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION};
+    use super::{protocol_compatible, TransportPreference, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION};
 
     #[test]
     fn protocol_ranges_must_overlap_and_be_well_formed() {
@@ -274,5 +277,33 @@ mod tests {
         assert!(!protocol_compatible(0, 0));
         assert!(!protocol_compatible(2, 2));
         assert!(!protocol_compatible(1, 2));
+    }
+
+    #[test]
+    fn transport_preferences_have_stable_client_values() {
+        assert_eq!(
+            serde_json::to_string(&TransportPreference::Ask).unwrap(),
+            r#""ask""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TransportPreference::Lan).unwrap(),
+            r#""lan""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TransportPreference::PeerToPeer).unwrap(),
+            r#""peerToPeer""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TransportPreference::Bluetooth).unwrap(),
+            r#""bluetooth""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TransportPreference::Relay).unwrap(),
+            r#""relay""#
+        );
+        assert_eq!(
+            serde_json::from_str::<TransportPreference>(r#""auto""#).unwrap(),
+            TransportPreference::Ask
+        );
     }
 }

@@ -16,7 +16,7 @@ export type Platform =
 /** Which shell renders the interface. Independent of the operating system. */
 export type Shell = "desktop" | "mobile";
 
-export type TransportPreference = "auto" | "lan" | "relay";
+export type TransportPreference = "ask" | "lan" | "peerToPeer" | "bluetooth" | "relay";
 
 export interface LocalDevice {
   id: string;
