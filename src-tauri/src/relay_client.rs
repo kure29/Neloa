@@ -15,7 +15,7 @@ use neloa_relay_protocol::{
 use parking_lot::RwLock;
 use tauri::{AppHandle, Emitter};
 use tokio::{
-    io::{duplex, split, AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf},
+    io::{duplex, split, DuplexStream, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::{mpsc, oneshot, watch},
     time::{interval, sleep, timeout, MissedTickBehavior},
@@ -34,6 +34,7 @@ use uuid::Uuid;
 
 use crate::{
     model::{local_capabilities, LocalDevice, PeerDevice, RelaySnapshot},
+    packet_stream::{run_packet_stream, PacketFraming},
     relay_settings::{RelayConnectionConfig, RelayDirective},
     unix_millis,
 };
@@ -579,33 +580,31 @@ fn spawn_tunnel(
 async fn run_tunnel_pump(
     tunnel_id: Uuid,
     stream: DuplexStream,
-    mut inbound: mpsc::Receiver<Vec<u8>>,
+    inbound: mpsc::Receiver<Vec<u8>>,
     events: mpsc::Sender<TunnelEvent>,
 ) {
-    let (mut reader, mut writer) = split(stream);
-    let mut buffer = vec![0_u8; TUNNEL_READ_BUFFER];
-    loop {
-        tokio::select! {
-            read = reader.read(&mut buffer) => {
-                let Ok(size) = read else { break; };
-                if size == 0 {
-                    break;
-                }
-                if events.send(TunnelEvent::Payload {
-                    tunnel_id,
-                    bytes: buffer[..size].to_vec(),
-                }).await.is_err() {
-                    return;
-                }
+    let payload_events = events.clone();
+    let _ = run_packet_stream(
+        stream,
+        inbound,
+        TUNNEL_READ_BUFFER,
+        PacketFraming::Raw,
+        move |bytes| {
+            let payload_events = payload_events.clone();
+            async move {
+                payload_events
+                    .send(TunnelEvent::Payload { tunnel_id, bytes })
+                    .await
+                    .map_err(|_| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::BrokenPipe,
+                            "relay event receiver closed",
+                        )
+                    })
             }
-            bytes = inbound.recv() => {
-                let Some(bytes) = bytes else { break; };
-                if writer.write_all(&bytes).await.is_err() {
-                    break;
-                }
-            }
-        }
-    }
+        },
+    )
+    .await;
     let _ = events.send(TunnelEvent::Closed { tunnel_id }).await;
 }
 
@@ -692,6 +691,8 @@ fn publish_status(app: &AppHandle, status: &Arc<RwLock<RelaySnapshot>>, snapshot
 
 #[cfg(test)]
 mod tests {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
     use super::*;
 
     fn relay_device(id: &str) -> RelayDevice {

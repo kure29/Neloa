@@ -35,6 +35,7 @@ mod device_settings;
 mod identity;
 mod model;
 mod network;
+mod packet_stream;
 mod peer_to_peer;
 mod relay_client;
 mod relay_settings;
