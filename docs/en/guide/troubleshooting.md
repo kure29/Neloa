@@ -29,9 +29,10 @@ Expand Settings → Connection → Connection status to see six checks:
 
 ## A device appears, but pairing times out
 
-- Initial pairing uses the local network only and never switches to the relay. Confirm both devices use the same Wi-Fi and that the router has neither guest isolation nor client isolation enabled.
+- Check the route selected on the device card. Local-network mode requires direct reachability; relay mode requires both devices to be connected to the same relay with the same token.
 - Allow Neloa to access the Local Network in iOS/macOS settings, and allow inbound Neloa connections in the macOS/Windows firewall.
 - Local transfers use UDP 48631. Successful mDNS/Bonjour discovery only proves that UDP 5353 works; it does not prove that the transfer port is allowed.
+- If guest-network or client isolation blocks LAN traffic, select **Relay** on the device card and pair again.
 
 ## A device shows "incompatible version"
 

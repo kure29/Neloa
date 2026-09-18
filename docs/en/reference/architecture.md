@@ -6,7 +6,7 @@ title: Architecture and security
 
 Neloa is local-first. Every client should remain useful without an account or an internet connection.
 
-## Current milestone
+## Current implementation
 
 - One React interface and one design system for every platform. `DesktopShell` and `MobileShell` share `views/` and `ui/`; macOS and Windows differ only in window controls, system font stack, and frame radius. Colour comes from a single set of CSS custom properties with a light and a dark value, so component rules never branch on the colour scheme.
 - Tauri 2 desktop and mobile shells, with generated Android and iOS native projects.
@@ -32,8 +32,8 @@ Neloa is local-first. Every client should remain useful without an account or an
 - Protocol range and capability negotiation in discovery and authenticated handshakes.
 - Explicit rejection of legacy, malformed, or feature-incompatible peers before application data is accepted.
 - A user-readable local connection status for QUIC, mDNS, identity, clipboard, peer capability, and firewall checks.
-- An optional self-hosted relay client with persistent authenticated WebSocket connections, trusted-device presence, and bounded virtual streams.
-- LAN-first transport selection: QUIC is attempted whenever a local address exists, then the relay is used only as a fallback for an already trusted online device.
+- An optional self-hosted relay client with persistent authenticated WebSocket connections, same-token device presence, and bounded virtual streams.
+- Per-device automatic, LAN, or relay routing. Automatic mode uses QUIC when a local address exists and otherwise uses the relay.
 
 Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and `capabilities=discovery,pairing,noise-xx,test-message,file-transfer,clipboard-text`. The same protocol range and capability list is authenticated inside the Noise XX handshake; mDNS values are presentation and early-filtering hints only.
 
@@ -55,7 +55,7 @@ src/
 
 QUIC uses a per-launch self-signed certificate only as a reliable encrypted datagram transport. It is not treated as the long-term device identity. The optional relay exposes each tunnel as the same bidirectional byte-stream interface. All application payloads are wrapped by Noise XX, and no plaintext application message may be written directly to either transport.
 
-Remote relay URLs must use `wss://`; plaintext `ws://` is accepted only for a loopback development server. The shared access token is stored in the native OS credential store, while `relay-settings.json` contains only the enable flag and public URL. Relay presence is filtered to devices already present in the local trust store. Even if the server sends forged device metadata, the subsequent Noise handshake must still match the pinned peer public key before application data is accepted.
+Remote relay URLs must use `wss://`; plaintext `ws://` is accepted only for a loopback development server. The shared access token is stored in the native OS credential store, while `relay-settings.json` contains only the enable flag and public URL. Relay presence includes devices connected with the same token so initial pairing can work across networks; the relay source ID must match the authenticated Noise metadata. Paired sessions must also match the pinned peer public key before application data is accepted.
 
 The Noise static private key is stored under the application service name in macOS Keychain, Windows Credential Manager, Android Keystore-backed storage, or iOS Keychain. `trusted-devices.json` contains only peer public keys, fingerprints, device metadata, and timestamps.
 
@@ -65,13 +65,13 @@ During first pairing, both devices compare a six-digit value derived from the sa
 
 Every Noise handshake carries the sender's current and minimum supported protocol versions plus its feature capabilities. Version ranges must overlap, malformed ranges fail closed, and the capability required by the session purpose must be present. A peer that omits these fields is treated as legacy protocol `0` and receives an actionable incompatibility error instead of entering pairing or transfer flows.
 
-Before sending file data, the sender hashes the source and offers its sanitized base name, byte size, and SHA-256 digest. The receiver writes only to a transfer-specific temporary file, rejects invalid offsets or excess bytes, verifies the final digest, flushes it to disk, and publishes it without replacing an existing file. Cancellation and failure remove only that transfer's temporary file.
+Peers that advertise `streaming-file-hash` offer only the sanitized base name and byte size. The sender computes SHA-256 while reading, encrypting, and sending the file, then commits the digest in the authenticated completion message; the receiver computes and compares its digest in parallel. Older peers without the capability retain the pre-transfer hash flow. The receiver writes only to a transfer-specific temporary file, rejects invalid offsets or excess bytes, verifies the final digest, flushes it to disk, and publishes it without replacing an existing file. Cancellation and failure remove only that transfer's temporary file.
 
 Clipboard synchronization is fail-closed and disabled by default. Enabling it records the current clipboard as a local baseline without transmitting it. Subsequent text updates receive UUIDs, are checked for size and strong credential markers, and are sent only to currently discovered trusted peers. Remote updates are acknowledged only after the OS clipboard write succeeds. Received content becomes the new local baseline, preventing it from being sent back; CRLF, CR, and LF are canonicalized for comparison across Windows and macOS. Events retain only peer, direction, byte count, status, and time—not clipboard text.
 
 Android requires `CHANGE_WIFI_MULTICAST_STATE` plus a held `WifiManager.MulticastLock` while the Activity is alive so mDNS packets are delivered reliably. iOS does not open a raw multicast socket: `NWBrowser` browses `_neloa._udp`, while `NetService` publishes and resolves the Bonjour service that points at the existing Rust QUIC listener on UDP 48631. Swift forwards resolved IPv4 addresses and TXT metadata to the shared Rust peer store. This path uses the declared Bonjour service and local-network privacy prompt without the restricted multicast entitlement.
 
-## Planned boundaries
+## Architecture layers
 
 ```text
 React UI
@@ -88,13 +88,6 @@ with a server token, keeps presence and tunnel state in memory, and forwards
 bounded binary frames without inspecting their Noise-encrypted contents. The
 client maintains one WebSocket connection, maps relay tunnels to bounded local
 byte streams, and reuses the existing pairing, transfer, test-message, and
-clipboard Noise protocol without transport-specific envelopes. Relay pairing is
-intentionally disabled: devices must establish trust locally before they are
-eligible for relay presence or tunnels.
-
-## Next milestones
-
-1. Relay acceptance: deploy behind a real TLS reverse proxy, validate reconnect and cross-network file/clipboard transfer on two physical devices, and add operational metrics without payload logging.
-2. Mobile acceptance: complete Android real-device validation and expand iOS coverage across network changes, long transfers, lifecycle, and foreground clipboard behavior.
-3. Hardening: pairing throttling, diagnostic error categorization, migration regression coverage, and platform firewall/lifecycle handling.
-4. Packaging: signed `.dmg`/`.app`, Windows MSIX or NSIS, Android release signing, and iOS/TestFlight distribution.
+clipboard Noise protocol without transport-specific envelopes. The shared token
+only scopes device visibility; trust is still established by the Noise
+handshake, the six-digit code, and explicit confirmation on both devices.

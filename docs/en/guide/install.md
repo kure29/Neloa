@@ -6,12 +6,12 @@ title: Download and install
 
 Stable builds live on the [latest GitHub Release](https://github.com/kure29/Neloa/releases/latest). Pick the file that matches your device; the release notes list every SHA-256.
 
-| Platform | 0.1.12 asset | Install notes |
+| Platform | 0.1.13 asset | Install notes |
 | --- | --- | --- |
-| macOS | `Neloa_0.1.12_universal.dmg` | Apple Silicon and Intel; ad-hoc signed, so the system may ask you to confirm before opening |
-| Windows | `Neloa_0.1.12_x64-setup.exe` | x64 NSIS; not commercially signed, so SmartScreen may report an unknown publisher |
-| Android device | `Neloa_0.1.12_arm64.apk` | ARM64; signed with the project's fixed key |
-| iOS | `Neloa_0.1.12_unsigned.ipa` | Must be re-signed with your own P12 certificate and provisioning profile |
+| macOS | `Neloa_0.1.13_universal.dmg` | Apple Silicon and Intel; ad-hoc signed, so the system may ask you to confirm before opening |
+| Windows | `Neloa_0.1.13_x64-setup.exe` | x64 NSIS; not commercially signed, so SmartScreen may report an unknown publisher |
+| Android device | `Neloa_0.1.13_arm64.apk` | ARM64; signed with the project's fixed key |
+| iOS | `Neloa_0.1.13_unsigned.ipa` | Must be re-signed with your own P12 certificate and provisioning profile |
 
 ## About signing
 
@@ -26,7 +26,7 @@ This section is worth reading on its own, because it decides which system prompt
 
 - Allow Local Network access when macOS or iOS first asks. If you denied it earlier, re-enable Neloa in system settings.
 - The macOS/Windows firewall must allow inbound Neloa connections. Discovery uses Bonjour/mDNS; transfers use UDP 48631.
-- Initial pairing is LAN-only. A configured relay is used only for a previously paired device with no available LAN route.
+- Local routing requires Local Network access. Cross-network discovery, pairing, and transfer require the same relay on both devices.
 
 ## Installing on Android
 

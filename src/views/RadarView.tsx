@@ -1,22 +1,12 @@
-import { useState, type FormEvent, type MouseEvent } from "react";
+import type { MouseEvent } from "react";
 
-import { errorMessage, formatBytes, peerIsCompatible, platformLabel } from "../lib/format";
+import { formatBytes, peerIsCompatible, platformLabel } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
-import { Badge, Button, DeviceAvatar, IconButton, Sheet, cx } from "../ui/kit";
+import { Badge, Button, DeviceAvatar, IconButton, cx } from "../ui/kit";
 import { Icon } from "../ui/icons";
-
-interface AliasEditor {
-  peerId: string;
-  name: string;
-  platform: string;
-  alias: string;
-}
 
 export function RadarView({ app }: { app: NeloaState }) {
   const peers = app.discovery.peers;
-  const [aliasEditor, setAliasEditor] = useState<AliasEditor | null>(null);
-  const [aliasValue, setAliasValue] = useState("");
-  const [aliasError, setAliasError] = useState("");
   const selectedSize = app.selectedFiles.reduce((total, file) => total + file.size, 0);
   const fileSummary = app.selectedFiles.length === 1
     ? `${app.selectedFiles[0].name} · ${formatBytes(selectedSize)}`
@@ -24,38 +14,11 @@ export function RadarView({ app }: { app: NeloaState }) {
   const showFileSelection = app.selectedFiles.length > 0;
   const trustedPeersOnline = peers.filter((peer) => app.trustedIds.has(peer.id)).length;
 
-  const openAliasEditor = (peerId: string, name: string, platform: string, alias = "") => {
-    setAliasEditor({ peerId, name, platform, alias });
-    setAliasValue(alias);
-    setAliasError("");
-  };
-
-  const submitAlias = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!aliasEditor) return;
-    const normalized = aliasValue.trim();
-    setAliasError("");
-    if ([...normalized].length > 32) {
-      setAliasError("设备备注最多 32 个字符");
-      return;
-    }
-    if (/\p{Cc}/u.test(normalized)) {
-      setAliasError("设备备注不能包含控制字符");
-      return;
-    }
-    try {
-      await app.renameTrustedDevice(aliasEditor.peerId, normalized);
-      setAliasEditor(null);
-    } catch (error) {
-      setAliasError(errorMessage(error));
-    }
-  };
-
   const clearPeerFromBlankArea = (event: MouseEvent<HTMLElement>) => {
     if (!app.selectedPeerId) return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.closest(".peer-row, .device-browser-heading, button, a, input")) return;
+    if (target.closest(".peer-row, .device-browser-heading, button, a, input, select")) return;
     app.setSelectedPeerId(null);
   };
 
@@ -95,6 +58,7 @@ export function RadarView({ app }: { app: NeloaState }) {
               const alias = trustedDevice?.alias?.trim() ?? "";
               const displayName = alias || peer.name;
               const pairBusy = app.busyAction === "pair" && peer.id === app.selectedPeerId;
+              const transportPreference = app.transportPreferenceFor(peer.id);
 
               return (
                 <div
@@ -145,41 +109,53 @@ export function RadarView({ app }: { app: NeloaState }) {
                   <span className="peer-row-actions">
                     {!compatible ? (
                       <Badge tone="warn">需更新</Badge>
-                    ) : trusted ? (
-                      <>
-                        {active && (
-                          <IconButton
-                            className="peer-selected-mark"
-                            icon="check"
-                            label={`取消选择 ${displayName}`}
-                            onClick={() => app.setSelectedPeerId(null)}
-                          />
-                        )}
-                        <IconButton
-                          className="peer-more"
-                          icon="pencil"
-                          label={`重命名 ${displayName}`}
-                          onClick={() => openAliasEditor(
-                            peer.id,
-                            peer.name,
-                            peer.platform,
-                            alias,
-                          )}
-                        />
-                      </>
                     ) : (
-                      <Button
-                        className="peer-pair"
-                        size="sm"
-                        disabled={app.busyAction === "pair"}
-                        onClick={() => {
-                          app.setSelectedPeerId(peer.id);
-                          void app.pairPeer(peer.id);
-                        }}
-                      >
-                        {pairBusy ? <Icon className="spin" name="scan" size={14} /> : null}
-                        {pairBusy ? "配对中…" : "配对"}
-                      </Button>
+                      <>
+                        <label className="peer-transport-control" title="选择这台设备的连接方式">
+                          <span className="sr-only">{displayName} 的连接方式</span>
+                          <select
+                            value={transportPreference}
+                            aria-label={`${displayName} 的连接方式`}
+                            disabled={app.busyAction !== null}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => {
+                              event.stopPropagation();
+                              void app.configureTransportPreference(
+                                peer.id,
+                                event.target.value as "auto" | "lan" | "relay",
+                              );
+                            }}
+                          >
+                            <option value="auto">自动</option>
+                            <option value="lan" disabled={peer.addresses.length === 0}>局域网</option>
+                            <option value="relay" disabled={!peer.relayAvailable}>中继</option>
+                          </select>
+                          <Icon name="chevron" size={13} />
+                        </label>
+                        {trusted ? (
+                          active && (
+                            <IconButton
+                              className="peer-selected-mark"
+                              icon="check"
+                              label={`取消选择 ${displayName}`}
+                              onClick={() => app.setSelectedPeerId(null)}
+                            />
+                          )
+                        ) : (
+                          <Button
+                            className="peer-pair"
+                            size="sm"
+                            disabled={app.busyAction === "pair"}
+                            onClick={() => {
+                              app.setSelectedPeerId(peer.id);
+                              void app.pairPeer(peer.id);
+                            }}
+                          >
+                            {pairBusy ? <Icon className="spin" name="scan" size={14} /> : null}
+                            {pairBusy ? "配对中…" : "配对"}
+                          </Button>
+                        )}
+                      </>
                     )}
                   </span>
                 </div>
@@ -273,71 +249,6 @@ export function RadarView({ app }: { app: NeloaState }) {
         </p>
       </div>
 
-      {aliasEditor && !app.pairing && app.fileOffers.length === 0 && (
-        <Sheet labelledBy="alias-sheet-title" className="sheet-alias">
-          <div className="sheet-head">
-            <DeviceAvatar platform={aliasEditor.platform} size={42} />
-            <div>
-              <h2 id="alias-sheet-title">设备备注</h2>
-              <p>{aliasEditor.name} · {platformLabel(aliasEditor.platform)}</p>
-            </div>
-          </div>
-          <form
-            className="alias-form"
-            aria-busy={app.busyAction === "alias"}
-            onSubmit={(event) => void submitAlias(event)}
-          >
-            <label className="setting-field">
-              <span>在这台设备上显示为</span>
-              <input
-                value={aliasValue}
-                autoComplete="off"
-                maxLength={32}
-                placeholder={aliasEditor.name}
-                aria-describedby="alias-hint"
-                aria-invalid={Boolean(aliasError)}
-                onChange={(event) => {
-                  setAliasValue(event.target.value);
-                  setAliasError("");
-                }}
-              />
-              <small id="alias-hint">备注只保存在本机，不会修改对方的设备名称。</small>
-              {aliasError && <small className="setting-field-error" role="alert">{aliasError}</small>}
-            </label>
-            {aliasEditor.alias && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="alias-reset"
-                disabled={app.busyAction === "alias" || aliasValue.length === 0}
-                onClick={() => {
-                  setAliasValue("");
-                  setAliasError("");
-                }}
-              >
-                恢复原名称
-              </Button>
-            )}
-            <div className="sheet-actions">
-              <Button
-                type="button"
-                disabled={app.busyAction === "alias"}
-                onClick={() => setAliasEditor(null)}
-              >
-                取消
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={app.busyAction === "alias" || aliasValue.trim() === aliasEditor.alias}
-              >
-                {app.busyAction === "alias" ? "保存中…" : "保存备注"}
-              </Button>
-            </div>
-          </form>
-        </Sheet>
-      )}
     </div>
   );
 }

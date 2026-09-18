@@ -13,7 +13,10 @@ use std::{
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use parking_lot::{Mutex, RwLock};
-use quinn::{crypto::rustls::QuicClientConfig, ClientConfig, Endpoint, RecvStream, SendStream};
+use quinn::{
+    crypto::rustls::QuicClientConfig, ClientConfig, Endpoint, RecvStream, SendStream,
+    TransportConfig, VarInt,
+};
 use rustls::{
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     crypto::CryptoProvider,
@@ -26,7 +29,7 @@ use snow::{params::NoiseParams, Builder, TransportState};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::{
     fs::{File, OpenOptions},
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter, ReadBuf},
     sync::{mpsc, oneshot, watch},
     time::timeout,
 };
@@ -38,7 +41,7 @@ use crate::{
     model::{
         ClipboardSyncEvent, FileOfferEvent, FileTransferProgress, FileTransferResult, LocalDevice,
         NetworkStatus, PairingPeer, PairingRequest, PairingResult, PeerDevice, TestMessageEvent,
-        TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+        TransportPreference, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
     },
     relay_client::{
         relay_client_channel, IncomingRelayTunnel, RelayClientHandle, RelayClientWorker,
@@ -53,6 +56,10 @@ const NOISE_PATTERN: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
 const FRAME_LIMIT: usize = 64 * 1024;
 const TEXT_LIMIT: usize = 4096;
 const FILE_CHUNK_SIZE: usize = 48 * 1024;
+const FILE_IO_BUFFER_SIZE: usize = 1024 * 1024;
+const FILE_PIPELINE_DEPTH: usize = 16;
+const LAN_STREAM_WINDOW: u32 = 8 * 1024 * 1024;
+const LAN_SEND_WINDOW: u64 = 16 * 1024 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const PAIRING_TIMEOUT: Duration = Duration::from_secs(120);
 const FILE_OFFER_TIMEOUT: Duration = Duration::from_secs(120);
@@ -134,28 +141,44 @@ impl TransportConnector {
         Ok((SessionSend::Quic(send), SessionReceive::Quic(receive)))
     }
 
-    async fn connect_trusted(
+    async fn connect_relay(
         &self,
         peer: &PeerDevice,
     ) -> Result<(SessionSend, SessionReceive), String> {
-        // A live Bonjour/mDNS route is authoritative. Silently switching an
-        // actively visible LAN peer to the relay makes the route badge lie and
-        // can send local traffic over the Internet after a firewall or local
-        // permission failure. Relay is reserved for peers with no LAN route.
-        if !peer.addresses.is_empty() {
-            return self.connect_lan(peer).await.map_err(|error| {
-                format!("局域网直连失败：{error}。请检查两端的本地网络权限、防火墙和客户端隔离设置")
-            });
+        if !peer.relay_available {
+            return Err("目标设备当前未连接中继".into());
         }
-        if peer.relay_available {
-            match self.relay.open_tunnel(peer.id.clone()).await {
-                Ok(RelayTunnel { send, receive }) => {
-                    return Ok((SessionSend::Relay(send), SessionReceive::Relay(receive)));
+        let RelayTunnel { send, receive } = self.relay.open_tunnel(peer.id.clone()).await?;
+        Ok((SessionSend::Relay(send), SessionReceive::Relay(receive)))
+    }
+
+    async fn connect(
+        &self,
+        peer: &PeerDevice,
+        preference: TransportPreference,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        match preference {
+            TransportPreference::Lan => {
+                if peer.addresses.is_empty() {
+                    return Err("目标设备当前没有可用的局域网地址".into());
                 }
-                Err(relay_error) => return Err(relay_error),
+                self.connect_lan(peer).await.map_err(|error| {
+                    format!("局域网直连失败：{error}。请检查本地网络权限、防火墙和客户端隔离设置")
+                })
+            }
+            TransportPreference::Relay => self.connect_relay(peer).await,
+            TransportPreference::Auto => {
+                if !peer.addresses.is_empty() {
+                    self.connect_lan(peer).await.map_err(|error| {
+                        format!("局域网直连失败：{error}。自动模式不会在连接失败后静默切换中继，可手动选择中继重试")
+                    })
+                } else if peer.relay_available {
+                    self.connect_relay(peer).await
+                } else {
+                    Err("设备当前没有可用的局域网或中继连接".into())
+                }
             }
         }
-        Err("设备当前没有可用的局域网或中继连接".into())
     }
 }
 
@@ -236,6 +259,17 @@ struct TransferInfo {
     cleanup_source: bool,
 }
 
+struct ReadAheadFile {
+    chunks: mpsc::Receiver<Result<Vec<u8>, String>>,
+    recycled: mpsc::Sender<Vec<u8>>,
+}
+
+struct WriteBehindFile {
+    chunks: Option<mpsc::Sender<(u64, Vec<u8>)>>,
+    recycled: mpsc::Receiver<Vec<u8>>,
+    task: tokio::task::JoinHandle<Result<(u64, String), TransferFailure>>,
+}
+
 #[derive(Debug)]
 struct TransferFailure {
     status: &'static str,
@@ -269,6 +303,7 @@ enum NetworkCommand {
     UpdateLocalDevice(LocalDevice),
     BeginPairing {
         peer: PeerDevice,
+        transport_preference: TransportPreference,
         response: oneshot::Sender<Result<PairingRequest, String>>,
     },
     ConfirmPairing {
@@ -423,10 +458,18 @@ impl NetworkHandle {
             .map_err(|_| "加密网络服务未运行".to_string())
     }
 
-    pub(crate) async fn begin_pairing(&self, peer: PeerDevice) -> Result<PairingRequest, String> {
+    pub(crate) async fn begin_pairing(
+        &self,
+        peer: PeerDevice,
+        transport_preference: TransportPreference,
+    ) -> Result<PairingRequest, String> {
         let (response, result) = oneshot::channel();
         self.sender
-            .send(NetworkCommand::BeginPairing { peer, response })
+            .send(NetworkCommand::BeginPairing {
+                peer,
+                transport_preference,
+                response,
+            })
             .map_err(|_| "加密网络服务未运行".to_string())?;
         result.await.map_err(|_| "配对连接意外中断".to_string())?
     }
@@ -556,7 +599,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
         quic: endpoint.clone(),
         relay: relay.clone(),
     };
-    tokio::spawn(relay_worker.run(app.clone(), trust.clone(), peers));
+    tokio::spawn(relay_worker.run(app.clone(), peers));
     status.write().active = true;
     let pending: PendingConfirmations = Arc::new(Mutex::new(HashMap::new()));
     let pending_offers: PendingFileOffers = Arc::new(Mutex::new(HashMap::new()));
@@ -600,6 +643,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                             context,
                             SessionSend::Quic(send),
                             SessionReceive::Quic(receive),
+                            None,
                         )
                         .await
                     }.await;
@@ -612,9 +656,6 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                 let Some(IncomingRelayTunnel { source_id, tunnel }) = incoming else {
                     return Err("中继连接服务意外停止".into());
                 };
-                if trust.find(&source_id).is_none() {
-                    continue;
-                }
                 let app = app.clone();
                 let local = local.clone();
                 let identity = identity.clone();
@@ -640,6 +681,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                         context,
                         SessionSend::Relay(tunnel.send),
                         SessionReceive::Relay(tunnel.receive),
+                        Some(source_id),
                     ).await {
                         let _ = app.emit("network-error", error);
                     }
@@ -651,7 +693,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                     NetworkCommand::UpdateLocalDevice(device) => {
                         local = device;
                     }
-                    NetworkCommand::BeginPairing { peer, response } => {
+                    NetworkCommand::BeginPairing { peer, transport_preference, response } => {
                         let connector = connector.clone();
                         let context = PairingContext {
                             app: app.clone(),
@@ -661,7 +703,13 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                             pending: Arc::clone(&pending),
                         };
                         tokio::spawn(async move {
-                            begin_outgoing_pairing(connector, context, peer, response).await;
+                            begin_outgoing_pairing(
+                                connector,
+                                context,
+                                peer,
+                                transport_preference,
+                                response,
+                            ).await;
                         });
                     }
                     NetworkCommand::ConfirmPairing { session_id, accepted, response } => {
@@ -794,16 +842,13 @@ async fn begin_outgoing_pairing(
     connector: TransportConnector,
     context: PairingContext,
     peer: PeerDevice,
+    transport_preference: TransportPreference,
     response: oneshot::Sender<Result<PairingRequest, String>>,
 ) {
-    // Pairing establishes the trust that the relay requires, so it must never
-    // use a relay tunnel itself.
-    let (send, receive) = match connector.connect_lan(&peer).await {
+    let (send, receive) = match connector.connect(&peer, transport_preference).await {
         Ok(streams) => streams,
         Err(error) => {
-            let _ = response.send(Err(format!(
-                "{error}。首次配对只能通过局域网完成，请检查两端的本地网络权限、防火墙和客户端隔离设置"
-            )));
+            let _ = response.send(Err(error));
             return;
         }
     };
@@ -838,6 +883,7 @@ async fn begin_outgoing_pairing(
         session,
         request.clone(),
         decision,
+        transport_preference,
     )
     .await
     {
@@ -859,11 +905,21 @@ async fn handle_incoming(
     context: IncomingContext,
     send: SessionSend,
     receive: SessionReceive,
+    expected_peer_id: Option<String>,
 ) -> Result<(), String> {
     let session =
         responder_handshake(send, receive, &context.file.identity, &context.file.local).await?;
+    if let Some(expected_peer_id) = expected_peer_id {
+        ensure_expected_peer(&expected_peer_id, &session.peer.id)?;
+    }
     match session.peer.purpose.as_str() {
         "pair" => {
+            let transport_preference = context
+                .file
+                .trust
+                .find(&session.peer.id)
+                .map(|device| device.transport_preference)
+                .unwrap_or_default();
             let request = pairing_request(&session, "incoming");
             let (confirmation, decision) = oneshot::channel();
             context
@@ -882,6 +938,7 @@ async fn handle_incoming(
                 session,
                 request,
                 decision,
+                transport_preference,
             )
             .await
         }
@@ -909,6 +966,7 @@ async fn finish_pairing(
     mut session: NoiseSession,
     request: PairingRequest,
     decision: oneshot::Receiver<bool>,
+    transport_preference: TransportPreference,
 ) -> Result<(), String> {
     let local_accepted = match timeout(PAIRING_TIMEOUT, decision).await {
         Ok(Ok(accepted)) => accepted,
@@ -949,6 +1007,7 @@ async fn finish_pairing(
             platform: session.peer.platform.clone(),
             public_key: hex::encode(session.remote_static),
             fingerprint: fingerprint(&session.remote_static),
+            transport_preference,
             paired_at_ms: now,
             last_verified_ms: now,
         })?;
@@ -1002,7 +1061,9 @@ async fn outgoing_test_message(
         .ok_or_else(|| "请先完成设备配对".to_string())?;
     let expected_key = decode_public_key(&trusted.public_key)?;
 
-    let (send, receive) = connector.connect_trusted(&peer).await?;
+    let (send, receive) = connector
+        .connect(&peer, trusted.transport_preference)
+        .await?;
     let mut session = initiator_handshake(
         send,
         receive,
@@ -1117,7 +1178,9 @@ async fn outgoing_clipboard_update(
         .ok_or_else(|| "请先完成设备配对".to_string())?;
     let expected_key = decode_public_key(&trusted.public_key)?;
 
-    let (send, receive) = connector.connect_trusted(peer).await?;
+    let (send, receive) = connector
+        .connect(peer, trusted.transport_preference)
+        .await?;
     let mut session = initiator_handshake(
         send,
         receive,
@@ -1261,7 +1324,6 @@ async fn run_outgoing_file_transfer(
         context.active_transfers.lock().remove(&transfer_id);
         return;
     };
-    emit_transfer_progress(&context.app, &info, "hashing", 0, Instant::now());
     // Dropping this future drops the entire session. Never reuse a Noise stream
     // after interrupting a partially written encrypted frame.
     let outcome = cancel_transfer_operation(
@@ -1314,11 +1376,8 @@ async fn outgoing_file_transfer(
         .find(&peer.id)
         .ok_or_else(|| TransferFailure::failed("请先完成设备配对"))?;
     let expected_key = decode_public_key(&trusted.public_key).map_err(TransferFailure::failed)?;
-    let sha256 = hash_file(&context.app, info, path, cancel).await?;
-    ensure_not_cancelled(cancel)?;
-
     let (send, receive) = connector
-        .connect_trusted(peer)
+        .connect(peer, trusted.transport_preference)
         .await
         .map_err(TransferFailure::failed)?;
     let mut session = initiator_handshake(send, receive, &context.identity, &context.local, "file")
@@ -1327,6 +1386,22 @@ async fn outgoing_file_transfer(
     ensure_expected_peer(&peer.id, &session.peer.id).map_err(TransferFailure::failed)?;
     ensure_trusted_key(&expected_key, &session.remote_static).map_err(TransferFailure::failed)?;
 
+    // Updated peers can authenticate the digest in FileComplete, avoiding a full
+    // extra read before the transfer begins. Keep the original pre-hash offer for
+    // older peers that do not advertise the streaming capability.
+    let streams_hash = session
+        .peer
+        .capabilities
+        .iter()
+        .any(|capability| capability == "streaming-file-hash");
+    let offered_sha256 = if streams_hash {
+        None
+    } else {
+        emit_transfer_progress(&context.app, info, "hashing", 0, Instant::now());
+        Some(hash_file(&context.app, info, path, cancel).await?)
+    };
+    ensure_not_cancelled(cancel)?;
+
     write_encrypted(
         &mut session.send,
         &mut session.transport,
@@ -1334,7 +1409,7 @@ async fn outgoing_file_transfer(
             transfer_id: info.id.clone(),
             name: info.name.clone(),
             size: info.size,
-            sha256: sha256.clone(),
+            sha256: offered_sha256.clone(),
         },
     )
     .await
@@ -1368,10 +1443,7 @@ async fn outgoing_file_transfer(
         _ => return Err(TransferFailure::failed("对端返回了错误的文件接收响应")),
     }
 
-    let mut file = File::open(path)
-        .await
-        .map_err(|error| TransferFailure::failed(format!("无法打开待发送文件：{error}")))?;
-    let mut buffer = vec![0_u8; FILE_CHUNK_SIZE];
+    let mut file = start_file_read_ahead(path.to_path_buf(), info.size, cancel.clone()).await?;
     let mut chunk_buffers = ChunkWriteBuffers::new();
     let mut transferred = 0_u64;
     let mut send_hash = Sha256::new();
@@ -1380,22 +1452,20 @@ async fn outgoing_file_transfer(
 
     loop {
         ensure_not_cancelled(cancel)?;
-        let read = file
-            .read(&mut buffer)
-            .await
-            .map_err(|error| TransferFailure::failed(format!("读取待发送文件失败：{error}")))?;
-        if read == 0 {
+        let Some(chunk) = file.chunks.recv().await else {
             break;
-        }
+        };
+        let chunk = chunk.map_err(TransferFailure::failed)?;
+        let read = chunk.len();
         if transferred.saturating_add(read as u64) > info.size {
             return Err(TransferFailure::failed("文件在发送期间发生变化，请重试"));
         }
-        send_hash.update(&buffer[..read]);
+        send_hash.update(&chunk);
         write_encrypted_chunk(
             &mut session.send,
             &mut session.transport,
             transferred,
-            &buffer[..read],
+            &chunk,
             &mut chunk_buffers,
         )
         .await
@@ -1407,6 +1477,7 @@ async fn outgoing_file_transfer(
             }
         })?;
         transferred += read as u64;
+        let _ = file.recycled.try_send(chunk);
         if should_emit_progress(&mut last_progress, transferred == info.size) {
             emit_transfer_progress(&context.app, info, "transferring", transferred, started);
         }
@@ -1416,10 +1487,12 @@ async fn outgoing_file_transfer(
         return Err(TransferFailure::failed("文件在发送期间发生变化，请重试"));
     }
     let sent_sha256 = hex::encode(send_hash.finalize());
-    if sent_sha256 != sha256 {
-        return Err(TransferFailure::failed(
-            "文件在发送期间发生变化，请重新选择",
-        ));
+    if let Some(expected_sha256) = offered_sha256.as_deref() {
+        if sent_sha256 != expected_sha256 {
+            return Err(TransferFailure::failed(
+                "文件在发送期间发生变化，请重新选择",
+            ));
+        }
     }
 
     write_encrypted(
@@ -1472,7 +1545,7 @@ async fn handle_incoming_file_transfer(
     )
     .await
     .map_err(|_| "等待文件信息超时".to_string())??;
-    let (transfer_id, raw_name, size, sha256) = match offer {
+    let (transfer_id, raw_name, size, offered_sha256) = match offer {
         WireMessage::FileOffer {
             transfer_id,
             name,
@@ -1483,7 +1556,16 @@ async fn handle_incoming_file_transfer(
     };
     Uuid::parse_str(&transfer_id).map_err(|_| "文件传输标识无效".to_string())?;
     let name = validate_file_name(&raw_name)?;
-    validate_sha256(&sha256)?;
+    if let Some(sha256) = offered_sha256.as_deref() {
+        validate_sha256(sha256)?;
+    } else if !session
+        .peer
+        .capabilities
+        .iter()
+        .any(|capability| capability == "streaming-file-hash")
+    {
+        return Err("对端省略了文件校验值，但未声明流式校验能力".into());
+    }
 
     let info = TransferInfo {
         id: transfer_id.clone(),
@@ -1505,7 +1587,7 @@ async fn handle_incoming_file_transfer(
     }
 
     let mut can_send_failure = false;
-    let result: Result<(PathBuf, String), TransferFailure> = async {
+    let result: Result<(PathBuf, String, String), TransferFailure> = async {
         let (confirmation, decision) = oneshot::channel();
         context.pending_offers.lock().insert(transfer_id.clone(), confirmation);
         context.app.emit("file-offer", FileOfferEvent {
@@ -1514,7 +1596,7 @@ async fn handle_incoming_file_transfer(
             peer_name: info.peer_name.clone(),
             name,
             size,
-            sha256: sha256.clone(),
+            sha256: offered_sha256.clone(),
         }).map_err(|error| TransferFailure::failed(format!("无法显示文件接收请求：{error}")))?;
 
         let accepted = tokio::select! {
@@ -1539,7 +1621,14 @@ async fn handle_incoming_file_transfer(
         can_send_failure = true;
 
         emit_transfer_progress(&context.app, &info, "transferring", 0, Instant::now());
-        let path = receive_file_payload(&context.app, &info, &sha256, &cancel, &mut session).await?;
+        let (path, verified_sha256) = receive_file_payload(
+            &context.app,
+            &info,
+            offered_sha256.as_deref(),
+            &cancel,
+            &mut session,
+        )
+        .await?;
         // Publication is the local commit point. A lost receipt or metadata write
         // must never hide a file that has already been verified and saved.
         let receipt = async {
@@ -1555,7 +1644,7 @@ async fn handle_incoming_file_transfer(
             let _ = timeout(Duration::from_secs(1), wait_stream_stopped(&mut session.send)).await;
             Ok::<(), String>(())
         };
-        let completed = finalize_received_file(path, receipt).await;
+        let completed = finalize_received_file(path, verified_sha256, receipt).await;
         if let Err(error) = context.trust.touch(&info.peer_id, unix_millis()).await {
             let _ = context.app.emit("network-error", error);
         }
@@ -1567,7 +1656,7 @@ async fn handle_incoming_file_transfer(
     context.pending_offers.lock().remove(&transfer_id);
     context.active_transfers.lock().remove(&transfer_id);
     match result {
-        Ok((path, message)) => emit_transfer_result(
+        Ok((path, message, sha256)) => emit_transfer_result(
             &context.app,
             &info,
             "completed",
@@ -1582,7 +1671,7 @@ async fn handle_incoming_file_transfer(
                 failure.status,
                 &failure.message,
                 None,
-                Some(sha256),
+                offered_sha256.clone(),
             );
             if failure.status == "failed" && can_send_failure {
                 let _ = write_encrypted(
@@ -1603,22 +1692,113 @@ async fn handle_incoming_file_transfer(
 
 async fn finalize_received_file(
     path: PathBuf,
+    sha256: String,
     receipt: impl Future<Output = Result<(), String>>,
-) -> (PathBuf, String) {
+) -> (PathBuf, String, String) {
     let message = match receipt.await {
         Ok(()) => "文件已校验并保存".into(),
         Err(error) => format!("文件已校验并保存，但无法向发送方确认：{error}"),
     };
-    (path, message)
+    (path, message, sha256)
+}
+
+async fn start_file_read_ahead(
+    path: PathBuf,
+    expected_size: u64,
+    cancel: TransferCancellation,
+) -> Result<ReadAheadFile, TransferFailure> {
+    let source = File::open(&path)
+        .await
+        .map_err(|error| TransferFailure::failed(format!("无法打开待发送文件：{error}")))?;
+    let (chunk_sender, chunks) = mpsc::channel(FILE_PIPELINE_DEPTH);
+    let (recycled, mut recycled_buffers) = mpsc::channel(FILE_PIPELINE_DEPTH);
+
+    tokio::spawn(async move {
+        let mut source = BufReader::with_capacity(FILE_IO_BUFFER_SIZE, source);
+        let mut processed = 0_u64;
+        loop {
+            if is_cancelled(&cancel) {
+                return;
+            }
+            let mut buffer = recycled_buffers
+                .try_recv()
+                .unwrap_or_else(|_| vec![0_u8; FILE_CHUNK_SIZE]);
+            buffer.resize(FILE_CHUNK_SIZE, 0);
+            let read = match source.read(&mut buffer).await {
+                Ok(read) => read,
+                Err(error) => {
+                    let _ = chunk_sender
+                        .send(Err(format!("读取待发送文件失败：{error}")))
+                        .await;
+                    return;
+                }
+            };
+            if read == 0 {
+                if processed != expected_size {
+                    let _ = chunk_sender
+                        .send(Err("文件大小已变化，请重新选择".into()))
+                        .await;
+                }
+                return;
+            }
+            processed = processed.saturating_add(read as u64);
+            if processed > expected_size {
+                let _ = chunk_sender
+                    .send(Err("文件大小已变化，请重新选择".into()))
+                    .await;
+                return;
+            }
+            buffer.truncate(read);
+            if chunk_sender.send(Ok(buffer)).await.is_err() {
+                return;
+            }
+        }
+    });
+
+    Ok(ReadAheadFile { chunks, recycled })
+}
+
+fn start_file_write_behind(file: File) -> WriteBehindFile {
+    let (chunks, mut chunk_receiver) = mpsc::channel::<(u64, Vec<u8>)>(FILE_PIPELINE_DEPTH);
+    let (recycled_sender, recycled) = mpsc::channel(FILE_PIPELINE_DEPTH);
+    let task = tokio::spawn(async move {
+        let mut file = BufWriter::with_capacity(FILE_IO_BUFFER_SIZE, file);
+        let mut hasher = Sha256::new();
+        let mut written = 0_u64;
+        while let Some((offset, bytes)) = chunk_receiver.recv().await {
+            if offset != written {
+                return Err(TransferFailure::failed("文件写入队列偏移无效"));
+            }
+            file.write_all(&bytes)
+                .await
+                .map_err(|error| TransferFailure::failed(format!("写入临时文件失败：{error}")))?;
+            hasher.update(&bytes);
+            written += bytes.len() as u64;
+            let _ = recycled_sender.try_send(bytes);
+        }
+        file.flush()
+            .await
+            .map_err(|error| TransferFailure::failed(format!("刷新接收文件失败：{error}")))?;
+        file.get_ref()
+            .sync_all()
+            .await
+            .map_err(|error| TransferFailure::failed(format!("同步接收文件失败：{error}")))?;
+        Ok((written, hex::encode(hasher.finalize())))
+    });
+    WriteBehindFile {
+        chunks: Some(chunks),
+        recycled,
+        task,
+    }
 }
 
 async fn receive_file_payload(
     app: &AppHandle,
     info: &TransferInfo,
-    expected_sha256: &str,
+    offered_sha256: Option<&str>,
     cancel: &TransferCancellation,
     session: &mut NoiseSession,
-) -> Result<PathBuf, TransferFailure> {
+) -> Result<(PathBuf, String), TransferFailure> {
     #[cfg(target_os = "ios")]
     let download_dir = app
         .path()
@@ -1635,16 +1815,17 @@ async fn receive_file_payload(
         .await
         .map_err(|error| TransferFailure::failed(format!("无法创建接收目录：{error}")))?;
     let temporary_path = download_dir.join(format!(".neloa-{}.part", info.id));
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .create_new(true)
         .write(true)
         .open(&temporary_path)
         .await
         .map_err(|error| TransferFailure::failed(format!("无法创建临时接收文件：{error}")))?;
+    let mut file = start_file_write_behind(file);
+    let mut writer_completed = false;
 
     let receive_result = async {
         let mut transferred = 0_u64;
-        let mut hasher = Sha256::new();
         let mut record_buffers = SecureRecordBuffers::new();
         let started = Instant::now();
         let mut last_progress = Instant::now() - PROGRESS_INTERVAL;
@@ -1674,10 +1855,18 @@ async fn receive_file_payload(
                     {
                         return Err(TransferFailure::failed("文件分块大小无效"));
                     }
-                    file.write_all(bytes).await.map_err(|error| {
-                        TransferFailure::failed(format!("写入临时文件失败：{error}"))
-                    })?;
-                    hasher.update(bytes);
+                    let mut owned = file
+                        .recycled
+                        .try_recv()
+                        .unwrap_or_else(|_| Vec::with_capacity(FILE_CHUNK_SIZE));
+                    owned.clear();
+                    owned.extend_from_slice(bytes);
+                    file.chunks
+                        .as_ref()
+                        .ok_or_else(|| TransferFailure::failed("文件写入队列已关闭"))?
+                        .send((offset, owned))
+                        .await
+                        .map_err(|_| TransferFailure::failed("文件写入任务意外结束"))?;
                     transferred += bytes.len() as u64;
                     if should_emit_progress(&mut last_progress, transferred == info.size) {
                         emit_transfer_progress(app, info, "transferring", transferred, started);
@@ -1687,20 +1876,25 @@ async fn receive_file_payload(
                     if size != info.size || transferred != info.size {
                         return Err(TransferFailure::failed("接收文件大小与发送信息不一致"));
                     }
-                    let actual_sha256 = hex::encode(hasher.finalize());
-                    if sha256 != expected_sha256 || actual_sha256 != expected_sha256 {
+                    validate_sha256(&sha256).map_err(TransferFailure::failed)?;
+                    drop(file.chunks.take());
+                    let (written, actual_sha256) = (&mut file.task).await.map_err(|error| {
+                        TransferFailure::failed(format!("文件写入任务意外结束：{error}"))
+                    })??;
+                    writer_completed = true;
+                    if written != info.size {
+                        return Err(TransferFailure::failed("写入文件大小与发送信息不一致"));
+                    }
+                    if actual_sha256 != sha256
+                        || offered_sha256.is_some_and(|expected| expected != sha256)
+                    {
                         return Err(TransferFailure::failed("SHA-256 校验失败，文件已丢弃"));
                     }
                     emit_transfer_progress(app, info, "verifying", transferred, started);
-                    file.flush().await.map_err(|error| {
-                        TransferFailure::failed(format!("刷新接收文件失败：{error}"))
-                    })?;
-                    file.sync_all().await.map_err(|error| {
-                        TransferFailure::failed(format!("同步接收文件失败：{error}"))
-                    })?;
-                    drop(file);
-                    return publish_without_overwrite(&temporary_path, &download_dir, &info.name)
-                        .await;
+                    let path =
+                        publish_without_overwrite(&temporary_path, &download_dir, &info.name)
+                            .await?;
+                    return Ok((path, actual_sha256));
                 }
                 BorrowedSecureRecord::Control(WireMessage::FileCancel { message }) => {
                     return Err(TransferFailure::cancelled(message));
@@ -1711,6 +1905,11 @@ async fn receive_file_payload(
     }
     .await;
 
+    if !writer_completed {
+        drop(file.chunks.take());
+        file.task.abort();
+        let _ = file.task.await;
+    }
     if receive_result.is_err() {
         let _ = tokio::fs::remove_file(&temporary_path).await;
     }
@@ -1723,9 +1922,10 @@ async fn hash_file(
     path: &Path,
     cancel: &TransferCancellation,
 ) -> Result<String, TransferFailure> {
-    let mut file = File::open(path)
+    let file = File::open(path)
         .await
         .map_err(|error| TransferFailure::failed(format!("无法打开待发送文件：{error}")))?;
+    let mut file = BufReader::with_capacity(FILE_IO_BUFFER_SIZE, file);
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 256 * 1024];
     let mut processed = 0_u64;
@@ -2028,7 +2228,8 @@ enum WireMessage {
         transfer_id: String,
         name: String,
         size: u64,
-        sha256: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
     },
     FileDecision {
         accepted: bool,
@@ -2508,10 +2709,7 @@ fn make_endpoint(port: u16) -> Result<Endpoint, String> {
     let private_key = PrivatePkcs8KeyDer::from(certified.signing_key.serialize_der());
     let mut server = quinn::ServerConfig::with_single_cert(vec![certificate], private_key.into())
         .map_err(|error| format!("无法配置 QUIC 服务：{error}"))?;
-    let transport =
-        Arc::get_mut(&mut server.transport).ok_or_else(|| "无法配置 QUIC 传输参数".to_string())?;
-    transport.max_concurrent_bidi_streams(16_u8.into());
-    transport.max_concurrent_uni_streams(0_u8.into());
+    server.transport_config(lan_transport_config());
     Endpoint::server(
         server,
         SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port),
@@ -2529,7 +2727,19 @@ fn insecure_quic_client_config() -> Result<ClientConfig, String> {
         .with_no_client_auth();
     let quic = QuicClientConfig::try_from(rustls)
         .map_err(|error| format!("无法配置 QUIC 客户端：{error}"))?;
-    Ok(ClientConfig::new(Arc::new(quic)))
+    let mut client = ClientConfig::new(Arc::new(quic));
+    client.transport_config(lan_transport_config());
+    Ok(client)
+}
+
+fn lan_transport_config() -> Arc<TransportConfig> {
+    let mut transport = TransportConfig::default();
+    transport
+        .max_concurrent_bidi_streams(16_u8.into())
+        .max_concurrent_uni_streams(0_u8.into())
+        .stream_receive_window(VarInt::from_u32(LAN_STREAM_WINDOW))
+        .send_window(LAN_SEND_WINDOW);
+    Arc::new(transport)
 }
 
 #[derive(Debug)]
@@ -2713,9 +2923,14 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("received.txt");
         tokio::fs::write(&path, b"verified data").await.unwrap();
-        let (completed_path, message) =
-            finalize_received_file(path.clone(), async { Err("connection reset".into()) }).await;
+        let digest = "a".repeat(64);
+        let (completed_path, message, completed_digest) =
+            finalize_received_file(path.clone(), digest.clone(), async {
+                Err("connection reset".into())
+            })
+            .await;
         assert_eq!(completed_path, path);
+        assert_eq!(completed_digest, digest);
         assert_eq!(
             tokio::fs::read(completed_path).await.unwrap(),
             b"verified data"
@@ -2799,6 +3014,36 @@ mod tests {
     }
 
     #[test]
+    fn file_offer_digest_is_optional_for_streaming_capability() {
+        let streaming = WireMessage::FileOffer {
+            transfer_id: "streaming-transfer".into(),
+            name: "archive.zip".into(),
+            size: 42,
+            sha256: None,
+        };
+        let encoded = serde_json::to_value(&streaming).unwrap();
+        assert!(encoded.get("sha256").is_none());
+        match serde_json::from_value::<WireMessage>(encoded).unwrap() {
+            WireMessage::FileOffer { sha256, .. } => assert_eq!(sha256, None),
+            _ => panic!("unexpected streaming file offer"),
+        }
+
+        let legacy = serde_json::json!({
+            "type": "fileOffer",
+            "transfer_id": "legacy-transfer",
+            "name": "archive.zip",
+            "size": 42,
+            "sha256": "a".repeat(64),
+        });
+        match serde_json::from_value::<WireMessage>(legacy).unwrap() {
+            WireMessage::FileOffer { sha256, .. } => {
+                assert_eq!(sha256, Some("a".repeat(64)));
+            }
+            _ => panic!("unexpected legacy file offer"),
+        }
+    }
+
+    #[test]
     fn file_name_validation_is_cross_platform_safe() {
         assert_eq!(
             validate_file_name("report 2026.pdf").unwrap(),
@@ -2834,6 +3079,55 @@ mod tests {
         assert_eq!(published.file_name().unwrap(), "report (1).txt");
         assert_eq!(tokio::fs::read(published).await.unwrap(), b"received");
         assert!(!temporary.exists());
+    }
+
+    #[tokio::test]
+    async fn read_ahead_pipeline_preserves_file_bytes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("source.bin");
+        let expected = (0..(FILE_CHUNK_SIZE * 3 + 17))
+            .map(|index| (index % 251) as u8)
+            .collect::<Vec<_>>();
+        tokio::fs::write(&path, &expected).await.unwrap();
+        let (_cancel_sender, cancel) = watch::channel(false);
+        let mut pipeline = start_file_read_ahead(path, expected.len() as u64, cancel)
+            .await
+            .unwrap();
+        let mut actual = Vec::new();
+        while let Some(chunk) = pipeline.chunks.recv().await {
+            let chunk = chunk.unwrap();
+            actual.extend_from_slice(&chunk);
+            let _ = pipeline.recycled.try_send(chunk);
+        }
+        assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
+    async fn write_behind_pipeline_preserves_size_and_digest() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("received.part");
+        let file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&path)
+            .await
+            .unwrap();
+        let expected = (0..(FILE_CHUNK_SIZE * 2 + 23))
+            .map(|index| (index % 239) as u8)
+            .collect::<Vec<_>>();
+        let mut pipeline = start_file_write_behind(file);
+        let chunks = pipeline.chunks.take().unwrap();
+        let split = FILE_CHUNK_SIZE;
+        chunks.send((0, expected[..split].to_vec())).await.unwrap();
+        chunks
+            .send((split as u64, expected[split..].to_vec()))
+            .await
+            .unwrap();
+        drop(chunks);
+        let (written, sha256) = pipeline.task.await.unwrap().unwrap();
+        assert_eq!(written, expected.len() as u64);
+        assert_eq!(sha256, hex::encode(Sha256::digest(&expected)));
+        assert_eq!(tokio::fs::read(path).await.unwrap(), expected);
     }
 
     #[test]
@@ -3018,7 +3312,11 @@ mod tests {
                         sha256,
                     } => {
                         assert_eq!(name, "report.txt");
-                        (transfer_id, size, sha256)
+                        (
+                            transfer_id,
+                            size,
+                            sha256.expect("legacy offer includes digest"),
+                        )
                     }
                     _ => panic!("unexpected file offer"),
                 };
@@ -3122,7 +3420,7 @@ mod tests {
                 transfer_id: transfer_id.clone(),
                 name: "report.txt".into(),
                 size: file_bytes.len() as u64,
-                sha256: sha256.clone(),
+                sha256: Some(sha256.clone()),
             },
         )
         .await

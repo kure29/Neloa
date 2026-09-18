@@ -45,7 +45,8 @@ use identity::NoiseIdentity;
 use model::{
     ClipboardSnapshot, DiagnosticCheck, DiagnosticPeer, DiagnosticsSnapshot, DiscoverySnapshot,
     LocalDevice, PairingRequest, PeerDevice, RelaySnapshot, SecuritySnapshot, SelectedFile,
-    TestMessageEvent, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+    TestMessageEvent, TransportPreference, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION,
+    PROTOCOL_VERSION,
 };
 use network::{NetworkHandle, NetworkStartup};
 use relay_settings::RelaySettingsStore;
@@ -815,6 +816,21 @@ fn set_trusted_device_alias(
     Ok(device)
 }
 
+#[tauri::command(rename_all = "camelCase")]
+fn set_trusted_device_transport(
+    app: tauri::AppHandle,
+    peer_id: String,
+    transport_preference: TransportPreference,
+    state: tauri::State<'_, AppState>,
+) -> Result<TrustedDevice, String> {
+    let device = state
+        .trust
+        .set_transport_preference(&peer_id, transport_preference)?;
+    app.emit("trusted-devices-changed", state.trust.list())
+        .map_err(|error| format!("无法刷新可信设备列表：{error}"))?;
+    Ok(device)
+}
+
 #[tauri::command]
 fn get_relay_snapshot(state: tauri::State<'_, AppState>) -> RelaySnapshot {
     state.network.relay_status()
@@ -971,7 +987,7 @@ fn diagnostics_snapshot(state: &AppState) -> DiagnosticsSnapshot {
         }
         .into(),
         detail: if relay.connected {
-            format!("已连接 · {} 台已配对设备在线", relay.online_devices)
+            format!("已连接 · {} 台设备在线", relay.online_devices)
         } else if relay.enabled {
             relay.error.clone().unwrap_or_else(|| "正在连接中继".into())
         } else {
@@ -1046,10 +1062,14 @@ fn find_peer(state: &AppState, peer_id: &str) -> Result<PeerDevice, String> {
 #[tauri::command(rename_all = "camelCase")]
 async fn begin_pairing(
     peer_id: String,
+    transport_preference: TransportPreference,
     state: tauri::State<'_, AppState>,
 ) -> Result<PairingRequest, String> {
     let peer = find_peer(&state, &peer_id)?;
-    state.network.begin_pairing(peer).await
+    state
+        .network
+        .begin_pairing(peer, transport_preference)
+        .await
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -1484,6 +1504,7 @@ pub fn run() {
             get_discovery_snapshot,
             get_security_snapshot,
             set_trusted_device_alias,
+            set_trusted_device_transport,
             get_relay_snapshot,
             set_relay_config,
             get_clipboard_snapshot,

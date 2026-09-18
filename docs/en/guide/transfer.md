@@ -19,7 +19,7 @@ The receiving side never saves anything automatically. Every incoming file shows
 
 - the sending device's name
 - the file name and size
-- the file digest (SHA-256)
+- SHA-256 verification status; the pre-transfer digest is also shown for compatible legacy peers
 
 The transfer only starts once you choose Accept and save. Choosing Reject ends this transfer immediately and tells the sender.
 
@@ -36,11 +36,11 @@ If a transfer is interrupted, cancelled, or rejected, its temporary file is remo
 - Every transfer can be cancelled on its own.
 - A send that failed or was interrupted keeps a Retry button in [transfer history](/en/guide/transfer#transfer-history).
 
-The transfer stage names what is happening right now: computing a checksum, waiting for the peer to accept, encrypting and sending, receiving and decrypting, verifying and writing.
+The transfer stage names what is happening right now: waiting for the peer to accept, encrypting and sending, receiving and decrypting, or verifying and writing. Transfers involving an older peer without streaming verification also show a checksum stage first.
 
 ## Integrity verification
 
-Before sending, the sender computes a SHA-256 for each file and offers the name, byte size, and digest together. The receiver verifies the digest again after writing, and only then publishes the final file.
+Between updated peers, the sender computes SHA-256 while it reads, encrypts, and sends the file, then commits the digest in the authenticated completion message. The receiver computes its own digest in parallel and publishes the final file only when they match. This avoids reading the complete source twice just to precompute the digest. Transfers with an older peer automatically retain the pre-hash compatibility flow.
 
 Which means: **"completed" means completed after verification.**
 

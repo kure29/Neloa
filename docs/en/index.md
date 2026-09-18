@@ -12,7 +12,7 @@ hero:
       text: First time here
       link: /en/guide/
     - theme: alt
-      text: Download 0.1.12
+      text: Download 0.1.13
       link: https://github.com/kure29/Neloa/releases/latest
 
 features:
@@ -32,13 +32,13 @@ features:
 
 ## Current status
 
-The current stable version is **0.1.12**, with a universal macOS DMG, Windows x64 installer, an Android ARM64 APK, and an unsigned iOS IPA. The desktop packages are not commercially code-signed, and the IPA must be re-signed with your own Apple certificate. [Download and install](/en/guide/install) covers each of these.
+The current stable version is **0.1.13**, with a universal macOS DMG, Windows x64 installer, an Android ARM64 APK, and an unsigned iOS IPA. The desktop packages are not commercially code-signed, and the IPA must be re-signed with your own Apple certificate. [Download and install](/en/guide/install) covers each of these.
 
-## What changed in 0.1.12
+## Connection routing
 
-- A peer with a discovered LAN address stays on direct QUIC instead of silently switching to the relay after a local error.
-- Initial pairing is LAN-only; the relay accepts previously paired devices only.
-- The macOS package now declares Local Network and Bonjour usage and connection timeouts provide actionable guidance.
+- Each peer can use **Automatic**, **Local network**, or **Relay** routing.
+- Automatic routing uses LAN QUIC when a local address is available and otherwise uses the configured relay.
+- Initial pairing can use either path; both devices must still compare and confirm the six-digit code.
 
 ## How this documentation is organised
 
@@ -47,5 +47,5 @@ User, build, and architecture documentation lives in the `docs/` directory. [Rel
 ## What it deliberately does not do
 
 - There is no account system and no cloud storage: trust between devices is established entirely on the devices themselves.
-- The relay takes no part in pairing. To reach each other through a relay, two devices must first be paired over a local network.
+- The relay only discovers devices and forwards encrypted bytes; users on both devices still make the pairing decision.
 - Clipboard sync is plain text only and off by default; on mobile it only works while the app is in the foreground.

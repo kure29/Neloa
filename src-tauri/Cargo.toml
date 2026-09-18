@@ -1,6 +1,6 @@
 [package]
 name = "neloa"
-version = "0.1.12"
+version = "0.1.13"
 description = "Local-first encrypted file and clipboard transfer"
 authors = ["Neloa contributors"]
 edition = "2021"
@@ -26,7 +26,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.11.0"
 snow = "0.10.0"
-tauri = { version = "2.11.5", features = [] }
+tauri = { version = "2.11.5", features = ["macos-private-api"] }
 tauri-plugin-clipboard-manager = "2.3.3"
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-fs = "2.5.2"
@@ -65,6 +65,6 @@ tokio = { version = "1.47", features = ["test-util"] }
 [profile.release]
 codegen-units = 1
 lto = "thin"
-opt-level = "s"
+opt-level = 3
 panic = "abort"
 strip = "symbols"

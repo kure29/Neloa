@@ -763,6 +763,59 @@
   padding-right: var(--s1);
 }
 
+.peer-transport-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--paper-0);
+  color: var(--ink-2);
+  transition: border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.peer-transport-control:focus-within {
+  border-color: var(--primary);
+  outline: 2px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  outline-offset: 1px;
+}
+
+.peer-transport-control select {
+  width: 76px;
+  height: 100%;
+  padding: 0 26px 0 var(--s2);
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--text-small);
+  font-weight: 500;
+}
+
+.peer-transport-control select:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.peer-transport-control svg {
+  position: absolute;
+  right: 7px;
+  pointer-events: none;
+  transform: rotate(90deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .peer-transport-control:hover {
+    border-color: var(--line-strong);
+    background: var(--paper-2);
+  }
+}
+
 .peer-selected-mark {
   display: grid;
   place-items: center;

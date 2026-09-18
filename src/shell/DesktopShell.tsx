@@ -1,6 +1,6 @@
-import { useEffect, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 
-import { performWindowAction, startWindowDragging } from "../bridge";
+import { onWindowMaximizedChange, performWindowAction, startWindowDragging } from "../bridge";
 import type { NeloaState } from "../lib/useNeloa";
 import { Icon } from "../ui/icons";
 import { IconButton, StatusDot, cx } from "../ui/kit";
@@ -25,6 +25,24 @@ function beginDrag(event: ReactMouseEvent<HTMLElement>) {
  */
 export function DesktopShell({ app }: { app: NeloaState }) {
   const isMac = app.platform !== "windows";
+  const [maximized, setMaximized] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.add("desktop-window");
+    let disposed = false;
+    let stop = () => {};
+    void onWindowMaximizedChange((value) => {
+      if (!disposed) setMaximized(value);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      disposed = true;
+      stop();
+      document.documentElement.classList.remove("desktop-window");
+    };
+  }, []);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -52,7 +70,7 @@ export function DesktopShell({ app }: { app: NeloaState }) {
   }, [app.setView]);
 
   return (
-    <div className={cx("app", "shell-desktop", `platform-${app.platform}`)}>
+    <div className={cx("app", "shell-desktop", maximized && "window-maximized", `platform-${app.platform}`)}>
       <a className="skip-link" href="#main">
         跳到主要内容
       </a>

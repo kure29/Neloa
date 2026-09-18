@@ -24,15 +24,15 @@ Do not confirm. Cancel the pairing, check that you selected the device you meant
 ## After pairing
 
 - Later sessions must match both the device ID and the stored public key, or the handshake is rejected.
-- Paired devices show a route marker on the devices screen: **local network** or **relay**.
+- Each device can use **Automatic**, **Local network**, or **Relay** routing from the devices screen.
 - Pairing survives a restart; you do not compare the code again.
-- The relay takes no part in pairing: crossing networks requires a pairing that was completed over a local network first.
+- Initial pairing can use LAN or relay. The relay only forwards Noise handshake bytes and never decides whether either side is trusted.
 
 ## Device aliases
 
 You can give any device a local alias, which is useful when two machines share a name such as "MacBook".
 
-- On the devices screen, open the more button on a paired device to set the alias.
+- Set the alias under Settings → Device trust.
 - Aliases are limited to 32 characters and may not contain control characters.
 - **An alias is stored only on this device** and never renames the other machine.
 

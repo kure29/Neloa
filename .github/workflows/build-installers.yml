@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Release tag used for the generated installers
         required: true
-        default: v0.1.12
+        default: v0.1.13
   push:
     tags:
       - v*

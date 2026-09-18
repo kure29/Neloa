@@ -8,10 +8,10 @@ Translated from the [Chinese source document](/build/mobile). If the two disagre
 
 ## Current delivery status
 
-| Platform | Current artifact | Verified | Not yet verified |
-| --- | --- | --- | --- |
-| Android | ARM64 signed release APK on GitHub Releases | Fixed signing, ARM64 architecture, icon, and checksum confirmed inside the package | On-device regression for the 0.1.12 LAN routing fix |
-| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | P12 re-signing and installation, the native Bonjour/Rust startup bridge, and a basic on-device flow | On-device regression for 0.1.12 macOS pairing and LAN routing fixes |
+| Platform | Current artifact | Build and installation notes |
+| --- | --- | --- |
+| Android | ARM64 signed release APK on GitHub Releases | Uses the project's fixed signature; supports ARM64 devices on Android 7.0 (API 24) and later |
+| iOS | `src-tauri/gen/apple/build/arm64/Neloa.ipa` | Unsigned IPA requiring a P12 certificate and provisioning profile; discovery uses the native Bonjour adapter |
 
 Android releases provide an ARM64 APK for mainstream physical devices. The APK is signed with the project's fixed Android PKCS#12 key and built with Rust release mode, symbol stripping, Thin LTO, and Android code shrinking. iOS produces an unsigned IPA through the full Xcode flow; installing it on a device still requires an Apple development certificate and a matching provisioning profile.
 
@@ -128,19 +128,18 @@ For a first pass, use one phone and the current Mac, in this order:
 
 ## Relay acceptance on real devices
 
-The relay never replaces the first pairing. Complete the local pairing above first, then verify across networks:
+The relay can carry initial pairing and later transfers. Verify it in this order:
 
 1. Deploy the relay behind a valid HTTPS certificate, and prepare a public `wss://.../v1/ws` address plus one token of at least 32 characters.
 2. On both devices open Settings → Connection → Self-hosted relay, enter the same address and token, save, and confirm the status reads connected.
-3. Move the phone to cellular or another Wi-Fi; the peer should reappear and show "paired · relay".
-4. Send test text, a small file, and a larger file in both directions, then verify foreground clipboard sync; encryption, acknowledgement, verification, and cancellation should behave exactly as they do on a local network.
+3. Move the phone to cellular or another Wi-Fi. When the peer appears, select **Relay**, compare the six-digit code, and complete an initial pairing.
+4. Switch among automatic, local-network, and relay routing. Send test text, a small file, and a larger file in both directions, then verify foreground clipboard sync; encryption, acknowledgement, verification, and cancellation should remain consistent.
 5. Temporarily enter a wrong token, stop the relay, and start it again; confirm the client reports a readable error and reconnects automatically, and that local transfers keep working.
 6. Connections must fail with an invalid or expired TLS certificate. Never expose a plaintext WebSocket port to the internet.
 
-## Known pre-release items
+## Platform limits and compatibility
 
 - Android release APKs use one permanent certificate; a first migration from an older debug signature still requires uninstalling and reinstalling.
 - The iOS discovery layer uses a native Bonjour adapter and does not depend on the multicast entitlement that requires extra Apple approval. `DefunctConnection` lifecycle recovery and the Swift/Rust static startup bridge have passed basic on-device verification after P12 re-signing.
-- 0.1.12 corrects LAN route priority and the initial pairing path. After release, regress direct pairing between Android/iOS and macOS/Windows, and confirm the relay carries no application traffic while a LAN route is present.
-- Mobile systems do not allow clipboard sync to become the same unlimited background polling the desktop uses. "Check again on returning to the foreground" and an explicit paste entry point are candidates for a later release.
+- Mobile systems do not allow clipboard sync to use the same unlimited background polling as desktop; synchronization currently runs only while the app is in the foreground.
 - The iOS and Android application identifier is `com.kure29.neloa`. On the first migration from the old identifier, the system treats it as a new app.

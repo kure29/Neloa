@@ -83,9 +83,13 @@ export function FileOfferSheet({ app }: { app: NeloaState }) {
 
       <div className="sheet-detail">
         <span>SHA-256</span>
-        <code className="selectable" title={offer.sha256}>
-          {offer.sha256.slice(0, 18)}…{offer.sha256.slice(-8)}
-        </code>
+        {offer.sha256 ? (
+          <code className="selectable" title={offer.sha256}>
+            {offer.sha256.slice(0, 18)}…{offer.sha256.slice(-8)}
+          </code>
+        ) : (
+          <span>传输完成后校验</span>
+        )}
       </div>
 
       <div className="sheet-actions">

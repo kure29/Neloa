@@ -30,6 +30,7 @@ import {
   onShellChange,
   onTestMessageReceived,
   onTrustedDevicesChanged,
+  setTrustedDeviceTransport,
   previewPlatform,
   revealFileInFolder,
   revokeTrustedDevice,
@@ -51,6 +52,7 @@ import type {
   SelectedFile,
   TransferRecord,
   TrustedDevice,
+  TransportPreference,
 } from "../types";
 import { errorMessage, fileTransferRecord, transferRecord } from "./format";
 import {
@@ -61,7 +63,7 @@ import {
 import { resolvePrimaryAction } from "./primaryAction";
 
 export type ViewName = "radar" | "history" | "settings";
-export type BusyAction = "pair" | "file" | "clipboard" | "deviceName" | "alias" | "relay" | "diagnostics" | null;
+export type BusyAction = "pair" | "file" | "clipboard" | "deviceName" | "alias" | "route" | "relay" | "diagnostics" | null;
 export type ToastTone = "neutral" | "ok" | "warn" | "danger";
 
 const EMPTY_DISCOVERY: DiscoverySnapshot = { active: false, error: null, peers: [] };
@@ -85,7 +87,7 @@ const EMPTY_RELAY: RelaySnapshot = {
 };
 const EMPTY_DIAGNOSTICS: DiagnosticsSnapshot = {
   generatedAtMs: 0,
-  appVersion: "0.1.12",
+  appVersion: "0.1.13",
   platform: "macos",
   protocolVersion: 1,
   minProtocolVersion: 1,
@@ -118,6 +120,7 @@ export function useNeloa() {
   const [lastClipboardEvent, setLastClipboardEvent] = useState<ClipboardSyncEvent | null>(null);
   const [view, setView] = useState<ViewName>("radar");
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
+  const [untrustedTransportPreferences, setUntrustedTransportPreferences] = useState<Record<string, TransportPreference>>({});
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const selectedFilesRef = useRef<SelectedFile[]>([]);
   const [fileDrop, setFileDrop] = useState({ active: false, count: 0 });
@@ -434,6 +437,11 @@ export function useNeloa() {
     [trustedDevicesById],
   );
   const selectedPeerTrusted = selectedPeer ? trustedIds.has(selectedPeer.id) : false;
+  const transportPreferenceFor = useCallback((peerId: string): TransportPreference => (
+    trustedDevicesById.get(peerId)?.transportPreference
+      ?? untrustedTransportPreferences[peerId]
+      ?? "auto"
+  ), [trustedDevicesById, untrustedTransportPreferences]);
   const selectedPeerForAction = useMemo(() => {
     if (!selectedPeer) return null;
     const alias = trustedDevicesById.get(selectedPeer.id)?.alias?.trim();
@@ -479,13 +487,47 @@ export function useNeloa() {
     }
     setBusyAction("pair");
     try {
-      setPairing(await beginPairing(peerId));
+      setPairing(await beginPairing(peerId, transportPreferenceFor(peerId)));
     } catch (error) {
       showToast(errorMessage(error), "danger");
     } finally {
       setBusyAction(null);
     }
-  }, [security.network, showToast]);
+  }, [security.network, showToast, transportPreferenceFor]);
+
+  const configureTransportPreference = useCallback(async (
+    peerId: string,
+    transportPreference: TransportPreference,
+  ) => {
+    const trusted = trustedDevicesById.has(peerId);
+    if (!trusted) {
+      setUntrustedTransportPreferences((current) => ({
+        ...current,
+        [peerId]: transportPreference,
+      }));
+      return;
+    }
+    setBusyAction("route");
+    try {
+      const device = await setTrustedDeviceTransport(peerId, transportPreference);
+      setSecurity((current) => ({
+        ...current,
+        trustedDevices: current.trustedDevices.map((item) => (
+          item.id === device.id ? device : item
+        )),
+      }));
+      const label = transportPreference === "lan"
+        ? "局域网直连"
+        : transportPreference === "relay"
+          ? "中继"
+          : "自动选择";
+      showToast(`传输方式已设为${label}`, "ok");
+    } catch (error) {
+      showToast(errorMessage(error), "danger");
+    } finally {
+      setBusyAction(null);
+    }
+  }, [showToast, trustedDevicesById]);
 
   const beginFileTransfers = useCallback(async (
     peerId: string,
@@ -755,6 +797,8 @@ export function useNeloa() {
     selectedPeerTrusted,
     trustedDevicesById,
     trustedIds,
+    transportPreferenceFor,
+    configureTransportPreference,
     selectedFiles,
     pickFiles,
     removeSelectedFile,

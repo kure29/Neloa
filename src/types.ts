@@ -16,6 +16,8 @@ export type Platform =
 /** Which shell renders the interface. Independent of the operating system. */
 export type Shell = "desktop" | "mobile";
 
+export type TransportPreference = "auto" | "lan" | "relay";
+
 export interface LocalDevice {
   id: string;
   name: string;
@@ -72,7 +74,7 @@ export interface FileOffer {
   peerName: string;
   name: string;
   size: number;
-  sha256: string;
+  sha256: string | null;
 }
 
 export interface FileTransferProgress {
@@ -108,6 +110,7 @@ export interface TrustedDevice {
   platform: string;
   publicKey: string;
   fingerprint: string;
+  transportPreference: TransportPreference;
   pairedAtMs: number;
   lastVerifiedMs: number;
 }

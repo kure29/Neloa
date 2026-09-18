@@ -10,7 +10,7 @@ Neloa transfers files and plain-text clipboard content between your own devices.
 
 **No account.** A device identity is a long-lived key pair kept in the system credential store: Keychain on macOS and iOS, Credential Manager on Windows, Keystore on Android. No server holds your identity, so no server can use it for anything else.
 
-**Local network first.** On the same network, devices connect directly over QUIC and find each other over mDNS/Bonjour (service `_neloa._udp.local.`, transport port UDP 48631). A discovered LAN route never switches silently to the relay; relay transport is used only when a paired device has no LAN route.
+**Controllable routing.** On the same network, devices can connect directly over QUIC and find each other over mDNS/Bonjour (service `_neloa._udp.local.`, transport port UDP 48631). Each peer can use automatic, local-network, or relay routing. Automatic mode uses LAN when an address is available and otherwise uses the relay, without silently switching after a failed connection.
 
 **End-to-end encryption.** Every piece of application data above the transport is protected by Noise XX, and the long-term device key takes part in authentication. The relay can see online device metadata and the timing and size of traffic, but never plaintext.
 
@@ -31,7 +31,7 @@ Neloa transfers files and plain-text clipboard content between your own devices.
 4. Check the pending list and press send. The receiving side has to explicitly accept each file.
 5. Received files are saved to the `Neloa` folder inside your system Downloads folder.
 
-Before using a relay across networks, pair once over the local network and then configure the same relay on both devices. See [Self-hosted relay](/en/guide/relay).
+For discovery, pairing, and transfer across networks, configure the same relay on both devices. See [Self-hosted relay](/en/guide/relay).
 
 ## Where to go next
 

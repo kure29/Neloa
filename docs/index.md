@@ -12,7 +12,7 @@ hero:
       text: 第一次使用
       link: /guide/
     - theme: alt
-      text: 下载 0.1.12
+      text: 下载 0.1.13
       link: https://github.com/kure29/Neloa/releases/latest
 
 features:
@@ -32,13 +32,13 @@ features:
 
 ## 当前状态
 
-当前稳定版本为 **0.1.12**，提供 macOS Universal DMG、Windows x64 安装包、Android ARM64 APK 和未签名 iOS IPA。macOS 和 Windows 安装包没有商业代码签名，iOS IPA 需要使用你自己的 Apple 证书重签后才能安装——这些都会在[下载与安装](/guide/install)里逐项说明。
+当前稳定版本为 **0.1.13**，提供 macOS Universal DMG、Windows x64 安装包、Android ARM64 APK 和未签名 iOS IPA。macOS 和 Windows 安装包没有商业代码签名，iOS IPA 需要使用你自己的 Apple 证书重签后才能安装——这些都会在[下载与安装](/guide/install)里逐项说明。
 
-## 0.1.12 更新
+## 连接方式
 
-- 发现到局域网地址的设备固定使用 QUIC 直连，不再因为本地错误静默绕到中继。
-- 首次配对仅允许通过局域网完成，中继只连接已经配对的设备。
-- macOS 包新增本地网络与 Bonjour 权限声明，并补充配对超时的可操作提示。
+- 每台设备可以选择「自动」「局域网」或「中继」。
+- 自动模式优先使用可用的局域网 QUIC 地址，否则使用已配置的中继。
+- 首次配对可以走局域网或中继；无论哪条路径，都要在两端核对并确认六位验证码。
 
 ## 这份文档的组织方式
 
@@ -47,5 +47,5 @@ features:
 ## 它不做什么
 
 - 没有账号系统，也没有云端存储：设备之间的信任完全建立在本地。
-- 中继不参与配对。想让两台设备通过中继通信，必须先在局域网完成一次配对。
+- 中继只负责发现和转发加密字节；配对决定仍由两端用户完成。
 - 剪贴板同步是纯文本且默认关闭的；移动端只在应用处于前台时工作。

@@ -6,12 +6,12 @@ title: 下载与安装
 
 正式构建位于 [GitHub Releases 最新版本](https://github.com/kure29/Neloa/releases/latest)。请按设备选择对应文件；Release 说明中列有全部 SHA-256。
 
-| 平台 | 0.1.12 下载文件 | 安装说明 |
+| 平台 | 0.1.13 下载文件 | 安装说明 |
 | --- | --- | --- |
-| macOS | `Neloa_0.1.12_universal.dmg` | Apple Silicon 与 Intel；ad-hoc 签名，系统可能要求手动确认打开 |
-| Windows | `Neloa_0.1.12_x64-setup.exe` | x64 NSIS；没有商业签名，SmartScreen 可能显示“未知发布者” |
-| Android 真机 | `Neloa_0.1.12_arm64.apk` | ARM64；使用项目固定密钥签名 |
-| iOS | `Neloa_0.1.12_unsigned.ipa` | 需要使用自己的 P12 证书与描述文件重签，不能直接安装 |
+| macOS | `Neloa_0.1.13_universal.dmg` | Apple Silicon 与 Intel；ad-hoc 签名，系统可能要求手动确认打开 |
+| Windows | `Neloa_0.1.13_x64-setup.exe` | x64 NSIS；没有商业签名，SmartScreen 可能显示“未知发布者” |
+| Android 真机 | `Neloa_0.1.13_arm64.apk` | ARM64；使用项目固定密钥签名 |
+| iOS | `Neloa_0.1.13_unsigned.ipa` | 需要使用自己的 P12 证书与描述文件重签，不能直接安装 |
 
 ## 关于签名
 
@@ -26,7 +26,7 @@ title: 下载与安装
 
 - macOS/iOS 首次启动时请允许 Neloa 访问“本地网络”；曾经拒绝过时，需要到系统设置中重新开启。
 - Windows/macOS 防火墙需要允许 Neloa 接收入站连接。发现使用 Bonjour/mDNS，实际传输使用 UDP 48631。
-- 首次配对只能在局域网内完成。设备已经配对且没有可用局域网路由时，才会使用配置好的中继。
+- 局域网直连依赖本地网络权限；跨网络发现、配对与传输则需要两端配置同一个中继。
 
 ## Android 安装
 

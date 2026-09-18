@@ -13,7 +13,7 @@
 </div>
 
 > [!IMPORTANT]
-> 当前版本 **0.1.12**。macOS 与 Windows 安装包没有商业代码签名；iOS IPA 未签名，需要用自己的 Apple 证书和描述文件重签后安装。
+> 当前版本 **0.1.13**。macOS 与 Windows 安装包没有商业代码签名；iOS IPA 未签名，需要用自己的 Apple 证书和描述文件重签后安装。
 
 ## 简体中文
 
@@ -24,14 +24,13 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 - Mac、Windows、Android 与 iPhone 之间互传一个或一批文件。
 - 在自己的设备间同步纯文本剪贴板，同时拦截超长文本和常见私钥内容。
 - 不想注册账号，也不想把文件交给第三方网盘。
-- 愿意自建一个轻量中继，让已配对设备跨网络保持可达。
+- 愿意自建一个轻量中继，让自己的设备跨网络发现、配对和传输。
 
-### 0.1.12 更新
+### 连接方式
 
-- 局域网设备存在有效地址时始终使用 QUIC 直连，不再因本地连接错误静默绕到公网中继。
-- 首次配对严格限制在局域网内，中继只服务已经配对的设备。
-- macOS 补齐本地网络与 Bonjour 权限声明，改善“能发现设备但配对超时”的问题。
-- 连接失败提示现在会直接指向本地网络权限、防火墙和路由器客户端隔离。
+- 每台设备都可选择「自动」「局域网」或「中继」。
+- 自动模式在存在局域网地址时使用 QUIC 直连，否则使用已配置的中继；连接失败时不会静默切换路径。
+- 首次配对也可以通过中继完成，但仍必须在两端核对六位验证码并分别确认。
 
 ### 下载与安装
 
@@ -39,21 +38,21 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 
 | 平台 | 下载文件 | 说明 |
 | --- | --- | --- |
-| macOS | `Neloa_0.1.12_universal.dmg` | Apple Silicon / Intel 通用包，ad-hoc 签名 |
-| Windows | `Neloa_0.1.12_x64-setup.exe` | Windows x64 NSIS，未商业签名 |
-| Android 真机 | `Neloa_0.1.12_arm64.apk` | 使用项目固定密钥签名 |
-| iOS | `Neloa_0.1.12_unsigned.ipa` | 未签名，必须自行重签 |
+| macOS | `Neloa_0.1.13_universal.dmg` | Apple Silicon / Intel 通用包，ad-hoc 签名 |
+| Windows | `Neloa_0.1.13_x64-setup.exe` | Windows x64 NSIS，未商业签名 |
+| Android 真机 | `Neloa_0.1.13_arm64.apk` | 使用项目固定密钥签名 |
+| iOS | `Neloa_0.1.13_unsigned.ipa` | 未签名，必须自行重签 |
 
 > macOS/iOS 首次启动请允许“本地网络”权限。Neloa 用 Bonjour/mDNS 发现设备，并使用 UDP 48631 建立 QUIC 直连。
 
 ### 30 秒开始传输
 
-1. 在两台设备上安装并打开 Neloa，让它们先连接同一局域网。
+1. 在两台设备上安装并打开 Neloa；局域网直连时连接同一网络，跨网络时配置同一个自建中继。
 2. 选择对方设备，核对两端六位数字并分别确认配对。
 3. 选择文件；macOS 和 Windows 也支持直接拖入多个文件。
 4. 接收端确认后开始传输，完成时校验文件大小与 SHA-256。
 
-跨网络使用前必须先完成一次局域网配对，然后在两端配置同一个[自建中继](https://kure29.github.io/Neloa/guide/relay)。
+跨网络发现、配对与传输需要在两端配置同一个[自建中继](https://kure29.github.io/Neloa/guide/relay)。
 
 ### 文档
 
@@ -61,7 +60,7 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 
 | 主题 | 位置 |
 | --- | --- |
-| 使用手册 | [docs/guide/](docs/guide/index.md) |
+| 使用文档 | [docs/guide/](docs/guide/index.md) |
 | 架构与威胁模型 | [docs/reference/architecture.md](docs/reference/architecture.md) |
 | 自建中继部署与线协议 | [relay/README.md](relay/README.md) |
 | 移动端构建与真机验收 | [docs/build/mobile.md](docs/build/mobile.md) |
@@ -81,9 +80,9 @@ npm run docs:dev      # 本地预览文档
 
 ## English
 
-Neloa is a local-first file and plain-text clipboard transfer app for your own devices. It needs no account and uploads no files to a cloud drive. Devices connect directly over LAN QUIC; previously paired devices can optionally use your self-hosted WebSocket relay when no local route exists. Noise XX protects application data end to end on either path.
+Neloa is a local-first file and plain-text clipboard transfer app for your own devices. It needs no account and uploads no files to a cloud drive. Each peer can use automatic routing, LAN QUIC, or your self-hosted WebSocket relay. Noise XX protects pairing and application data end to end on either path.
 
-Version **0.1.12** keeps visible LAN peers on the direct path, restricts initial pairing to the LAN, adds the macOS Local Network/Bonjour declarations, and provides actionable connection errors.
+Automatic routing uses LAN QUIC whenever a local address is available and otherwise uses the relay. Initial pairing can also use the relay; both devices must still compare and confirm the same six-digit code.
 
 Download macOS, Windows, Android, and unsigned iOS packages from the [latest GitHub Release](https://github.com/kure29/Neloa/releases/latest). Desktop packages are not commercially signed, and the iOS IPA must be re-signed with your own Apple certificate and provisioning profile. The full [English documentation](https://kure29.github.io/Neloa/en/) covers installation, pairing, transfers, relay deployment, and troubleshooting.
 

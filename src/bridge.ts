@@ -23,6 +23,7 @@ import type {
   SelectedFile,
   Shell,
   TestMessageEvent,
+  TransportPreference,
   TrustedDevice,
 } from "./types";
 
@@ -43,6 +44,7 @@ let previewRelay: RelaySnapshot = {
   error: null,
 };
 const previewPairings = new Map<string, PairingRequest>();
+const previewPairingPreferences = new Map<string, TransportPreference>();
 const previewTransferTimers = new Map<string, number[]>();
 const previewTransferDetails = new Map<string, Omit<FileTransferResult, "status" | "message" | "sha256" | "atMs">>();
 
@@ -141,7 +143,7 @@ function previewDevice(): LocalDevice {
     id: "preview-device",
     name: previewDeviceName ?? names[platform],
     platform,
-    version: "0.1.12-preview",
+    version: "0.1.13-preview",
   };
 }
 
@@ -175,7 +177,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
       id,
       name,
       platform: peerPlatform,
-      version: "0.1.12",
+      version: "0.1.13",
       protocolVersion: 1,
       minProtocolVersion: 1,
       capabilities: ["discovery", "pairing", "noise-xx", "test-message", "file-transfer", "clipboard-text"],
@@ -235,12 +237,13 @@ export async function setRelayConfig(
   token: string,
 ): Promise<RelaySnapshot> {
   if (!isDesktopRuntime) {
+    const onlineDevices = enabled ? (await getDiscoverySnapshot()).peers.length : 0;
     previewRelay = {
       enabled,
       url: url.trim(),
       hasToken: previewRelay.hasToken || token.length > 0,
       connected: enabled,
-      onlineDevices: enabled ? previewTrustedDevices.length : 0,
+      onlineDevices,
       error: null,
     };
     emitPreview("relay-status-changed", previewRelay);
@@ -357,7 +360,7 @@ export async function getDiagnosticsSnapshot(): Promise<DiagnosticsSnapshot> {
         label: "自建中继",
         state: relay.connected ? "ok" : relay.enabled && relay.error ? "warning" : "idle",
         detail: relay.connected
-          ? `已连接 · ${relay.onlineDevices} 台已配对设备在线`
+          ? `已连接 · ${relay.onlineDevices} 台设备在线`
           : relay.error ?? "未启用 · 局域网传输不受影响",
         guidance: relay.enabled && !relay.connected
           ? "确认中继地址、令牌和 TLS 证书有效"
@@ -381,7 +384,10 @@ export async function getDiagnosticsSnapshot(): Promise<DiagnosticsSnapshot> {
   };
 }
 
-export async function beginPairing(peerId: string): Promise<PairingRequest> {
+export async function beginPairing(
+  peerId: string,
+  transportPreference: TransportPreference,
+): Promise<PairingRequest> {
   if (!isDesktopRuntime) {
     const peer = (await getDiscoverySnapshot()).peers.find((device) => device.id === peerId);
     if (!peer) throw new Error("目标设备已离线");
@@ -398,9 +404,10 @@ export async function beginPairing(peerId: string): Promise<PairingRequest> {
       direction: "outgoing",
     };
     previewPairings.set(request.sessionId, request);
+    previewPairingPreferences.set(request.sessionId, transportPreference);
     return request;
   }
-  return invoke<PairingRequest>("begin_pairing", { peerId });
+  return invoke<PairingRequest>("begin_pairing", { peerId, transportPreference });
 }
 
 export async function decidePairing(sessionId: string, accepted: boolean): Promise<void> {
@@ -408,6 +415,8 @@ export async function decidePairing(sessionId: string, accepted: boolean): Promi
     const request = previewPairings.get(sessionId);
     if (!request) throw new Error("该配对请求已过期");
     previewPairings.delete(sessionId);
+    const transportPreference = previewPairingPreferences.get(sessionId) ?? "auto";
+    previewPairingPreferences.delete(sessionId);
     if (accepted) {
       const now = Date.now();
       previewTrustedDevices = [
@@ -417,6 +426,7 @@ export async function decidePairing(sessionId: string, accepted: boolean): Promi
           platform: request.peer.platform,
           publicKey: "preview-public-key",
           fingerprint: request.peer.fingerprint,
+          transportPreference,
           pairedAtMs: now,
           lastVerifiedMs: now,
         },
@@ -485,6 +495,36 @@ export async function setTrustedDeviceAlias(
   return invoke<TrustedDevice>("set_trusted_device_alias", { peerId, alias });
 }
 
+export async function setTrustedDeviceTransport(
+  peerId: string,
+  transportPreference: TransportPreference,
+): Promise<TrustedDevice> {
+  if (!isDesktopRuntime) {
+    const device = previewTrustedDevices.find((item) => item.id === peerId);
+    if (!device) throw new Error("只能为已配对设备设置传输方式");
+    device.transportPreference = transportPreference;
+    emitPreview("trusted-devices-changed", [...previewTrustedDevices]);
+    return { ...device };
+  }
+  return invoke<TrustedDevice>("set_trusted_device_transport", {
+    peerId,
+    transportPreference,
+  });
+}
+
+export async function onWindowMaximizedChange(
+  callback: (maximized: boolean) => void,
+): Promise<UnlistenFn> {
+  if (!isDesktopRuntime) {
+    callback(false);
+    return () => {};
+  }
+  const appWindow = getCurrentWindow();
+  const publish = async () => callback(await appWindow.isMaximized());
+  await publish();
+  return appWindow.onResized(() => void publish());
+}
+
 export async function startFileTransfer(peerId: string, path: string): Promise<string> {
   if (!isDesktopRuntime) {
     const trusted = previewTrustedDevices.find((device) => device.id === peerId);
@@ -500,11 +540,10 @@ export async function startFileTransfer(peerId: string, path: string): Promise<s
       size,
     };
     const timers = [
-      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "hashing", transferred: size * 0.7, bytesPerSecond: 84_000_000 }), 80),
-      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "waiting", transferred: 0, bytesPerSecond: 0 }), 260),
-      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "transferring", transferred: size * 0.28, bytesPerSecond: 21_400_000 }), 520),
-      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "transferring", transferred: size * 0.72, bytesPerSecond: 24_800_000 }), 900),
-      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "verifying", transferred: size, bytesPerSecond: 23_100_000 }), 1250),
+      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "waiting", transferred: 0, bytesPerSecond: 0 }), 80),
+      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "transferring", transferred: size * 0.28, bytesPerSecond: 62_400_000 }), 340),
+      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "transferring", transferred: size * 0.72, bytesPerSecond: 68_800_000 }), 680),
+      window.setTimeout(() => emitPreview<FileTransferProgress>("file-transfer-progress", { ...base, stage: "verifying", transferred: size, bytesPerSecond: 66_100_000 }), 1020),
       window.setTimeout(() => {
         previewTransferTimers.delete(transferId);
         previewTransferDetails.delete(transferId);
@@ -521,7 +560,7 @@ export async function startFileTransfer(peerId: string, path: string): Promise<s
           size,
           atMs: Date.now(),
         });
-      }, 1540),
+      }, 1280),
     ];
     previewTransferTimers.set(transferId, timers);
     previewTransferDetails.set(transferId, {

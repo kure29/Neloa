@@ -19,6 +19,12 @@
 
 .shell-desktop {
   border-radius: var(--frame-radius);
+  background: var(--paper-0);
+  overflow: hidden;
+}
+
+.shell-desktop.window-maximized {
+  border-radius: 0;
 }
 
 /* ---------- title bar ---------- */
@@ -187,7 +193,7 @@
 
 .shell-desktop .peer-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));
   grid-auto-rows: 1fr;
   gap: var(--s3);
   overflow: visible;

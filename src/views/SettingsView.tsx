@@ -310,10 +310,10 @@ export function SettingsView({ app }: { app: NeloaState }) {
                 <strong>自建中继</strong>
                 <span>
                   {relay.connected
-                    ? `${relay.onlineDevices} 台已配对设备通过中继在线`
+                    ? `${relay.onlineDevices} 台设备通过中继在线`
                     : relay.enabled
                       ? "正在保持与自建中继的连接"
-                      : "局域网路由消失后可用，不经中继配对"}
+                      : "支持跨网络发现、配对与传输"}
                 </span>
               </div>
               <Badge tone={relayTone}>{relayLabel}</Badge>
@@ -579,7 +579,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
       {security.network.error && !problemChecks.some((check) => check.id === "network") && (
         <p className="page-error">局域网连接暂不可用：{security.network.error}</p>
       )}
-      <p className="page-footnote">Neloa {app.local?.version ?? "0.1.12"}</p>
+      <p className="page-footnote">Neloa {app.local?.version ?? "0.1.13"}</p>
 
       {trustedDeviceEditor && !app.pairing && app.fileOffers.length === 0 && (
         <Sheet labelledBy="settings-alias-sheet-title" className="sheet-alias">

@@ -31,6 +31,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+html.desktop-window,
+html.desktop-window body,
+html.desktop-window #root {
+  background: transparent;
+}
+
 button,
 input,
 textarea {

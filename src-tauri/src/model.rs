@@ -8,6 +8,7 @@ pub(crate) const CAPABILITIES: &[&str] = &[
     "noise-xx",
     "test-message",
     "file-transfer",
+    "streaming-file-hash",
     "clipboard-text",
 ];
 
@@ -49,6 +50,15 @@ pub(crate) struct PeerDevice {
     pub service_fullname: String,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum TransportPreference {
+    #[default]
+    Auto,
+    Lan,
+    Relay,
+}
+
 impl PeerDevice {
     pub(crate) fn is_protocol_compatible(&self) -> bool {
         protocol_compatible(self.protocol_version, self.min_protocol_version)
@@ -81,6 +91,8 @@ pub(crate) struct TrustedDevice {
     pub platform: String,
     pub public_key: String,
     pub fingerprint: String,
+    #[serde(default)]
+    pub transport_preference: TransportPreference,
     pub paired_at_ms: u128,
     pub last_verified_ms: u128,
 }
@@ -159,7 +171,7 @@ pub(crate) struct FileOfferEvent {
     pub peer_name: String,
     pub name: String,
     pub size: u64,
-    pub sha256: String,
+    pub sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]

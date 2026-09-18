@@ -2,7 +2,7 @@ use std::{cmp::Reverse, collections::HashMap, fs, io::Write, path::PathBuf, sync
 
 use parking_lot::{Mutex, RwLock};
 
-use crate::model::TrustedDevice;
+use crate::model::{TransportPreference, TrustedDevice};
 
 const TOUCH_PERSIST_INTERVAL_MS: u128 = 30_000;
 pub(crate) const MAX_DEVICE_ALIAS_CHARS: usize = 32;
@@ -92,6 +92,20 @@ impl TrustStore {
                 .get_mut(id)
                 .ok_or_else(|| "只能为已配对设备设置备注名".to_string())?;
             device.alias = alias;
+            Ok(device.clone())
+        })
+    }
+
+    pub(crate) fn set_transport_preference(
+        &self,
+        id: &str,
+        preference: TransportPreference,
+    ) -> Result<TrustedDevice, String> {
+        self.update_devices(|devices| {
+            let device = devices
+                .get_mut(id)
+                .ok_or_else(|| "只能为已配对设备设置传输方式".to_string())?;
+            device.transport_preference = preference;
             Ok(device.clone())
         })
     }
@@ -204,6 +218,7 @@ mod tests {
             platform: "test".into(),
             public_key: "public-key".into(),
             fingerprint: "fingerprint".into(),
+            transport_preference: TransportPreference::Auto,
             paired_at_ms: 0,
             last_verified_ms,
         }
@@ -300,7 +315,30 @@ mod tests {
         .unwrap();
 
         let store = TrustStore::load(path).unwrap();
-        assert_eq!(store.find("legacy").unwrap().alias, None);
+        let legacy = store.find("legacy").unwrap();
+        assert_eq!(legacy.alias, None);
+        assert_eq!(legacy.transport_preference, TransportPreference::Auto);
+    }
+
+    #[test]
+    fn persists_transport_preference() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("trusted-devices.json");
+        let store = TrustStore::load(path.clone()).unwrap();
+        store.upsert(trusted_device(1)).unwrap();
+
+        let updated = store
+            .set_transport_preference("device-1", TransportPreference::Relay)
+            .unwrap();
+        assert_eq!(updated.transport_preference, TransportPreference::Relay);
+        assert_eq!(
+            TrustStore::load(path)
+                .unwrap()
+                .find("device-1")
+                .unwrap()
+                .transport_preference,
+            TransportPreference::Relay
+        );
     }
 
     #[test]

@@ -40,7 +40,7 @@ Windows 10 1803 and later usually already include WebView2; when it is missing, 
 A successful local build leaves the installer at:
 
 ```text
-src-tauri\target\release\bundle\nsis\Neloa_0.1.12_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Neloa_0.1.13_x64-setup.exe
 ```
 
 The final file name can vary slightly between Tauri versions; trust whichever `.exe` is in that directory. Build output is not committed to Git; the files in GitHub Releases are the delivery artifacts.

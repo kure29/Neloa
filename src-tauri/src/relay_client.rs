@@ -35,7 +35,6 @@ use uuid::Uuid;
 use crate::{
     model::{LocalDevice, PeerDevice, RelaySnapshot, CAPABILITIES},
     relay_settings::{RelayConnectionConfig, RelayDirective},
-    trust::TrustStore,
     unix_millis,
 };
 
@@ -197,7 +196,6 @@ impl RelayClientWorker {
     pub(crate) async fn run(
         mut self,
         app: AppHandle,
-        trust: TrustStore,
         peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     ) {
         loop {
@@ -234,7 +232,6 @@ impl RelayClientWorker {
                     match run_connection(
                         &app,
                         &local,
-                        &trust,
                         &peers,
                         &self.status,
                         &mut self.directive,
@@ -293,7 +290,6 @@ async fn wait_for_reconfiguration(
 async fn run_connection(
     app: &AppHandle,
     local: &LocalDevice,
-    trust: &TrustStore,
     peers: &Arc<RwLock<HashMap<String, PeerDevice>>>,
     status: &Arc<RwLock<RelaySnapshot>>,
     directive: &mut watch::Receiver<RelayDirective>,
@@ -366,10 +362,6 @@ async fn run_connection(
                 let Some(request) = request else {
                     return ConnectionExit::Failed("中继连接服务已停止".into());
                 };
-                if trust.find(&request.target_id).is_none() {
-                    let _ = request.response.send(Err("只允许通过中继连接已配对设备".into()));
-                    continue;
-                }
                 let tunnel_id = Uuid::new_v4();
                 let control = ClientControl::OpenTunnel {
                     tunnel_id,
@@ -426,14 +418,14 @@ async fn run_connection(
                         };
                         match control {
                             ServerControl::Presence { devices } => {
-                                let online_devices = apply_relay_presence(peers, trust, &local.id, devices);
+                                let online_devices = apply_relay_presence(peers, &local.id, devices);
                                 let mut next = config_snapshot(&config);
                                 next.connected = true;
                                 next.online_devices = online_devices;
                                 publish_status(app, status, next);
                             }
                             ServerControl::IncomingTunnel { tunnel_id, source } => {
-                                if source.id == local.id || trust.find(&source.id).is_none() || tunnels.contains_key(&tunnel_id) {
+                                if source.id == local.id || tunnels.contains_key(&tunnel_id) {
                                     let _ = send_control(&mut writer, &ClientControl::CloseTunnel { tunnel_id }).await;
                                     continue;
                                 }
@@ -622,13 +614,12 @@ async fn run_tunnel_pump(
 
 fn apply_relay_presence(
     peers: &Arc<RwLock<HashMap<String, PeerDevice>>>,
-    trust: &TrustStore,
     local_id: &str,
     devices: Vec<RelayDevice>,
 ) -> usize {
     let devices = devices
         .into_iter()
-        .filter(|device| device.id != local_id && trust.find(&device.id).is_some())
+        .filter(|device| device.id != local_id)
         .map(|device| (device.id.clone(), device))
         .collect::<HashMap<_, _>>();
     let online_ids = devices.keys().cloned().collect::<HashSet<_>>();
@@ -702,7 +693,6 @@ fn publish_status(app: &AppHandle, status: &Arc<RwLock<RelaySnapshot>>, snapshot
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::TrustedDevice;
 
     fn relay_device(id: &str) -> RelayDevice {
         RelayDevice {
@@ -754,26 +744,11 @@ mod tests {
     }
 
     #[test]
-    fn relay_presence_exposes_only_previously_trusted_devices() {
-        let directory = tempfile::tempdir().unwrap();
-        let trust = TrustStore::load(directory.path().join("trusted-devices.json")).unwrap();
-        trust
-            .upsert(TrustedDevice {
-                id: "trusted".into(),
-                name: "Trusted".into(),
-                alias: None,
-                platform: "test".into(),
-                public_key: "00".repeat(32),
-                fingerprint: "00:00:00:00".into(),
-                paired_at_ms: 1,
-                last_verified_ms: 1,
-            })
-            .unwrap();
+    fn relay_presence_exposes_pairable_devices() {
         let peers = Arc::new(RwLock::new(HashMap::new()));
 
         let online = apply_relay_presence(
             &peers,
-            &trust,
             "local",
             vec![
                 relay_device("local"),
@@ -782,12 +757,12 @@ mod tests {
             ],
         );
 
-        assert_eq!(online, 1);
-        assert_eq!(peers.read().len(), 1);
+        assert_eq!(online, 2);
+        assert_eq!(peers.read().len(), 2);
         assert!(peers.read().get("trusted").unwrap().relay_available);
-        assert!(!peers.read().contains_key("untrusted"));
+        assert!(peers.read().get("untrusted").unwrap().relay_available);
 
-        apply_relay_presence(&peers, &trust, "local", Vec::new());
+        apply_relay_presence(&peers, "local", Vec::new());
         assert!(peers.read().is_empty());
     }
 }

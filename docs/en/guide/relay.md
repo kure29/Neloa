@@ -4,7 +4,7 @@ title: Self-hosted relay
 
 # Self-hosted relay
 
-The relay solves one problem: how two already paired devices reach each other when they are not on the same network. It does **not** solve pairing — cross-network use starts with a pairing over the local network.
+The relay lets devices on different networks discover, pair, and transfer with each other. It only forwards Noise-encrypted bytes; users on both devices still decide whether a pairing is trusted by comparing the six-digit code.
 
 The relay lives in the `relay/` directory of the repository, targets a small single-user deployment, and needs no database. It only forwards encrypted data it cannot interpret: it can see device metadata and the timing and size of traffic, never Noise plaintext.
 
@@ -39,14 +39,14 @@ The relay does not provide TLS itself. A public deployment needs an HTTPS termin
 
 ## Connecting clients
 
-1. Pair the two devices over the local network first.
-2. Deploy the relay and have the same token of at least 32 characters ready.
-3. On every device, open Settings → Connection → Self-hosted relay.
-4. Enter the public `wss://.../v1/ws` URL and the same token, switch it on, and save.
+1. Deploy the relay and have the same token of at least 32 characters ready.
+2. On every device, open Settings → Connection → Self-hosted relay.
+3. Enter the public `wss://.../v1/ws` URL and the same token, switch it on, and save.
+4. When the peer appears, select **Relay** to pair directly or leave routing on **Automatic**.
 
 The URL and enable flag are stored in the application data directory; the token is stored separately in the system credential store. Leaving the token field blank keeps the saved value.
 
-When a paired device is only reachable through the relay, its radar status reads **paired · relay**. Turning the relay off does not affect local transfers.
+The devices screen lets you select automatic, local-network, or relay routing per peer. Turning the relay off does not affect local transfers.
 
 ## Limits worth knowing before you deploy
 
@@ -54,6 +54,6 @@ When a paired device is only reachable through the relay, its radar status reads
 - One deployment is one process, with no multi-instance routing.
 - The shared token is meant for a single owner, not for unrelated users.
 - TLS, rate limiting at the public edge, monitoring, and token backups belong to whoever operates the deployment.
-- Relay pairing is unsupported by design.
+- The shared token scopes devices to one deployment; it does not establish trust. Initial pairing still requires both sides to confirm the code.
 
 Authentication headers, the `register` control message, tunnel frame formats, and the full limitations list are in [Relay service and wire protocol](/en/reference/relay), taken from `relay/README.md`.

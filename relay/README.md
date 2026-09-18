@@ -10,10 +10,11 @@ single-user deployment:
 - bounded queues close an overloaded tunnel instead of growing without limit.
 
 Current clients keep a persistent authenticated connection to this service.
-They try LAN QUIC first and use the relay only when the direct route fails or is
-unavailable. Relay discovery and tunnels are limited to devices that were
-already paired locally, and every relayed session still performs the existing
-Noise XX identity check and end-to-end encryption.
+Each peer can use automatic routing, LAN QUIC, or the relay. Automatic routing
+uses LAN whenever an address is available and otherwise uses the relay. Relay
+presence includes unpaired devices so initial pairing can work across networks;
+every relayed session still performs the Noise XX identity check and end-to-end
+encryption.
 
 ## Run locally
 
@@ -47,20 +48,21 @@ WebSocket listener directly to the internet.
 
 ## Connect Neloa clients
 
-1. Pair the devices once while they can reach each other over the same LAN.
-2. Deploy the relay behind HTTPS and keep the generated
+1. Deploy the relay behind HTTPS and keep the generated
    `NELOA_RELAY_TOKEN` available on each device.
-3. On every client, open **设置 → 连接 → 自建中继**.
-4. Enter the public `wss://.../v1/ws` URL and the same token, enable the
+2. On every client, open **设置 → 连接 → 自建中继**.
+3. Enter the public `wss://.../v1/ws` URL and the same token, enable the
    switch, then save.
+4. When the device appears, select relay to pair directly, or leave routing on
+   automatic.
 
 The URL and enable flag are stored in app data. The token is stored separately
 in Keychain, Credential Manager, Android Keystore-backed storage, or iOS
 Keychain. A blank token field preserves the previously saved value. Public
 relay URLs must use `wss://`; `ws://` is accepted only for loopback testing.
 
-When an already paired device is reachable only through the relay, its radar
-status reads **已配对 · 中继**. Closing the relay does not disable LAN transfer.
+The devices screen lets you select automatic, LAN, or relay routing per peer.
+Closing the relay does not disable LAN transfer.
 
 ## Wire protocol v1
 
@@ -87,5 +89,5 @@ client-side, so a relay connection alone does not make another device trusted.
 - The shared token is intended for one owner, not unrelated users.
 - TLS, rate limiting at the public edge, monitoring, and backups of the token
   belong to the operator's reverse-proxy/deployment configuration.
-- Relay pairing is intentionally unsupported; bootstrap trust over LAN first.
-- Real-device validation across public networks is the next acceptance step.
+- The shared token is not a device-trust credential. Initial pairing still
+  requires both users to compare and confirm the six-digit code.
