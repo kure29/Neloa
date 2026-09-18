@@ -38,6 +38,7 @@ export interface PeerDevice {
   lastSeenMs: number;
   relayAvailable: boolean;
   peerToPeerAvailable: boolean;
+  bluetoothAvailable: boolean;
 }
 
 export interface DiscoverySnapshot {

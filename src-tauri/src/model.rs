@@ -4,6 +4,8 @@ pub(crate) const PROTOCOL_VERSION: u16 = 1;
 pub(crate) const MIN_PROTOCOL_VERSION: u16 = 1;
 #[cfg(target_os = "android")]
 pub(crate) const CAPABILITY_PEER_TO_PEER_WIFI: &str = "transport-peer-to-peer-wifi";
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) const CAPABILITY_BLUETOOTH: &str = "transport-bluetooth";
 pub(crate) const CAPABILITIES: &[&str] = &[
     "discovery",
     "pairing",
@@ -23,6 +25,12 @@ pub(crate) fn local_capabilities() -> Vec<String> {
     let capabilities = {
         let mut capabilities = capabilities;
         capabilities.push(CAPABILITY_PEER_TO_PEER_WIFI.to_string());
+        capabilities
+    };
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    let capabilities = {
+        let mut capabilities = capabilities;
+        capabilities.push(CAPABILITY_BLUETOOTH.to_string());
         capabilities
     };
     capabilities
@@ -64,9 +72,13 @@ pub(crate) struct PeerDevice {
     pub relay_available: bool,
     #[serde(default)]
     pub peer_to_peer_available: bool,
+    #[serde(default)]
+    pub bluetooth_available: bool,
     #[serde(skip)]
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     pub peer_to_peer_device_address: Option<String>,
     #[serde(skip)]
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     pub peer_to_peer_address: Option<String>,
     #[serde(skip)]
     pub service_fullname: String,
@@ -347,6 +359,7 @@ mod tests {
             last_seen_ms: 0,
             relay_available: false,
             peer_to_peer_available: true,
+            bluetooth_available: false,
             peer_to_peer_device_address: Some("02:00:00:00:00:00".into()),
             peer_to_peer_address: Some("192.168.49.2".into()),
             service_fullname: String::new(),

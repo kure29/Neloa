@@ -137,6 +137,16 @@ Use two physical Android devices; an emulator does not represent Wi-Fi Direct be
 4. Send a small file, a larger file, and test text in both directions, then verify cancellation and retry. The route must remain Wi-Fi Direct and must not switch to LAN or relay after a failure.
 5. Disable Wi-Fi on one device, revoke Nearby devices permission, and reject one system connection request. Each case must produce a readable error; route establishment must time out after 45 seconds.
 
+## Apple Bluetooth acceptance
+
+Use two BLE-capable macOS/iOS devices. One machine cannot validate both the central and peripheral data paths.
+
+1. Enable Bluetooth and open Neloa on both devices, then grant Bluetooth permission. They should discover each other within one scan cycle even without a shared LAN or configured relay.
+2. Select **Bluetooth** on the device card and complete initial pairing, accepting only after the six-digit codes match. A failure must not fall back to LAN or relay.
+3. Send test text, clipboard content, and a small file in both directions, then verify rejection, cancellation, and retry. Record real BLE throughput rather than applying a LAN-speed requirement.
+4. Disable Bluetooth on one side during a transfer. The session must end without publishing a partial file; after re-enabling Bluetooth, wait for rediscovery and transfer again.
+5. Revoke Bluetooth permission on one side and confirm the error points to system privacy settings. Restore permission, restart the app, and verify again.
+
 ## Relay acceptance on real devices
 
 The relay can carry initial pairing and later transfers. Verify it in this order:
@@ -152,6 +162,7 @@ The relay can carry initial pairing and later transfers. Verify it in this order
 
 - Android release APKs use one permanent certificate; a first migration from an older debug signature still requires uninstalling and reinstalling.
 - Wi-Fi Direct currently supports Android-to-Android only. Hardware support, group-owner selection, and confirmation UI are controlled by the device vendor.
+- Bluetooth currently uses BLE GATT between macOS and iOS. It is intended for small data and emergency transfers without a LAN, not LAN-class throughput.
 - The iOS discovery layer uses a native Bonjour adapter and does not depend on the multicast entitlement that requires extra Apple approval. `DefunctConnection` lifecycle recovery and the Swift/Rust static startup bridge have passed basic on-device verification after P12 re-signing.
 - Mobile systems do not allow clipboard sync to use the same unlimited background polling as desktop; synchronization currently runs only while the app is in the foreground.
 - The iOS and Android application identifier is `com.kure29.neloa`. On the first migration from the old identifier, the system treats it as a new app.

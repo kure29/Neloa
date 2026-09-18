@@ -2980,6 +2980,7 @@ dependencies = [
  "bitflags 2.13.1",
  "dispatch2",
  "objc2",
+ "objc2-core-foundation",
  "objc2-foundation",
 ]
 

@@ -186,6 +186,7 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
       lastSeenMs: Date.now(),
       relayAvailable: false,
       peerToPeerAvailable: false,
+      bluetoothAvailable: false,
     });
     const peers = platform === "windows"
       ? [

@@ -79,7 +79,8 @@ export function RadarView({ app }: { app: NeloaState }) {
               const route = routePresentation(transportPreference);
               const peerToPeerAvailable = peer.capabilities.includes(PEER_TO_PEER_CAPABILITY)
                 && peer.peerToPeerAvailable;
-              const bluetoothAvailable = peer.capabilities.includes(BLUETOOTH_CAPABILITY);
+              const bluetoothAvailable = peer.capabilities.includes(BLUETOOTH_CAPABILITY)
+                && peer.bluetoothAvailable;
 
               return (
                 <div

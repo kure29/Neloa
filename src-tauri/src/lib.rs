@@ -437,6 +437,8 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                     existing.and_then(|peer| peer.peer_to_peer_address.clone());
                                 let peer_to_peer_available =
                                     existing.is_some_and(|peer| peer.peer_to_peer_available);
+                                let bluetooth_available =
+                                    existing.is_some_and(|peer| peer.bluetooth_available);
                                 let peer = PeerDevice {
                                     id: id.clone(),
                                     name: info
@@ -476,6 +478,7 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                     last_seen_ms: unix_millis(),
                                     relay_available,
                                     peer_to_peer_available,
+                                    bluetooth_available,
                                     peer_to_peer_device_address,
                                     peer_to_peer_address,
                                     service_fullname: info.get_fullname().to_string(),
@@ -492,7 +495,9 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                     peer.addresses.clear();
                                     peer.port = 0;
                                     peer.service_fullname.clear();
-                                    peer.relay_available || peer.peer_to_peer_available
+                                    peer.relay_available
+                                        || peer.peer_to_peer_available
+                                        || peer.bluetooth_available
                                 } else {
                                     true
                                 }
@@ -675,6 +680,9 @@ pub extern "C" fn neloa_ios_discovery_peer_upsert(peer_json: *const std::ffi::c_
                 last_seen_ms: unix_millis(),
                 relay_available,
                 peer_to_peer_available: false,
+                bluetooth_available: peers
+                    .get(&peer.id)
+                    .is_some_and(|current| current.bluetooth_available),
                 peer_to_peer_device_address: None,
                 peer_to_peer_address: None,
                 service_fullname: peer.service_fullname,
@@ -707,7 +715,7 @@ pub extern "C" fn neloa_ios_discovery_peer_remove(fullname: *const std::ffi::c_c
             peer.addresses.clear();
             peer.port = 0;
             peer.service_fullname.clear();
-            peer.relay_available || peer.peer_to_peer_available
+            peer.relay_available || peer.peer_to_peer_available || peer.bluetooth_available
         } else {
             true
         }
@@ -1165,6 +1173,8 @@ fn revoke_trusted_device(
             if id == &peer_id {
                 peer.relay_available = false;
                 !peer.addresses.is_empty()
+                    || peer.peer_to_peer_available
+                    || peer.bluetooth_available
             } else {
                 true
             }
@@ -1481,7 +1491,11 @@ pub fn run() {
                 local.clone(),
                 Arc::clone(&discovery.peers),
             );
-            let bluetooth = bluetooth::start(app.handle().clone());
+            let (bluetooth, bluetooth_incoming) = bluetooth::start(
+                app.handle().clone(),
+                local.clone(),
+                Arc::clone(&discovery.peers),
+            );
             let network = match NoiseIdentity::load_or_create() {
                 Ok(identity) => NetworkHandle::start(NetworkStartup {
                     app: app.handle().clone(),
@@ -1494,6 +1508,7 @@ pub fn run() {
                     relay_directive,
                     peer_to_peer,
                     bluetooth,
+                    bluetooth_incoming,
                 }),
                 Err(error) => {
                     NetworkHandle::unavailable(error, SERVICE_PORT, relay_directive, local.clone())

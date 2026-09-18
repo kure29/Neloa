@@ -9,6 +9,6 @@
 		<string>_neloa._udp</string>
 	</array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Neloa 仅在你选择蓝牙连接时使用蓝牙发现并连接附近设备，以传输文件和剪贴板文本。</string>
+	<string>Neloa 使用低功耗蓝牙发现附近的 Neloa 设备；仅在你选择蓝牙连接后传输文件和剪贴板文本。</string>
 </dict>
 </plist>

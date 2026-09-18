@@ -623,7 +623,9 @@ fn apply_relay_presence(
     peers.retain(|id, peer| {
         if peer.relay_available && !online_ids.contains(id) {
             peer.relay_available = false;
-            return !peer.addresses.is_empty() || peer.peer_to_peer_available;
+            return !peer.addresses.is_empty()
+                || peer.peer_to_peer_available
+                || peer.bluetooth_available;
         }
         true
     });
@@ -656,6 +658,7 @@ fn apply_relay_presence(
                     last_seen_ms: now,
                     relay_available: true,
                     peer_to_peer_available: false,
+                    bluetooth_available: false,
                     peer_to_peer_device_address: None,
                     peer_to_peer_address: None,
                     service_fullname: String::new(),
@@ -669,7 +672,7 @@ fn apply_relay_presence(
 fn clear_relay_presence(peers: &Arc<RwLock<HashMap<String, PeerDevice>>>) {
     peers.write().retain(|_, peer| {
         peer.relay_available = false;
-        !peer.addresses.is_empty() || peer.peer_to_peer_available
+        !peer.addresses.is_empty() || peer.peer_to_peer_available || peer.bluetooth_available
     });
 }
 

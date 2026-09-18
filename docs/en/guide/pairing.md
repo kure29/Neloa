@@ -24,9 +24,9 @@ Do not confirm. Cancel the pairing, check that you selected the device you meant
 ## After pairing
 
 - Later sessions must match both the device ID and the stored public key, or the handshake is rejected.
-- Before pairing, explicitly select a route on the devices screen. The choice is stored per peer. Android builds from the current source can choose **Wi-Fi Direct** for a nearby Android device; stable builds can choose **Local network** or **Relay**.
+- Before pairing, explicitly select a route on the devices screen. The choice is stored per peer. The 0.1.13 stable build provides **Local network** and **Relay**; current source builds add Android **Wi-Fi Direct** and Apple **Bluetooth**.
 - Pairing survives a restart; you do not compare the code again.
-- Initial pairing does not require a LAN and can use the relay. Android source builds can also pair over Wi-Fi Direct. Both paths only carry Noise handshake bytes and never decide whether either side is trusted.
+- Initial pairing does not require a LAN and can use the relay, Android Wi-Fi Direct, or Apple Bluetooth. Every path only carries Noise handshake bytes and never decides whether either side is trusted.
 
 ## Device aliases
 

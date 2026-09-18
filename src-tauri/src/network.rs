@@ -36,7 +36,7 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    bluetooth::BluetoothHandle,
+    bluetooth::{BluetoothHandle, IncomingBluetoothLink},
     clipboard::{validate_clipboard_text, ClipboardService},
     identity::{fingerprint, NoiseIdentity},
     model::{
@@ -180,10 +180,13 @@ impl TransportConnector {
         &self,
         peer: &PeerDevice,
     ) -> Result<(SessionSend, SessionReceive), String> {
-        let (send, receive) = self.bluetooth.connect(peer).await?;
+        if !peer.bluetooth_available {
+            return Err("目标设备当前不在蓝牙范围内".into());
+        }
+        let tunnel = self.bluetooth.connect(peer).await?;
         Ok((
-            SessionSend::Bluetooth(send),
-            SessionReceive::Bluetooth(receive),
+            SessionSend::Bluetooth(tunnel.send),
+            SessionReceive::Bluetooth(tunnel.receive),
         ))
     }
 
@@ -231,6 +234,7 @@ pub(crate) struct NetworkStartup {
     pub(crate) relay_directive: RelayDirective,
     pub(crate) peer_to_peer: PeerToPeerHandle,
     pub(crate) bluetooth: BluetoothHandle,
+    pub(crate) bluetooth_incoming: mpsc::Receiver<IncomingBluetoothLink>,
 }
 
 struct NetworkRuntime {
@@ -244,6 +248,7 @@ struct NetworkRuntime {
     relay_incoming: mpsc::Receiver<IncomingRelayTunnel>,
     peer_to_peer: PeerToPeerHandle,
     bluetooth: BluetoothHandle,
+    bluetooth_incoming: mpsc::Receiver<IncomingBluetoothLink>,
 }
 
 #[derive(Clone)]
@@ -420,6 +425,7 @@ impl NetworkHandle {
             relay_directive,
             peer_to_peer,
             bluetooth,
+            bluetooth_incoming,
         } = startup;
         let (sender, receiver) = mpsc::unbounded_channel();
         let (relay, relay_worker, relay_incoming) =
@@ -459,6 +465,7 @@ impl NetworkHandle {
                         relay_incoming,
                         peer_to_peer: thread_peer_to_peer,
                         bluetooth,
+                        bluetooth_incoming,
                     };
                     if let Err(error) = runtime.block_on(run_network(network)) {
                         let mut current = thread_status.write();
@@ -629,6 +636,7 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
         mut relay_incoming,
         peer_to_peer,
         bluetooth,
+        mut bluetooth_incoming,
     } = runtime;
     let NetworkContext {
         app,
@@ -640,11 +648,21 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
     let mut endpoint = make_endpoint(port)?;
     endpoint.set_default_client_config(insecure_quic_client_config()?);
     let connector = TransportConnector {
-        bluetooth,
+        bluetooth: bluetooth.clone(),
         quic: endpoint.clone(),
         relay: relay.clone(),
         peer_to_peer,
     };
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let bluetooth = bluetooth.clone();
+        let app = app.clone();
+        tokio::spawn(async move {
+            if let Err(error) = bluetooth.activate().await {
+                let _ = app.emit("network-error", error);
+            }
+        });
+    }
     tokio::spawn(relay_worker.run(app.clone(), peers));
     status.write().active = true;
     let pending: PendingConfirmations = Arc::new(Mutex::new(HashMap::new()));
@@ -733,10 +751,47 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                     }
                 });
             }
+            incoming = bluetooth_incoming.recv() => {
+                let Some(incoming) = incoming else {
+                    return Err("蓝牙接收服务意外停止".into());
+                };
+                let tunnel = bluetooth.accept(incoming);
+                let app = app.clone();
+                let local = local.clone();
+                let identity = identity.clone();
+                let trust = trust.clone();
+                let clipboard = clipboard.clone();
+                let pending = Arc::clone(&pending);
+                let pending_offers = Arc::clone(&pending_offers);
+                let active_transfers = Arc::clone(&active_transfers);
+                tokio::spawn(async move {
+                    let context = IncomingContext {
+                        file: FileTransferContext {
+                            app: app.clone(),
+                            local,
+                            identity,
+                            trust,
+                            pending_offers,
+                            active_transfers,
+                        },
+                        clipboard,
+                        pending_pairing: pending,
+                    };
+                    if let Err(error) = handle_incoming(
+                        context,
+                        SessionSend::Bluetooth(tunnel.send),
+                        SessionReceive::Bluetooth(tunnel.receive),
+                        None,
+                    ).await {
+                        let _ = app.emit("network-error", error);
+                    }
+                });
+            }
             command = commands.recv() => {
                 let Some(command) = command else { return Ok(()); };
                 match command {
                     NetworkCommand::UpdateLocalDevice(device) => {
+                        connector.bluetooth.update_local_device(device.clone());
                         local = device;
                     }
                     NetworkCommand::BeginPairing { peer, transport_preference, response } => {
@@ -3009,6 +3064,7 @@ mod tests {
             last_seen_ms: 0,
             relay_available: false,
             peer_to_peer_available: false,
+            bluetooth_available: false,
             peer_to_peer_device_address: None,
             peer_to_peer_address: None,
             service_fullname: String::new(),
@@ -3444,6 +3500,7 @@ mod tests {
             last_seen_ms: 0,
             relay_available: false,
             peer_to_peer_available: false,
+            bluetooth_available: false,
             peer_to_peer_device_address: None,
             peer_to_peer_address: None,
             service_fullname: String::new(),
@@ -3605,6 +3662,7 @@ mod tests {
             last_seen_ms: 0,
             relay_available: false,
             peer_to_peer_available: false,
+            bluetooth_available: false,
             peer_to_peer_device_address: None,
             peer_to_peer_address: None,
             service_fullname: String::new(),

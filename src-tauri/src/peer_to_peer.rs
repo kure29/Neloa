@@ -234,6 +234,7 @@ mod android {
                                 last_seen_ms: unix_millis(),
                                 relay_available: false,
                                 peer_to_peer_available: true,
+                                bluetooth_available: false,
                                 peer_to_peer_device_address: Some(peer.device_address),
                                 peer_to_peer_address: route,
                                 service_fullname: String::new(),

@@ -35,8 +35,9 @@ Neloa is local-first. Every client should remain useful without an account or an
 - An optional self-hosted relay client with persistent authenticated WebSocket connections, same-token device presence, and bounded virtual streams.
 - An explicit per-device route choice. An unset route rejects the connection instead of recommending, automatically selecting, or silently changing paths.
 - Native Android Wi-Fi Direct service discovery, group formation, and address rendezvous. It is enabled only when a nearby Android peer is actually visible and reuses the same QUIC, Noise, pairing, and transfer protocols.
+- Apple CoreBluetooth discovery and GATT transport. A fixed service exposes public discovery metadata; two data characteristics use negotiated-MTU fragmentation, packet sequencing, half-close, and native write backpressure before reusing the same Noise, pairing, and transfer protocols.
 
-Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and the base capabilities `discovery,pairing,noise-xx,test-message,file-transfer,streaming-file-hash,clipboard-text`; Android also declares `transport-peer-to-peer-wifi`. The same protocol range and capability list is authenticated inside the Noise XX handshake; discovery values are presentation and early-filtering hints only.
+Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and the base capabilities `discovery,pairing,noise-xx,test-message,file-transfer,streaming-file-hash,clipboard-text`; Android also declares `transport-peer-to-peer-wifi`, while macOS and iOS declare `transport-bluetooth`. The same protocol range and capability list is authenticated inside the Noise XX handshake; discovery values are presentation and early-filtering hints only.
 
 ## Interface layout
 
@@ -54,7 +55,7 @@ src/
 
 ## Security boundary
 
-QUIC uses a per-launch self-signed certificate only as a reliable encrypted datagram transport. It is not treated as the long-term device identity. The optional relay exposes each tunnel as the same bidirectional byte-stream interface. All application payloads are wrapped by Noise XX, and no plaintext application message may be written directly to either transport.
+QUIC uses a per-launch self-signed certificate only as a reliable encrypted datagram transport. It is not treated as the long-term device identity. Relay, Wi-Fi Direct, and Bluetooth adapters all expose the same bidirectional byte-stream interface. All application payloads are wrapped by Noise XX, and no plaintext application message may be written directly to any transport.
 
 Remote relay URLs must use `wss://`; plaintext `ws://` is accepted only for a loopback development server. The shared access token is stored in the native OS credential store, while `relay-settings.json` contains only the enable flag and public URL. Relay presence includes devices connected with the same token so initial pairing can work across networks; the relay source ID must match the authenticated Noise metadata. Paired sessions must also match the pinned peer public key before application data is accepted.
 
@@ -71,6 +72,8 @@ Peers that advertise `streaming-file-hash` offer only the sanitized base name an
 Clipboard synchronization is fail-closed and disabled by default. Enabling it records the current clipboard as a local baseline without transmitting it. Subsequent text updates receive UUIDs, are checked for size and strong credential markers, and are sent only to currently discovered trusted peers. Remote updates are acknowledged only after the OS clipboard write succeeds. Received content becomes the new local baseline, preventing it from being sent back; CRLF, CR, and LF are canonicalized for comparison across Windows and macOS. Events retain only peer, direction, byte count, status, and time—not clipboard text.
 
 Android requires `CHANGE_WIFI_MULTICAST_STATE` plus a held `WifiManager.MulticastLock` while the Activity is alive so mDNS packets are delivered reliably. The Wi-Fi Direct adapter uses Android DNS-SD discovery, system group formation, and a local rendezvous port that exchanges only device IDs and group addresses. These are untrusted routing hints; the subsequent Noise XX handshake still authenticates the actual peer. Native device addresses and group IPs stay inside Rust and are not sent to the WebView. Android 13+ uses Nearby devices permission; earlier versions use location permission.
+
+macOS and iOS use one fixed 128-bit CoreBluetooth service UUID. Its read-only identity characteristic contains the same public device metadata used by Bonjour and capability negotiation; it maps a BLE peripheral into the device list but is not a trust anchor. A central-write characteristic and a peripheral-notify characteristic carry versioned packets with monotonic sequence numbers. Missing, duplicate, reordered, or malformed final packets close the session. Sending honours `canSendWriteWithoutResponse` and `updateValue` readiness, while Noise XX still verifies the device ID, static key, and all application content.
 
 iOS does not open a raw multicast socket: `NWBrowser` browses `_neloa._udp`, while `NetService` publishes and resolves the Bonjour service that points at the existing Rust QUIC listener on UDP 48631. Swift forwards resolved IPv4 addresses and TXT metadata to the shared Rust peer store. This path uses the declared Bonjour service and local-network privacy prompt without the restricted multicast entitlement.
 

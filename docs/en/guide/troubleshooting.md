@@ -29,7 +29,7 @@ Expand Settings → Connection → Connection status to see six checks:
 
 ## A device appears, but pairing times out
 
-- Check the route selected on the device card. Local-network mode requires direct reachability; Wi-Fi Direct currently requires two nearby Android devices with permission granted; relay mode requires both devices to be connected to the same relay with the same token.
+- Check the route selected on the device card. Local-network mode requires direct reachability; Wi-Fi Direct requires two nearby Android devices; Bluetooth requires nearby macOS/iOS devices with permission granted; relay mode requires both devices to be connected to the same relay with the same token.
 - Allow Neloa to access the Local Network in iOS/macOS settings, and allow inbound Neloa connections in the macOS/Windows firewall.
 - Local transfers use UDP 48631. Successful mDNS/Bonjour discovery only proves that UDP 5353 works; it does not prove that the transfer port is allowed.
 - If guest-network or client isolation blocks LAN traffic, select **Relay** on the device card and pair again.
@@ -40,6 +40,13 @@ Expand Settings → Connection → Connection status to see six checks:
 - Keep Wi-Fi enabled and Neloa in the foreground on both devices. Grant Nearby devices on Android 13+, or grant location and enable system location services on Android 12 and earlier.
 - The device card enables this route only after native Wi-Fi Direct discovery sees the peer. Seeing a peer through the relay does not mean it is nearby.
 - Android may show a Wi-Fi Direct confirmation. Rejection, a busy device, or a wait longer than 45 seconds fails explicitly; Neloa never switches to LAN or relay automatically.
+
+## Apple Bluetooth is unavailable
+
+- The current Bluetooth path supports macOS and iOS. Both devices must grant Neloa Bluetooth access on first launch; re-enable it under Privacy & Security in system settings after a denial.
+- The device card enables **Bluetooth** only after the BLE identity has been read. Discovery polls nearby Neloa devices, so a newly launched peer may take one scan cycle to appear.
+- Once selected, the session stays on BLE and never falls back to LAN or relay. Search or connection attempts end with an error after 45 seconds.
+- BLE is suitable for test text, clipboard content, and smaller files, but is much slower than LAN QUIC. Prefer LAN, Wi-Fi Direct, or relay for large files.
 
 ## A device shows "incompatible version"
 

@@ -36,10 +36,11 @@ The current stable version is **0.1.13**, with a universal macOS DMG, Windows x6
 
 ## Connection routing
 
-- You must explicitly select **Local network** or **Relay** for each peer.
+- You must explicitly select a route for each peer. The 0.1.13 stable build provides **Local network** and **Relay**.
 - Neloa does not recommend, automatically select, or silently change the route.
 - Initial pairing can use either path; both devices must still compare and confirm the six-digit code.
 - The current source tree also lets Android clients select **Wi-Fi Direct** for a nearby Android peer without sharing a LAN. This is not included in the 0.1.13 downloads.
+- The current source tree also lets macOS and iOS discover nearby Apple devices over BLE and select **Bluetooth** transport. This is also not included in the 0.1.13 downloads.
 
 ## How this documentation is organised
 

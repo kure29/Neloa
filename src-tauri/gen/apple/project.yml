@@ -41,7 +41,7 @@ targets:
       properties:
         LSRequiresIPhoneOS: true
         NSBonjourServices: [_neloa._udp]
-        NSBluetoothAlwaysUsageDescription: Neloa 仅在你选择蓝牙连接时使用蓝牙发现并连接附近设备，以传输文件和剪贴板文本。
+        NSBluetoothAlwaysUsageDescription: Neloa 使用低功耗蓝牙发现附近的 Neloa 设备；仅在你选择蓝牙连接后传输文件和剪贴板文本。
         NSLocalNetworkUsageDescription: Neloa 需要访问局域网，以发现附近设备并在设备之间传输文件和剪贴板文本。
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
