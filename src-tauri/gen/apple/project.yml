@@ -31,6 +31,7 @@ targets:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
+        excludes: ["**/*"]
       - path: neloa_iOS
       - path: assets
         buildPhase: resources
@@ -43,6 +44,8 @@ targets:
         NSBonjourServices: [_neloa._udp]
         NSBluetoothAlwaysUsageDescription: Neloa 使用低功耗蓝牙发现附近的 Neloa 设备；仅在你选择蓝牙连接后传输文件和剪贴板文本。
         NSLocalNetworkUsageDescription: Neloa 需要访问局域网，以发现附近设备并在设备之间传输文件和剪贴板文本。
+        LSSupportsOpeningDocumentsInPlace: true
+        UIFileSharingEnabled: true
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -76,6 +79,7 @@ targets:
     dependencies:
       - framework: libapp.a
         embed: false
+      - sdk: CoreBluetooth.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
