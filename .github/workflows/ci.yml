@@ -68,3 +68,64 @@ jobs:
 
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+  android:
+    name: Android ARM64 native build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NDK_VERSION: 28.2.13676358
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+          cache-dependency-path: |
+            src-tauri/gen/android/**/*.gradle*
+            src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Install Android SDK and NDK
+        shell: bash
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: ci-android-aarch64
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build ARM64 debug APK
+        run: npm run tauri -- android build --debug --target aarch64 --split-per-abi --apk --ci
+
+      - name: Verify Wi-Fi Direct native bridge
+        shell: bash
+        run: |
+          library="src-tauri/target/aarch64-linux-android/debug/libneloa_lib.so"
+          apk="src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk"
+          llvm_nm="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          "$llvm_nm" -D "$library" | grep -q 'Java_com_kure29_neloa_WifiDirectBridge_nativeRegister'
+          "$llvm_nm" -D "$library" | grep -q 'Java_com_kure29_neloa_WifiDirectBridge_nativeEvent'
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -q 'android.permission.NEARBY_WIFI_DEVICES'
