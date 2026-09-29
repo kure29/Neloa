@@ -44,7 +44,8 @@
     "category": "Utility",
     "shortDescription": "Local-first file and clipboard transfer",
     "macOS": {
-      "infoPlist": "Info.macos.plist"
+      "infoPlist": "Info.macos.plist",
+      "signingIdentity": "-"
     },
     "windows": {
       "nsis": {
