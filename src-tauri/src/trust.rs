@@ -1,8 +1,11 @@
-use std::{cmp::Reverse, collections::HashMap, fs, io::Write, path::PathBuf, sync::Arc};
+use std::{cmp::Reverse, collections::HashMap, fs, path::PathBuf, sync::Arc};
 
 use parking_lot::{Mutex, RwLock};
 
-use crate::model::{TransportPreference, TrustedDevice};
+use crate::{
+    model::{TransportPreference, TrustedDevice},
+    storage::{quarantine_corrupt_file, write_atomically},
+};
 
 const TOUCH_PERSIST_INTERVAL_MS: u128 = 30_000;
 pub(crate) const MAX_DEVICE_ALIAS_CHARS: usize = 32;
@@ -24,9 +27,7 @@ impl TrustStore {
                 Ok(devices) => devices,
                 Err(error) => {
                     // Never restore an older trust snapshot: it could resurrect a revoked key.
-                    let backup =
-                        path.with_extension(format!("corrupt-{}.json", uuid::Uuid::new_v4()));
-                    fs::rename(&path, &backup)
+                    let backup = quarantine_corrupt_file(&path)
                         .map_err(|error| format!("无法保留损坏的可信设备列表：{error}"))?;
                     eprintln!(
                         "可信设备列表已损坏（{error}），已保留至 {}，请重新配对",
@@ -179,24 +180,11 @@ impl TrustStore {
     }
 
     fn persist_devices(&self, mut devices: Vec<TrustedDevice>) -> Result<(), String> {
-        let parent = self
-            .path
-            .parent()
-            .filter(|path| !path.as_os_str().is_empty())
-            .unwrap_or_else(|| std::path::Path::new("."));
-        fs::create_dir_all(parent).map_err(|error| format!("无法创建应用数据目录：{error}"))?;
         devices.sort_by_key(|device| Reverse(device.last_verified_ms));
         let data = serde_json::to_vec_pretty(&devices)
             .map_err(|error| format!("无法序列化可信设备列表：{error}"))?;
-        let mut temporary = tempfile::NamedTempFile::new_in(parent)
-            .map_err(|error| format!("无法创建可信设备列表临时文件：{error}"))?;
-        temporary
-            .write_all(&data)
-            .and_then(|_| temporary.as_file().sync_all())
+        write_atomically(&self.path, &data)
             .map_err(|error| format!("无法保存可信设备列表：{error}"))?;
-        temporary
-            .persist(&self.path)
-            .map_err(|error| format!("无法替换可信设备列表：{error}"))?;
         *self.last_touch_persisted_ms.lock() = devices
             .iter()
             .map(|device| device.last_verified_ms)
@@ -208,6 +196,8 @@ impl TrustStore {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use super::*;
 
     fn trusted_device(last_verified_ms: u128) -> TrustedDevice {

@@ -40,6 +40,7 @@ mod packet_stream;
 mod peer_to_peer;
 mod relay_client;
 mod relay_settings;
+mod storage;
 mod trust;
 
 use clipboard::ClipboardService;
