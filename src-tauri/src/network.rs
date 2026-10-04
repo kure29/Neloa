@@ -1220,7 +1220,7 @@ async fn incoming_test_message(
     trust: TrustStore,
     mut session: NoiseSession,
 ) -> Result<(), String> {
-    if !validate_incoming_trust(&app, &trust, &mut session).await? {
+    if !validate_incoming_trust(&trust, &mut session).await? {
         return Ok(());
     }
 
@@ -1337,7 +1337,7 @@ async fn incoming_clipboard_update(
     clipboard: ClipboardService,
     mut session: NoiseSession,
 ) -> Result<(), String> {
-    if !validate_incoming_trust(&app, &trust, &mut session).await? {
+    if !validate_incoming_trust(&trust, &mut session).await? {
         return Ok(());
     }
 
@@ -1636,7 +1636,7 @@ async fn handle_incoming_file_transfer(
     context: FileTransferContext,
     mut session: NoiseSession,
 ) -> Result<(), String> {
-    if !validate_incoming_trust(&context.app, &context.trust, &mut session).await? {
+    if !validate_incoming_trust(&context.trust, &mut session).await? {
         return Ok(());
     }
 
@@ -2895,7 +2895,6 @@ impl ServerCertVerifier for SkipServerVerification {
 }
 
 async fn validate_incoming_trust(
-    app: &AppHandle,
     trust: &TrustStore,
     session: &mut NoiseSession,
 ) -> Result<bool, String> {
@@ -2908,10 +2907,10 @@ async fn validate_incoming_trust(
         return Ok(true);
     }
 
-    if trust.remove(&session.peer.id)? {
-        app.emit("trusted-devices-changed", trust.list())
-            .map_err(|error| format!("无法刷新可信设备列表：{error}"))?;
-    }
+    // The claimed device ID is public (mDNS, BLE, relay presence), so a key
+    // mismatch proves nothing about the paired device. Never drop the local
+    // record here, or anyone nearby could unpair it by reusing its ID. A peer
+    // that really rotated its key is told to re-pair, which replaces the record.
     write_encrypted(
         &mut session.send,
         &mut session.transport,
@@ -3366,6 +3365,82 @@ mod tests {
             _ => panic!("unexpected relay test acknowledgement"),
         }
         responder.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn impostor_reusing_a_paired_id_cannot_revoke_trust() {
+        let directory = tempfile::tempdir().unwrap();
+        let trust = TrustStore::load(directory.path().join("trusted-devices.json")).unwrap();
+        let paired_identity = NoiseIdentity::generate_for_test();
+        trust
+            .upsert(TrustedDevice {
+                id: "paired-peer".into(),
+                name: "Paired".into(),
+                alias: None,
+                platform: "macos".into(),
+                public_key: hex::encode(paired_identity.public()),
+                fingerprint: fingerprint(&paired_identity.public()),
+                transport_preference: TransportPreference::Lan,
+                paired_at_ms: 1,
+                last_verified_ms: 1,
+            })
+            .unwrap();
+
+        let impostor_identity = NoiseIdentity::generate_for_test();
+        let impostor_device = LocalDevice {
+            id: "paired-peer".into(),
+            name: "Paired".into(),
+            platform: "macos".into(),
+            version: "test".into(),
+        };
+        let local_identity = NoiseIdentity::generate_for_test();
+        let local_device = LocalDevice {
+            id: "local".into(),
+            name: "Local".into(),
+            platform: "windows".into(),
+            version: "test".into(),
+        };
+        let (impostor_stream, local_stream) = tokio::io::duplex(64 * 1024);
+        let (impostor_receive, impostor_send) = tokio::io::split(impostor_stream);
+        let (local_receive, local_send) = tokio::io::split(local_stream);
+
+        let responder_trust = trust.clone();
+        let responder = tokio::spawn(async move {
+            let mut session = responder_handshake(
+                SessionSend::Relay(local_send),
+                SessionReceive::Relay(local_receive),
+                &local_identity,
+                &local_device,
+            )
+            .await
+            .unwrap();
+            validate_incoming_trust(&responder_trust, &mut session)
+                .await
+                .unwrap()
+        });
+
+        let mut session = initiator_handshake(
+            SessionSend::Relay(impostor_send),
+            SessionReceive::Relay(impostor_receive),
+            &impostor_identity,
+            &impostor_device,
+            "file",
+        )
+        .await
+        .unwrap();
+        match read_encrypted(&mut session.receive, &mut session.transport)
+            .await
+            .unwrap()
+        {
+            WireMessage::Error { message } => assert_eq!(message, REPAIR_REQUIRED_MESSAGE),
+            _ => panic!("an impostor must be told to re-pair"),
+        }
+        assert!(!responder.await.unwrap(), "impostor must not be trusted");
+        assert_eq!(
+            trust.find("paired-peer").unwrap().public_key,
+            hex::encode(paired_identity.public()),
+            "the genuine pairing must survive an impostor's handshake"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
