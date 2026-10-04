@@ -3,8 +3,8 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use neloa_relay::{router, RelayState};
 use neloa_relay_protocol::{
-    decode_tunnel_frame, encode_tunnel_frame, ClientControl, RelayDevice, ServerControl,
-    RELAY_PROTOCOL_VERSION,
+    decode_tunnel_frame, encode_tunnel_frame, ClientControl, RelayDevice, RelayErrorCode,
+    ServerControl, RELAY_PROTOCOL_VERSION,
 };
 use tokio::{net::TcpListener, time::timeout};
 use tokio_tungstenite::{
@@ -166,5 +166,71 @@ async fn websocket_endpoint_rejects_missing_bearer_token() {
         .await
         .unwrap_err();
     assert!(error.to_string().contains("401"));
+    server.abort();
+}
+
+async fn register(socket: &mut ClientSocket, id: &str) -> ServerControl {
+    send_control(
+        socket,
+        &ClientControl::Register {
+            relay_protocol_version: RELAY_PROTOCOL_VERSION,
+            device: device(id, id),
+        },
+    )
+    .await;
+    receive_control(socket, |message| {
+        matches!(
+            message,
+            ServerControl::Registered { .. } | ServerControl::Error { .. }
+        )
+    })
+    .await
+}
+
+#[tokio::test]
+async fn silent_device_is_dropped_so_it_can_reconnect() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = RelayState::new(TOKEN)
+        .unwrap()
+        .with_idle_timeout(Duration::from_millis(500));
+    let server = tokio::spawn(async move {
+        axum::serve(listener, router(state)).await.unwrap();
+    });
+    let url = format!("ws://{address}/v1/ws");
+
+    let mut stale = connect(&url).await;
+    assert!(matches!(
+        register(&mut stale, "laptop").await,
+        ServerControl::Registered { .. }
+    ));
+
+    // Keepalives hold the registration well past the idle deadline.
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        stale.send(Message::Ping(Vec::new().into())).await.unwrap();
+    }
+    let mut duplicate = connect(&url).await;
+    match register(&mut duplicate, "laptop").await {
+        ServerControl::Error { code, .. } => assert_eq!(code, RelayErrorCode::DuplicateDevice),
+        other => panic!("a live device must keep its ID, got {other:?}"),
+    }
+
+    // Once the device goes silent, the server releases its ID.
+    timeout(Duration::from_secs(3), async {
+        loop {
+            match stale.next().await {
+                None | Some(Err(_)) | Some(Ok(Message::Close(_))) => return,
+                Some(Ok(_)) => {}
+            }
+        }
+    })
+    .await
+    .expect("the relay should drop a device that stopped sending keepalives");
+    let mut replacement = connect(&url).await;
+    assert!(matches!(
+        register(&mut replacement, "laptop").await,
+        ServerControl::Registered { .. }
+    ));
     server.abort();
 }

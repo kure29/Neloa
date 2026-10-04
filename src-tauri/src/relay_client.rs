@@ -18,7 +18,7 @@ use tokio::{
     io::{duplex, split, DuplexStream, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::{mpsc, oneshot, watch},
-    time::{interval, sleep, timeout, MissedTickBehavior},
+    time::{interval, sleep, timeout, Instant, MissedTickBehavior},
 };
 use tokio_tungstenite::{
     connect_async_with_config,
@@ -44,6 +44,9 @@ const OPEN_TUNNEL_TIMEOUT: Duration = Duration::from_secs(10);
 const RECONNECT_DELAY: Duration = Duration::from_secs(3);
 const RECONFIGURE_DELAY: Duration = Duration::from_millis(200);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(25);
+// Every keepalive is answered, so this long without any message means the
+// connection died silently (sleep, network switch) and must be replaced.
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(60);
 const COMMAND_CAPACITY: usize = 32;
 const INCOMING_TUNNEL_CAPACITY: usize = 16;
 const TUNNEL_EVENT_CAPACITY: usize = 256;
@@ -334,6 +337,7 @@ async fn run_connection(
     let mut keepalive = interval(KEEPALIVE_INTERVAL);
     keepalive.set_missed_tick_behavior(MissedTickBehavior::Delay);
     keepalive.tick().await;
+    let mut last_received = Instant::now();
     loop {
         tokio::select! {
             changed = directive.changed() => {
@@ -406,6 +410,7 @@ async fn run_connection(
                     Some(Err(error)) => return ConnectionExit::Failed(format!("中继连接异常：{error}")),
                     None => return ConnectionExit::Failed("中继连接已关闭".into()),
                 };
+                last_received = Instant::now();
                 match message {
                     Message::Text(text) => {
                         let control = match serde_json::from_str::<ServerControl>(&text) {
@@ -500,6 +505,9 @@ async fn run_connection(
                 }
             }
             _ = keepalive.tick() => {
+                if last_received.elapsed() >= RESPONSE_TIMEOUT {
+                    return ConnectionExit::Failed("中继长时间没有响应，正在重新连接".into());
+                }
                 // Protocol-level pings are answered by both the Rust relay and
                 // Cloudflare's WebSocket edge without waking a hibernating
                 // Durable Object for an application JSON message.
