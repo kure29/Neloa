@@ -69,6 +69,44 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
+  relay:
+    name: Relay server and protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ./relay -> target
+            ./crates/neloa-relay-protocol -> target
+
+      - name: Check Rust formatting
+        run: |
+          cargo fmt --manifest-path relay/Cargo.toml --all -- --check
+          cargo fmt --manifest-path crates/neloa-relay-protocol/Cargo.toml --all -- --check
+
+      # The protocol crate is checked through its own manifest: its
+      # dev-dependencies are not resolved when it is built as a relay dependency.
+      - name: Run Clippy
+        run: |
+          cargo clippy --manifest-path relay/Cargo.toml --all-targets --locked -- -D warnings
+          cargo clippy --manifest-path crates/neloa-relay-protocol/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run Rust tests
+        run: |
+          cargo test --manifest-path relay/Cargo.toml --locked
+          cargo test --manifest-path crates/neloa-relay-protocol/Cargo.toml
+
   android:
     name: Android ARM64 native build
     runs-on: ubuntu-latest
