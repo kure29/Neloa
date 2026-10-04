@@ -164,6 +164,10 @@ jobs:
           library="src-tauri/target/aarch64-linux-android/debug/libneloa_lib.so"
           apk="src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk"
           llvm_nm="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          "$llvm_nm" -D "$library" | grep -q 'Java_com_kure29_neloa_WifiDirectBridge_nativeRegister'
-          "$llvm_nm" -D "$library" | grep -q 'Java_com_kure29_neloa_WifiDirectBridge_nativeEvent'
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -q 'android.permission.NEARBY_WIFI_DEVICES'
+          # Capture output before matching: `grep -q` exits at the first match,
+          # and under pipefail the producer's broken-pipe error fails the step.
+          symbols="$("$llvm_nm" -D "$library")"
+          permissions="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk")"
+          grep -q 'Java_com_kure29_neloa_WifiDirectBridge_nativeRegister' <<< "$symbols"
+          grep -q 'Java_com_kure29_neloa_WifiDirectBridge_nativeEvent' <<< "$symbols"
+          grep -q 'android.permission.NEARBY_WIFI_DEVICES' <<< "$permissions"

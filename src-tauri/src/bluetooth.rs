@@ -1,21 +1,29 @@
-use std::{collections::HashMap, io, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use std::{io, time::Duration};
 
 use parking_lot::RwLock;
 use tauri::AppHandle;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 use tokio::{
-    io::{duplex, split, DuplexStream, ReadHalf, WriteHalf},
-    sync::mpsc,
+    io::{duplex, split},
     time::timeout,
 };
-
-use crate::{
-    model::{LocalDevice, PeerDevice},
-    packet_stream::{run_packet_stream, PacketFraming},
+use tokio::{
+    io::{DuplexStream, ReadHalf, WriteHalf},
+    sync::mpsc,
 };
 
-const STREAM_BUFFER_SIZE: usize = 1024 * 1024;
+use crate::model::{LocalDevice, PeerDevice};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use crate::packet_stream::{run_packet_stream, PacketFraming};
+
 const PACKET_QUEUE_DEPTH: usize = 256;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const STREAM_BUFFER_SIZE: usize = 1024 * 1024;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 const CONNECTION_TIMEOUT: Duration = Duration::from_secs(45);
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 const PACKET_SEND_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) struct BluetoothTunnel {
