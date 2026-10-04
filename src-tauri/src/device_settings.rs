@@ -3,6 +3,8 @@ use std::{fs, path::PathBuf, sync::Arc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
+use crate::storage::{set_aside_corrupt_settings, write_atomically};
+
 pub(crate) const MAX_DEVICE_NAME_CHARS: usize = 32;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -19,17 +21,23 @@ pub(crate) struct DeviceSettingsStore {
 
 impl DeviceSettingsStore {
     pub(crate) fn load(path: PathBuf, default_name: String) -> Result<Self, String> {
-        let settings = if path.exists() {
+        let stored_name = if path.exists() {
             let bytes = fs::read(&path).map_err(|error| format!("无法读取设备设置：{error}"))?;
-            let stored: StoredDeviceSettings = serde_json::from_slice(&bytes)
-                .map_err(|error| format!("设备设置已损坏：{error}"))?;
-            StoredDeviceSettings {
-                name: normalize_device_name(&stored.name)?,
+            match serde_json::from_slice::<StoredDeviceSettings>(&bytes)
+                .map_err(|error| error.to_string())
+                .and_then(|stored| normalize_device_name(&stored.name))
+            {
+                Ok(name) => Some(name),
+                Err(error) => {
+                    set_aside_corrupt_settings(&path, "设备设置", &error);
+                    None
+                }
             }
         } else {
-            StoredDeviceSettings {
-                name: safe_default_name(&default_name),
-            }
+            None
+        };
+        let settings = StoredDeviceSettings {
+            name: stored_name.unwrap_or_else(|| safe_default_name(&default_name)),
         };
         Ok(Self {
             path,
@@ -50,12 +58,9 @@ impl DeviceSettingsStore {
     }
 
     fn persist(&self, settings: &StoredDeviceSettings) -> Result<(), String> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent).map_err(|error| format!("无法创建设备设置目录：{error}"))?;
-        }
         let bytes = serde_json::to_vec_pretty(settings)
             .map_err(|error| format!("无法编码设备设置：{error}"))?;
-        fs::write(&self.path, bytes).map_err(|error| format!("无法保存设备设置：{error}"))
+        write_atomically(&self.path, &bytes).map_err(|error| format!("无法保存设备设置：{error}"))
     }
 }
 
@@ -107,6 +112,29 @@ mod tests {
                 .count(),
             MAX_DEVICE_NAME_CHARS
         );
+    }
+
+    #[test]
+    fn unreadable_settings_fall_back_to_the_default_name() {
+        for contents in [&b""[..], b"{\"name\":", b"{\"name\":\"line\\nbreak\"}"] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("device-settings.json");
+            fs::write(&path, contents).unwrap();
+
+            let store = DeviceSettingsStore::load(path.clone(), "MacBook".into()).unwrap();
+            assert_eq!(store.name(), "MacBook");
+            let backup = fs::read_dir(root.path()).unwrap().next().unwrap().unwrap();
+            assert!(backup.file_name().to_string_lossy().contains("corrupt-"));
+            assert_eq!(fs::read(backup.path()).unwrap(), contents);
+
+            store.update("Renamed").unwrap();
+            assert_eq!(
+                DeviceSettingsStore::load(path, "ignored".into())
+                    .unwrap()
+                    .name(),
+                "Renamed"
+            );
+        }
     }
 
     #[test]

@@ -185,6 +185,8 @@ export async function getDiscoverySnapshot(): Promise<DiscoverySnapshot> {
       port: 48631,
       lastSeenMs: Date.now(),
       relayAvailable: false,
+      peerToPeerAvailable: false,
+      bluetoothAvailable: false,
     });
     const peers = platform === "windows"
       ? [
@@ -415,7 +417,7 @@ export async function decidePairing(sessionId: string, accepted: boolean): Promi
     const request = previewPairings.get(sessionId);
     if (!request) throw new Error("该配对请求已过期");
     previewPairings.delete(sessionId);
-    const transportPreference = previewPairingPreferences.get(sessionId) ?? "auto";
+    const transportPreference = previewPairingPreferences.get(sessionId) ?? "ask";
     previewPairingPreferences.delete(sessionId);
     if (accepted) {
       const now = Date.now();

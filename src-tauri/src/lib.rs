@@ -30,22 +30,26 @@ use tauri_plugin_fs::FilePath;
 use tauri_plugin_fs::{FsExt, OpenOptions};
 use uuid::Uuid;
 
+mod bluetooth;
 mod clipboard;
 mod device_settings;
 mod identity;
 mod model;
 mod network;
+mod packet_stream;
+mod peer_to_peer;
 mod relay_client;
 mod relay_settings;
+mod storage;
 mod trust;
 
 use clipboard::ClipboardService;
 use device_settings::DeviceSettingsStore;
 use identity::NoiseIdentity;
 use model::{
-    ClipboardSnapshot, DiagnosticCheck, DiagnosticPeer, DiagnosticsSnapshot, DiscoverySnapshot,
-    LocalDevice, PairingRequest, PeerDevice, RelaySnapshot, SecuritySnapshot, SelectedFile,
-    TestMessageEvent, TransportPreference, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION,
+    local_capabilities, ClipboardSnapshot, DiagnosticCheck, DiagnosticPeer, DiagnosticsSnapshot,
+    DiscoverySnapshot, LocalDevice, PairingRequest, PeerDevice, RelaySnapshot, SecuritySnapshot,
+    SelectedFile, TestMessageEvent, TransportPreference, TrustedDevice, MIN_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
 };
 use network::{NetworkHandle, NetworkStartup};
@@ -346,7 +350,7 @@ fn discovery_service(local: &LocalDevice, host_name: &str) -> Result<ServiceInfo
     let instance_name = format!("Neloa-{short_id}");
     let protocol_version = PROTOCOL_VERSION.to_string();
     let min_protocol_version = MIN_PROTOCOL_VERSION.to_string();
-    let capabilities = CAPABILITIES.join(",");
+    let capabilities = local_capabilities().join(",");
     let properties = [
         ("id", local.id.as_str()),
         ("name", local.name.as_str()),
@@ -425,8 +429,17 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                 false
                             } else {
                                 let mut peers = peers_for_thread.write();
+                                let existing = peers.get(&id);
                                 let relay_available =
-                                    peers.get(&id).is_some_and(|peer| peer.relay_available);
+                                    existing.is_some_and(|peer| peer.relay_available);
+                                let peer_to_peer_device_address = existing
+                                    .and_then(|peer| peer.peer_to_peer_device_address.clone());
+                                let peer_to_peer_address =
+                                    existing.and_then(|peer| peer.peer_to_peer_address.clone());
+                                let peer_to_peer_available =
+                                    existing.is_some_and(|peer| peer.peer_to_peer_available);
+                                let bluetooth_available =
+                                    existing.is_some_and(|peer| peer.bluetooth_available);
                                 let peer = PeerDevice {
                                     id: id.clone(),
                                     name: info
@@ -465,6 +478,10 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                     port: info.get_port(),
                                     last_seen_ms: unix_millis(),
                                     relay_available,
+                                    peer_to_peer_available,
+                                    bluetooth_available,
+                                    peer_to_peer_device_address,
+                                    peer_to_peer_address,
                                     service_fullname: info.get_fullname().to_string(),
                                 };
                                 peers.insert(id, peer);
@@ -480,6 +497,8 @@ fn start_discovery(app: tauri::AppHandle, local: &LocalDevice) -> DiscoveryState
                                     peer.port = 0;
                                     peer.service_fullname.clear();
                                     peer.relay_available
+                                        || peer.peer_to_peer_available
+                                        || peer.bluetooth_available
                                 } else {
                                     true
                                 }
@@ -605,7 +624,7 @@ fn start_ios_discovery(local: &LocalDevice) -> Result<(), String> {
         version: &local.version,
         protocol_version: PROTOCOL_VERSION,
         min_protocol_version: MIN_PROTOCOL_VERSION,
-        capabilities: CAPABILITIES.join(","),
+        capabilities: local_capabilities().join(","),
     };
     serde_json::to_string(&config)
         .map_err(|problem| format!("无法生成 Bonjour 配置：{problem}"))
@@ -661,6 +680,12 @@ pub extern "C" fn neloa_ios_discovery_peer_upsert(peer_json: *const std::ffi::c_
                 port: peer.port,
                 last_seen_ms: unix_millis(),
                 relay_available,
+                peer_to_peer_available: false,
+                bluetooth_available: peers
+                    .get(&peer.id)
+                    .is_some_and(|current| current.bluetooth_available),
+                peer_to_peer_device_address: None,
+                peer_to_peer_address: None,
                 service_fullname: peer.service_fullname,
             };
             peers.insert(peer.id.clone(), peer);
@@ -691,7 +716,7 @@ pub extern "C" fn neloa_ios_discovery_peer_remove(fullname: *const std::ffi::c_c
             peer.addresses.clear();
             peer.port = 0;
             peer.service_fullname.clear();
-            peer.relay_available
+            peer.relay_available || peer.peer_to_peer_available || peer.bluetooth_available
         } else {
             true
         }
@@ -1149,6 +1174,8 @@ fn revoke_trusted_device(
             if id == &peer_id {
                 peer.relay_available = false;
                 !peer.addresses.is_empty()
+                    || peer.peer_to_peer_available
+                    || peer.bluetooth_available
             } else {
                 true
             }
@@ -1460,6 +1487,16 @@ pub fn run() {
                 RelaySettingsStore::load(app_data_dir.join("relay-settings.json"))?;
             let relay_directive = relay_settings.directive();
             let discovery = start_discovery(app.handle().clone(), &local);
+            let peer_to_peer = peer_to_peer::start(
+                app.handle().clone(),
+                local.clone(),
+                Arc::clone(&discovery.peers),
+            );
+            let (bluetooth, bluetooth_incoming) = bluetooth::start(
+                app.handle().clone(),
+                local.clone(),
+                Arc::clone(&discovery.peers),
+            );
             let network = match NoiseIdentity::load_or_create() {
                 Ok(identity) => NetworkHandle::start(NetworkStartup {
                     app: app.handle().clone(),
@@ -1470,6 +1507,9 @@ pub fn run() {
                     port: SERVICE_PORT,
                     peers: Arc::clone(&discovery.peers),
                     relay_directive,
+                    peer_to_peer,
+                    bluetooth,
+                    bluetooth_incoming,
                 }),
                 Err(error) => {
                     NetworkHandle::unavailable(error, SERVICE_PORT, relay_directive, local.clone())

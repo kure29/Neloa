@@ -25,14 +25,28 @@ Expand Settings → Connection → Connection status to see six checks:
 2. Look at the devices screen hint. "Searching for nearby and relay devices" means discovery is still running; "device discovery is unavailable" means it is not, so check Device discovery under Connection status.
 3. On Windows, check whether the firewall allows Neloa on private and public networks.
 4. iOS and recent macOS releases ask for Local Network permission on first run; if it was declined, re-enable it in system settings. Seeing a device followed by a pairing timeout usually means discovery is visible while Local Network privacy or the firewall blocks UDP 48631.
-5. Android needs working Wi-Fi. Neloa holds the mDNS multicast lock while the app is alive, but local discovery cannot work when the device is only on cellular.
+5. Android needs working Wi-Fi. Neloa holds the mDNS multicast lock while the app is alive, but local discovery cannot work when the device is only on cellular. Wi-Fi Direct also needs Nearby devices permission on Android 13+ or location permission on Android 12 and earlier.
 
 ## A device appears, but pairing times out
 
-- Check the route selected on the device card. Local-network mode requires direct reachability; relay mode requires both devices to be connected to the same relay with the same token.
+- Check the route selected on the device card. Local-network mode requires direct reachability; Wi-Fi Direct requires two nearby Android devices; Bluetooth requires nearby macOS/iOS devices with permission granted; relay mode requires both devices to be connected to the same relay with the same token.
 - Allow Neloa to access the Local Network in iOS/macOS settings, and allow inbound Neloa connections in the macOS/Windows firewall.
 - Local transfers use UDP 48631. Successful mDNS/Bonjour discovery only proves that UDP 5353 works; it does not prove that the transfer port is allowed.
 - If guest-network or client isolation blocks LAN traffic, select **Relay** on the device card and pair again.
+
+## Android Wi-Fi Direct is unavailable
+
+- Wi-Fi Direct currently works only between Android devices. The option remains unavailable on desktop and iOS.
+- Keep Wi-Fi enabled and Neloa in the foreground on both devices. Grant Nearby devices on Android 13+, or grant location and enable system location services on Android 12 and earlier.
+- The device card enables this route only after native Wi-Fi Direct discovery sees the peer. Seeing a peer through the relay does not mean it is nearby.
+- Android may show a Wi-Fi Direct confirmation. Rejection, a busy device, or a wait longer than 45 seconds fails explicitly; Neloa never switches to LAN or relay automatically.
+
+## Apple Bluetooth is unavailable
+
+- The current Bluetooth path supports macOS and iOS. Both devices must grant Neloa Bluetooth access on first launch; re-enable it under Privacy & Security in system settings after a denial.
+- The device card enables **Bluetooth** only after the BLE identity has been read. Discovery polls nearby Neloa devices, so a newly launched peer may take one scan cycle to appear.
+- Once selected, the session stays on BLE and never falls back to LAN or relay. Search or connection attempts end with an error after 45 seconds.
+- BLE is suitable for test text, clipboard content, and smaller files, but is much slower than LAN QUIC. Prefer LAN, Wi-Fi Direct, or relay for large files.
 
 ## A device shows "incompatible version"
 

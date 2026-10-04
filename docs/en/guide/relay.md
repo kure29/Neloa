@@ -6,7 +6,9 @@ title: Self-hosted relay
 
 The relay lets devices on different networks discover, pair, and transfer with each other. It only forwards Noise-encrypted bytes; users on both devices still decide whether a pairing is trusted by comparing the six-digit code.
 
-The relay lives in the `relay/` directory of the repository, targets a small single-user deployment, and needs no database. It only forwards encrypted data it cannot interpret: it can see device metadata and the timing and size of traffic, never Noise plaintext.
+The Rust relay lives in the `relay/` directory of the repository, targets a small single-user deployment, and needs no database. It only forwards encrypted data it cannot interpret: it can see device metadata and the timing and size of traffic, never Noise plaintext.
+
+If you do not want to maintain a server and reverse proxy, use the wire-compatible [Cloudflare Workers relay](/en/guide/relay-cloudflare). Both implementations use the same client settings and security boundary.
 
 ## Trying it locally
 
@@ -42,11 +44,11 @@ The relay does not provide TLS itself. A public deployment needs an HTTPS termin
 1. Deploy the relay and have the same token of at least 32 characters ready.
 2. On every device, open Settings → Connection → Self-hosted relay.
 3. Enter the public `wss://.../v1/ws` URL and the same token, switch it on, and save.
-4. When the peer appears, select **Relay** to pair directly or leave routing on **Automatic**.
+4. When the peer appears, select **Relay** and start pairing.
 
 The URL and enable flag are stored in the application data directory; the token is stored separately in the system credential store. Leaving the token field blank keeps the saved value.
 
-The devices screen lets you select automatic, local-network, or relay routing per peer. Turning the relay off does not affect local transfers.
+The devices screen requires an explicit local-network or relay choice per peer. Turning the relay off does not affect local transfers and does not make the client switch routes automatically.
 
 ## Limits worth knowing before you deploy
 

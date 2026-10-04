@@ -10,7 +10,7 @@ Neloa transfers files and plain-text clipboard content between your own devices.
 
 **No account.** A device identity is a long-lived key pair kept in the system credential store: Keychain on macOS and iOS, Credential Manager on Windows, Keystore on Android. No server holds your identity, so no server can use it for anything else.
 
-**Controllable routing.** On the same network, devices can connect directly over QUIC and find each other over mDNS/Bonjour (service `_neloa._udp.local.`, transport port UDP 48631). Each peer can use automatic, local-network, or relay routing. Automatic mode uses LAN when an address is available and otherwise uses the relay, without silently switching after a failed connection.
+**Controllable routing.** On the same network, devices can connect directly over QUIC and find each other over mDNS/Bonjour (service `_neloa._udp.local.`, transport port UDP 48631). You explicitly select local-network or relay routing for each peer; Neloa does not recommend, automatically select, or silently change the route.
 
 **End-to-end encryption.** Every piece of application data above the transport is protected by Noise XX, and the long-term device key takes part in authentication. The relay can see online device metadata and the timing and size of traffic, but never plaintext.
 

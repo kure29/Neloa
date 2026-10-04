@@ -37,6 +37,9 @@ const MAX_CONFIGURED_DEVICES: usize = 4096;
 const MINIMUM_TOKEN_LEN: usize = 32;
 const MAXIMUM_TOKEN_LEN: usize = 512;
 const REGISTER_TIMEOUT: Duration = Duration::from_secs(10);
+// Clients send a keepalive every 25 seconds. Missing two in a row means the
+// device vanished without closing its connection (sleep, network switch).
+const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 const OUTBOUND_QUEUE_CAPACITY: usize = 256;
 const MAX_CONTROL_MESSAGE_SIZE: usize = 32 * 1024;
 
@@ -76,6 +79,7 @@ impl RelayConfig {
 #[derive(Clone)]
 pub struct RelayState {
     inner: Arc<RelayStateInner>,
+    idle_timeout: Duration,
 }
 
 struct RelayStateInner {
@@ -160,7 +164,14 @@ impl RelayState {
                 connections: RwLock::new(HashMap::new()),
                 tunnels: Mutex::new(HashMap::new()),
             }),
+            idle_timeout: DEFAULT_IDLE_TIMEOUT,
         })
+    }
+
+    /// Drops a registered device after this long without any message from it.
+    pub fn with_idle_timeout(mut self, idle_timeout: Duration) -> Self {
+        self.idle_timeout = idle_timeout;
+        self
     }
 
     fn next_connection_id(&self) -> u64 {
@@ -464,7 +475,17 @@ async fn handle_socket(socket: WebSocket, state: RelayState) {
     state.broadcast_presence().await;
     info!(connection_id, "relay device registered");
 
-    while let Some(message) = socket_receiver.next().await {
+    loop {
+        // Without a deadline, a silently vanished client keeps its device ID
+        // registered forever and every reconnect is rejected as a duplicate.
+        let message = match timeout(state.idle_timeout, socket_receiver.next()).await {
+            Ok(Some(message)) => message,
+            Ok(None) => break,
+            Err(_) => {
+                info!(connection_id, "relay device stopped sending keepalives");
+                break;
+            }
+        };
         match message {
             Ok(Message::Text(text)) if text.len() <= MAX_CONTROL_MESSAGE_SIZE => {
                 match serde_json::from_str::<ClientControl>(&text) {

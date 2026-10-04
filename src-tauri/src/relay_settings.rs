@@ -8,6 +8,7 @@ use zeroize::Zeroizing;
 use crate::{
     identity::{load_relay_token, store_relay_token},
     model::RelaySnapshot,
+    storage::{set_aside_corrupt_settings, write_atomically},
 };
 
 const MINIMUM_TOKEN_LEN: usize = 32;
@@ -86,7 +87,10 @@ impl RelaySettingsStore {
     pub(crate) fn load(path: PathBuf) -> Result<Self, String> {
         let settings = if path.exists() {
             let bytes = fs::read(&path).map_err(|error| format!("无法读取中继设置：{error}"))?;
-            serde_json::from_slice(&bytes).map_err(|error| format!("中继设置已损坏：{error}"))?
+            serde_json::from_slice(&bytes).unwrap_or_else(|error| {
+                set_aside_corrupt_settings(&path, "中继设置", &error.to_string());
+                StoredRelaySettings::default()
+            })
         } else {
             StoredRelaySettings::default()
         };
@@ -168,12 +172,9 @@ impl RelaySettingsStore {
     }
 
     fn persist(&self, settings: &StoredRelaySettings) -> Result<(), String> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent).map_err(|error| format!("无法创建设置目录：{error}"))?;
-        }
         let bytes = serde_json::to_vec_pretty(settings)
             .map_err(|error| format!("无法编码中继设置：{error}"))?;
-        fs::write(&self.path, bytes).map_err(|error| format!("无法保存中继设置：{error}"))
+        write_atomically(&self.path, &bytes).map_err(|error| format!("无法保存中继设置：{error}"))
     }
 }
 
@@ -259,7 +260,24 @@ fn normalize_relay_url(value: &str) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_relay_url, validate_relay_token};
+    use std::fs;
+
+    use super::{normalize_relay_url, validate_relay_token, RelaySettingsStore};
+
+    #[test]
+    fn unreadable_settings_fall_back_to_disabled_relay() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("relay-settings.json");
+        fs::write(&path, b"{\"enabled\":tr").unwrap();
+
+        let store = RelaySettingsStore::load(path).unwrap();
+        let settings = store.settings.read().clone();
+        assert!(!settings.enabled);
+        assert!(settings.url.is_empty());
+        let backup = fs::read_dir(root.path()).unwrap().next().unwrap().unwrap();
+        assert!(backup.file_name().to_string_lossy().contains("corrupt-"));
+        assert_eq!(fs::read(backup.path()).unwrap(), b"{\"enabled\":tr");
+    }
 
     #[test]
     fn relay_url_requires_tls_except_for_loopback() {

@@ -15,10 +15,10 @@ use neloa_relay_protocol::{
 use parking_lot::RwLock;
 use tauri::{AppHandle, Emitter};
 use tokio::{
-    io::{duplex, split, AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf},
+    io::{duplex, split, DuplexStream, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::{mpsc, oneshot, watch},
-    time::{interval, sleep, timeout, MissedTickBehavior},
+    time::{interval, sleep, timeout, Instant, MissedTickBehavior},
 };
 use tokio_tungstenite::{
     connect_async_with_config,
@@ -33,7 +33,8 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use crate::{
-    model::{LocalDevice, PeerDevice, RelaySnapshot, CAPABILITIES},
+    model::{local_capabilities, LocalDevice, PeerDevice, RelaySnapshot},
+    packet_stream::{run_packet_stream, PacketFraming},
     relay_settings::{RelayConnectionConfig, RelayDirective},
     unix_millis,
 };
@@ -43,6 +44,9 @@ const OPEN_TUNNEL_TIMEOUT: Duration = Duration::from_secs(10);
 const RECONNECT_DELAY: Duration = Duration::from_secs(3);
 const RECONFIGURE_DELAY: Duration = Duration::from_millis(200);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(25);
+// Every keepalive is answered, so this long without any message means the
+// connection died silently (sleep, network switch) and must be replaced.
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(60);
 const COMMAND_CAPACITY: usize = 32;
 const INCOMING_TUNNEL_CAPACITY: usize = 16;
 const TUNNEL_EVENT_CAPACITY: usize = 256;
@@ -312,10 +316,7 @@ async fn run_connection(
             app_version: local.version.clone(),
             protocol_version: crate::model::PROTOCOL_VERSION,
             min_protocol_version: crate::model::MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
-                .iter()
-                .map(|value| (*value).to_string())
-                .collect(),
+            capabilities: local_capabilities(),
         },
     };
     if let Err(error) = send_control(&mut writer, &registration).await {
@@ -336,8 +337,7 @@ async fn run_connection(
     let mut keepalive = interval(KEEPALIVE_INTERVAL);
     keepalive.set_missed_tick_behavior(MissedTickBehavior::Delay);
     keepalive.tick().await;
-    let mut nonce = 0_u64;
-
+    let mut last_received = Instant::now();
     loop {
         tokio::select! {
             changed = directive.changed() => {
@@ -410,6 +410,7 @@ async fn run_connection(
                     Some(Err(error)) => return ConnectionExit::Failed(format!("中继连接异常：{error}")),
                     None => return ConnectionExit::Failed("中继连接已关闭".into()),
                 };
+                last_received = Instant::now();
                 match message {
                     Message::Text(text) => {
                         let control = match serde_json::from_str::<ServerControl>(&text) {
@@ -504,9 +505,14 @@ async fn run_connection(
                 }
             }
             _ = keepalive.tick() => {
-                nonce = nonce.wrapping_add(1);
-                if let Err(error) = send_control(&mut writer, &ClientControl::Ping { nonce }).await {
-                    return ConnectionExit::Failed(error);
+                if last_received.elapsed() >= RESPONSE_TIMEOUT {
+                    return ConnectionExit::Failed("中继长时间没有响应，正在重新连接".into());
+                }
+                // Protocol-level pings are answered by both the Rust relay and
+                // Cloudflare's WebSocket edge without waking a hibernating
+                // Durable Object for an application JSON message.
+                if let Err(error) = writer.send(Message::Ping(Vec::new().into())).await {
+                    return ConnectionExit::Failed(format!("无法发送中继保活消息：{error}"));
                 }
             }
         }
@@ -582,33 +588,31 @@ fn spawn_tunnel(
 async fn run_tunnel_pump(
     tunnel_id: Uuid,
     stream: DuplexStream,
-    mut inbound: mpsc::Receiver<Vec<u8>>,
+    inbound: mpsc::Receiver<Vec<u8>>,
     events: mpsc::Sender<TunnelEvent>,
 ) {
-    let (mut reader, mut writer) = split(stream);
-    let mut buffer = vec![0_u8; TUNNEL_READ_BUFFER];
-    loop {
-        tokio::select! {
-            read = reader.read(&mut buffer) => {
-                let Ok(size) = read else { break; };
-                if size == 0 {
-                    break;
-                }
-                if events.send(TunnelEvent::Payload {
-                    tunnel_id,
-                    bytes: buffer[..size].to_vec(),
-                }).await.is_err() {
-                    return;
-                }
+    let payload_events = events.clone();
+    let _ = run_packet_stream(
+        stream,
+        inbound,
+        TUNNEL_READ_BUFFER,
+        PacketFraming::Raw,
+        move |bytes| {
+            let payload_events = payload_events.clone();
+            async move {
+                payload_events
+                    .send(TunnelEvent::Payload { tunnel_id, bytes })
+                    .await
+                    .map_err(|_| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::BrokenPipe,
+                            "relay event receiver closed",
+                        )
+                    })
             }
-            bytes = inbound.recv() => {
-                let Some(bytes) = bytes else { break; };
-                if writer.write_all(&bytes).await.is_err() {
-                    break;
-                }
-            }
-        }
-    }
+        },
+    )
+    .await;
     let _ = events.send(TunnelEvent::Closed { tunnel_id }).await;
 }
 
@@ -627,7 +631,9 @@ fn apply_relay_presence(
     peers.retain(|id, peer| {
         if peer.relay_available && !online_ids.contains(id) {
             peer.relay_available = false;
-            return !peer.addresses.is_empty();
+            return !peer.addresses.is_empty()
+                || peer.peer_to_peer_available
+                || peer.bluetooth_available;
         }
         true
     });
@@ -659,6 +665,10 @@ fn apply_relay_presence(
                     port: 0,
                     last_seen_ms: now,
                     relay_available: true,
+                    peer_to_peer_available: false,
+                    bluetooth_available: false,
+                    peer_to_peer_device_address: None,
+                    peer_to_peer_address: None,
                     service_fullname: String::new(),
                 },
             );
@@ -670,7 +680,7 @@ fn apply_relay_presence(
 fn clear_relay_presence(peers: &Arc<RwLock<HashMap<String, PeerDevice>>>) {
     peers.write().retain(|_, peer| {
         peer.relay_available = false;
-        !peer.addresses.is_empty()
+        !peer.addresses.is_empty() || peer.peer_to_peer_available || peer.bluetooth_available
     });
 }
 
@@ -692,6 +702,8 @@ fn publish_status(app: &AppHandle, status: &Arc<RwLock<RelaySnapshot>>, snapshot
 
 #[cfg(test)]
 mod tests {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
     use super::*;
 
     fn relay_device(id: &str) -> RelayDevice {
@@ -702,7 +714,7 @@ mod tests {
             app_version: "test".into(),
             protocol_version: crate::model::PROTOCOL_VERSION,
             min_protocol_version: crate::model::MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
+            capabilities: crate::model::CAPABILITIES
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),

@@ -36,13 +36,16 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
+    bluetooth::{BluetoothHandle, IncomingBluetoothLink},
     clipboard::{validate_clipboard_text, ClipboardService},
     identity::{fingerprint, NoiseIdentity},
     model::{
-        ClipboardSyncEvent, FileOfferEvent, FileTransferProgress, FileTransferResult, LocalDevice,
-        NetworkStatus, PairingPeer, PairingRequest, PairingResult, PeerDevice, TestMessageEvent,
-        TransportPreference, TrustedDevice, CAPABILITIES, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+        local_capabilities, ClipboardSyncEvent, FileOfferEvent, FileTransferProgress,
+        FileTransferResult, LocalDevice, NetworkStatus, PairingPeer, PairingRequest, PairingResult,
+        PeerDevice, TestMessageEvent, TransportPreference, TrustedDevice, MIN_PROTOCOL_VERSION,
+        PROTOCOL_VERSION,
     },
+    peer_to_peer::PeerToPeerHandle,
     relay_client::{
         relay_client_channel, IncomingRelayTunnel, RelayClientHandle, RelayClientWorker,
         RelayTunnel,
@@ -75,11 +78,13 @@ type ActiveTransfers = Arc<Mutex<HashMap<String, watch::Sender<bool>>>>;
 enum SessionSend {
     Quic(SendStream),
     Relay(tokio::io::WriteHalf<tokio::io::DuplexStream>),
+    Bluetooth(tokio::io::WriteHalf<tokio::io::DuplexStream>),
 }
 
 enum SessionReceive {
     Quic(RecvStream),
     Relay(tokio::io::ReadHalf<tokio::io::DuplexStream>),
+    Bluetooth(tokio::io::ReadHalf<tokio::io::DuplexStream>),
 }
 
 impl AsyncWrite for SessionSend {
@@ -93,6 +98,7 @@ impl AsyncWrite for SessionSend {
                 <SendStream as AsyncWrite>::poll_write(Pin::new(stream), context, buffer)
             }
             Self::Relay(stream) => Pin::new(stream).poll_write(context, buffer),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_write(context, buffer),
         }
     }
 
@@ -100,6 +106,7 @@ impl AsyncWrite for SessionSend {
         match self.get_mut() {
             Self::Quic(stream) => <SendStream as AsyncWrite>::poll_flush(Pin::new(stream), context),
             Self::Relay(stream) => Pin::new(stream).poll_flush(context),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_flush(context),
         }
     }
 
@@ -109,6 +116,7 @@ impl AsyncWrite for SessionSend {
                 <SendStream as AsyncWrite>::poll_shutdown(Pin::new(stream), context)
             }
             Self::Relay(stream) => Pin::new(stream).poll_shutdown(context),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_shutdown(context),
         }
     }
 }
@@ -122,14 +130,17 @@ impl AsyncRead for SessionReceive {
         match self.get_mut() {
             Self::Quic(stream) => Pin::new(stream).poll_read(context, buffer),
             Self::Relay(stream) => Pin::new(stream).poll_read(context, buffer),
+            Self::Bluetooth(stream) => Pin::new(stream).poll_read(context, buffer),
         }
     }
 }
 
 #[derive(Clone)]
 struct TransportConnector {
+    bluetooth: BluetoothHandle,
     quic: Endpoint,
     relay: RelayClientHandle,
+    peer_to_peer: PeerToPeerHandle,
 }
 
 impl TransportConnector {
@@ -152,6 +163,33 @@ impl TransportConnector {
         Ok((SessionSend::Relay(send), SessionReceive::Relay(receive)))
     }
 
+    async fn connect_peer_to_peer(
+        &self,
+        peer: &PeerDevice,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        let address = self.peer_to_peer.connect(peer).await?;
+        let mut direct_peer = peer.clone();
+        direct_peer.addresses = vec![address];
+        direct_peer.port = crate::SERVICE_PORT;
+        self.connect_lan(&direct_peer)
+            .await
+            .map_err(|error| format!("点对点 Wi-Fi 直连失败：{error}"))
+    }
+
+    async fn connect_bluetooth(
+        &self,
+        peer: &PeerDevice,
+    ) -> Result<(SessionSend, SessionReceive), String> {
+        if !peer.bluetooth_available {
+            return Err("目标设备当前不在蓝牙范围内".into());
+        }
+        let tunnel = self.bluetooth.connect(peer).await?;
+        Ok((
+            SessionSend::Bluetooth(tunnel.send),
+            SessionReceive::Bluetooth(tunnel.receive),
+        ))
+    }
+
     async fn connect(
         &self,
         peer: &PeerDevice,
@@ -167,16 +205,10 @@ impl TransportConnector {
                 })
             }
             TransportPreference::Relay => self.connect_relay(peer).await,
-            TransportPreference::Auto => {
-                if !peer.addresses.is_empty() {
-                    self.connect_lan(peer).await.map_err(|error| {
-                        format!("局域网直连失败：{error}。自动模式不会在连接失败后静默切换中继，可手动选择中继重试")
-                    })
-                } else if peer.relay_available {
-                    self.connect_relay(peer).await
-                } else {
-                    Err("设备当前没有可用的局域网或中继连接".into())
-                }
+            TransportPreference::PeerToPeer => self.connect_peer_to_peer(peer).await,
+            TransportPreference::Bluetooth => self.connect_bluetooth(peer).await,
+            TransportPreference::Ask => {
+                Err("请先为这台设备选择连接方式；Neloa 不会替你自动选择或切换路径".into())
             }
         }
     }
@@ -200,6 +232,9 @@ pub(crate) struct NetworkStartup {
     pub(crate) port: u16,
     pub(crate) peers: Arc<RwLock<HashMap<String, PeerDevice>>>,
     pub(crate) relay_directive: RelayDirective,
+    pub(crate) peer_to_peer: PeerToPeerHandle,
+    pub(crate) bluetooth: BluetoothHandle,
+    pub(crate) bluetooth_incoming: mpsc::Receiver<IncomingBluetoothLink>,
 }
 
 struct NetworkRuntime {
@@ -211,6 +246,9 @@ struct NetworkRuntime {
     relay: RelayClientHandle,
     relay_worker: RelayClientWorker,
     relay_incoming: mpsc::Receiver<IncomingRelayTunnel>,
+    peer_to_peer: PeerToPeerHandle,
+    bluetooth: BluetoothHandle,
+    bluetooth_incoming: mpsc::Receiver<IncomingBluetoothLink>,
 }
 
 #[derive(Clone)]
@@ -345,6 +383,7 @@ pub(crate) struct NetworkHandle {
     sender: mpsc::UnboundedSender<NetworkCommand>,
     status: Arc<RwLock<NetworkStatus>>,
     relay: RelayClientHandle,
+    peer_to_peer: PeerToPeerHandle,
 }
 
 impl NetworkHandle {
@@ -370,6 +409,7 @@ impl NetworkHandle {
                 identity_fingerprint: "不可用".to_string(),
             })),
             relay,
+            peer_to_peer: PeerToPeerHandle::unavailable(),
         }
     }
 
@@ -383,11 +423,15 @@ impl NetworkHandle {
             port,
             peers,
             relay_directive,
+            peer_to_peer,
+            bluetooth,
+            bluetooth_incoming,
         } = startup;
         let (sender, receiver) = mpsc::unbounded_channel();
         let (relay, relay_worker, relay_incoming) =
             relay_client_channel(relay_directive, local.clone());
         let thread_relay = relay.clone();
+        let thread_peer_to_peer = peer_to_peer.clone();
         let status = Arc::new(RwLock::new(NetworkStatus {
             active: false,
             error: None,
@@ -419,6 +463,9 @@ impl NetworkHandle {
                         relay: thread_relay,
                         relay_worker,
                         relay_incoming,
+                        peer_to_peer: thread_peer_to_peer,
+                        bluetooth,
+                        bluetooth_incoming,
                     };
                     if let Err(error) = runtime.block_on(run_network(network)) {
                         let mut current = thread_status.write();
@@ -436,6 +483,7 @@ impl NetworkHandle {
             sender,
             status,
             relay,
+            peer_to_peer,
         }
     }
 
@@ -453,6 +501,7 @@ impl NetworkHandle {
 
     pub(crate) fn update_local_device(&self, device: LocalDevice) -> Result<(), String> {
         self.relay.update_device(device.clone())?;
+        self.peer_to_peer.update_local_device(device.clone())?;
         self.sender
             .send(NetworkCommand::UpdateLocalDevice(device))
             .map_err(|_| "加密网络服务未运行".to_string())
@@ -585,6 +634,9 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
         relay,
         relay_worker,
         mut relay_incoming,
+        peer_to_peer,
+        bluetooth,
+        mut bluetooth_incoming,
     } = runtime;
     let NetworkContext {
         app,
@@ -596,9 +648,21 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
     let mut endpoint = make_endpoint(port)?;
     endpoint.set_default_client_config(insecure_quic_client_config()?);
     let connector = TransportConnector {
+        bluetooth: bluetooth.clone(),
         quic: endpoint.clone(),
         relay: relay.clone(),
+        peer_to_peer,
     };
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let bluetooth = bluetooth.clone();
+        let app = app.clone();
+        tokio::spawn(async move {
+            if let Err(error) = bluetooth.activate().await {
+                let _ = app.emit("network-error", error);
+            }
+        });
+    }
     tokio::spawn(relay_worker.run(app.clone(), peers));
     status.write().active = true;
     let pending: PendingConfirmations = Arc::new(Mutex::new(HashMap::new()));
@@ -687,10 +751,47 @@ async fn run_network(runtime: NetworkRuntime) -> Result<(), String> {
                     }
                 });
             }
+            incoming = bluetooth_incoming.recv() => {
+                let Some(incoming) = incoming else {
+                    return Err("蓝牙接收服务意外停止".into());
+                };
+                let tunnel = bluetooth.accept(incoming);
+                let app = app.clone();
+                let local = local.clone();
+                let identity = identity.clone();
+                let trust = trust.clone();
+                let clipboard = clipboard.clone();
+                let pending = Arc::clone(&pending);
+                let pending_offers = Arc::clone(&pending_offers);
+                let active_transfers = Arc::clone(&active_transfers);
+                tokio::spawn(async move {
+                    let context = IncomingContext {
+                        file: FileTransferContext {
+                            app: app.clone(),
+                            local,
+                            identity,
+                            trust,
+                            pending_offers,
+                            active_transfers,
+                        },
+                        clipboard,
+                        pending_pairing: pending,
+                    };
+                    if let Err(error) = handle_incoming(
+                        context,
+                        SessionSend::Bluetooth(tunnel.send),
+                        SessionReceive::Bluetooth(tunnel.receive),
+                        None,
+                    ).await {
+                        let _ = app.emit("network-error", error);
+                    }
+                });
+            }
             command = commands.recv() => {
                 let Some(command) = command else { return Ok(()); };
                 match command {
                     NetworkCommand::UpdateLocalDevice(device) => {
+                        connector.bluetooth.update_local_device(device.clone());
                         local = device;
                     }
                     NetworkCommand::BeginPairing { peer, transport_preference, response } => {
@@ -1119,7 +1220,7 @@ async fn incoming_test_message(
     trust: TrustStore,
     mut session: NoiseSession,
 ) -> Result<(), String> {
-    if !validate_incoming_trust(&app, &trust, &mut session).await? {
+    if !validate_incoming_trust(&trust, &mut session).await? {
         return Ok(());
     }
 
@@ -1236,7 +1337,7 @@ async fn incoming_clipboard_update(
     clipboard: ClipboardService,
     mut session: NoiseSession,
 ) -> Result<(), String> {
-    if !validate_incoming_trust(&app, &trust, &mut session).await? {
+    if !validate_incoming_trust(&trust, &mut session).await? {
         return Ok(());
     }
 
@@ -1535,7 +1636,7 @@ async fn handle_incoming_file_transfer(
     context: FileTransferContext,
     mut session: NoiseSession,
 ) -> Result<(), String> {
-    if !validate_incoming_trust(&context.app, &context.trust, &mut session).await? {
+    if !validate_incoming_trust(&context.trust, &mut session).await? {
         return Ok(());
     }
 
@@ -2402,10 +2503,7 @@ fn handshake_metadata(local: &LocalDevice, purpose: &str) -> HandshakeMetadata {
         version: local.version.clone(),
         protocol_version: PROTOCOL_VERSION,
         min_protocol_version: MIN_PROTOCOL_VERSION,
-        capabilities: CAPABILITIES
-            .iter()
-            .map(|value| (*value).to_string())
-            .collect(),
+        capabilities: local_capabilities(),
         purpose: purpose.to_string(),
     }
 }
@@ -2624,7 +2722,7 @@ fn finish_stream(send: &mut SessionSend) -> Result<(), String> {
         SessionSend::Quic(stream) => stream
             .finish()
             .map_err(|error| format!("无法完成加密数据流：{error}")),
-        SessionSend::Relay(_) => Ok(()),
+        SessionSend::Relay(_) | SessionSend::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2635,7 +2733,7 @@ async fn wait_stream_stopped(send: &mut SessionSend) -> Result<(), String> {
             .await
             .map(|_| ())
             .map_err(|error| format!("等待对端完成数据流失败：{error}")),
-        SessionSend::Relay(_) => Ok(()),
+        SessionSend::Relay(_) | SessionSend::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2644,7 +2742,7 @@ fn stop_receive(receive: &mut SessionReceive) -> Result<(), String> {
         SessionReceive::Quic(stream) => stream
             .stop(0_u8.into())
             .map_err(|error| format!("无法停止接收数据流：{error}")),
-        SessionReceive::Relay(_) => Ok(()),
+        SessionReceive::Relay(_) | SessionReceive::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2653,7 +2751,7 @@ fn reset_send(send: &mut SessionSend) -> Result<(), String> {
         SessionSend::Quic(stream) => stream
             .reset(0_u8.into())
             .map_err(|error| format!("无法重置发送数据流：{error}")),
-        SessionSend::Relay(_) => Ok(()),
+        SessionSend::Relay(_) | SessionSend::Bluetooth(_) => Ok(()),
     }
 }
 
@@ -2797,7 +2895,6 @@ impl ServerCertVerifier for SkipServerVerification {
 }
 
 async fn validate_incoming_trust(
-    app: &AppHandle,
     trust: &TrustStore,
     session: &mut NoiseSession,
 ) -> Result<bool, String> {
@@ -2810,10 +2907,10 @@ async fn validate_incoming_trust(
         return Ok(true);
     }
 
-    if trust.remove(&session.peer.id)? {
-        app.emit("trusted-devices-changed", trust.list())
-            .map_err(|error| format!("无法刷新可信设备列表：{error}"))?;
-    }
+    // The claimed device ID is public (mDNS, BLE, relay presence), so a key
+    // mismatch proves nothing about the paired device. Never drop the local
+    // record here, or anyone nearby could unpair it by reusing its ID. A peer
+    // that really rotated its key is told to re-pair, which replaces the record.
     write_encrypted(
         &mut session.send,
         &mut session.transport,
@@ -2965,6 +3062,10 @@ mod tests {
             port,
             last_seen_ms: 0,
             relay_available: false,
+            peer_to_peer_available: false,
+            bluetooth_available: false,
+            peer_to_peer_device_address: None,
+            peer_to_peer_address: None,
             service_fullname: String::new(),
         };
         let (mut send, mut receive) = timeout(Duration::from_secs(2), connect_quic(&client, &peer))
@@ -3266,6 +3367,82 @@ mod tests {
         responder.await.unwrap();
     }
 
+    #[tokio::test]
+    async fn impostor_reusing_a_paired_id_cannot_revoke_trust() {
+        let directory = tempfile::tempdir().unwrap();
+        let trust = TrustStore::load(directory.path().join("trusted-devices.json")).unwrap();
+        let paired_identity = NoiseIdentity::generate_for_test();
+        trust
+            .upsert(TrustedDevice {
+                id: "paired-peer".into(),
+                name: "Paired".into(),
+                alias: None,
+                platform: "macos".into(),
+                public_key: hex::encode(paired_identity.public()),
+                fingerprint: fingerprint(&paired_identity.public()),
+                transport_preference: TransportPreference::Lan,
+                paired_at_ms: 1,
+                last_verified_ms: 1,
+            })
+            .unwrap();
+
+        let impostor_identity = NoiseIdentity::generate_for_test();
+        let impostor_device = LocalDevice {
+            id: "paired-peer".into(),
+            name: "Paired".into(),
+            platform: "macos".into(),
+            version: "test".into(),
+        };
+        let local_identity = NoiseIdentity::generate_for_test();
+        let local_device = LocalDevice {
+            id: "local".into(),
+            name: "Local".into(),
+            platform: "windows".into(),
+            version: "test".into(),
+        };
+        let (impostor_stream, local_stream) = tokio::io::duplex(64 * 1024);
+        let (impostor_receive, impostor_send) = tokio::io::split(impostor_stream);
+        let (local_receive, local_send) = tokio::io::split(local_stream);
+
+        let responder_trust = trust.clone();
+        let responder = tokio::spawn(async move {
+            let mut session = responder_handshake(
+                SessionSend::Relay(local_send),
+                SessionReceive::Relay(local_receive),
+                &local_identity,
+                &local_device,
+            )
+            .await
+            .unwrap();
+            validate_incoming_trust(&responder_trust, &mut session)
+                .await
+                .unwrap()
+        });
+
+        let mut session = initiator_handshake(
+            SessionSend::Relay(impostor_send),
+            SessionReceive::Relay(impostor_receive),
+            &impostor_identity,
+            &impostor_device,
+            "file",
+        )
+        .await
+        .unwrap();
+        match read_encrypted(&mut session.receive, &mut session.transport)
+            .await
+            .unwrap()
+        {
+            WireMessage::Error { message } => assert_eq!(message, REPAIR_REQUIRED_MESSAGE),
+            _ => panic!("an impostor must be told to re-pair"),
+        }
+        assert!(!responder.await.unwrap(), "impostor must not be trusted");
+        assert_eq!(
+            trust.find("paired-peer").unwrap().public_key,
+            hex::encode(paired_identity.public()),
+            "the genuine pairing must survive an impostor's handshake"
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn quic_loopback_carries_noise_encrypted_file_protocol() {
         let server_identity = NoiseIdentity::generate_for_test();
@@ -3389,7 +3566,7 @@ mod tests {
             version: "test".into(),
             protocol_version: PROTOCOL_VERSION,
             min_protocol_version: MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
+            capabilities: crate::model::CAPABILITIES
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),
@@ -3397,6 +3574,10 @@ mod tests {
             port: server_address.port(),
             last_seen_ms: 0,
             relay_available: false,
+            peer_to_peer_available: false,
+            bluetooth_available: false,
+            peer_to_peer_device_address: None,
+            peer_to_peer_address: None,
             service_fullname: String::new(),
         };
         let (send, receive) = connect_quic(&client, &peer).await.unwrap();
@@ -3547,7 +3728,7 @@ mod tests {
             version: "test".into(),
             protocol_version: PROTOCOL_VERSION,
             min_protocol_version: MIN_PROTOCOL_VERSION,
-            capabilities: CAPABILITIES
+            capabilities: crate::model::CAPABILITIES
                 .iter()
                 .map(|value| (*value).to_string())
                 .collect(),
@@ -3555,6 +3736,10 @@ mod tests {
             port: server_address.port(),
             last_seen_ms: 0,
             relay_available: false,
+            peer_to_peer_available: false,
+            bluetooth_available: false,
+            peer_to_peer_device_address: None,
+            peer_to_peer_address: None,
             service_fullname: String::new(),
         };
         let (send, receive) = connect_quic(&client, &peer).await.unwrap();

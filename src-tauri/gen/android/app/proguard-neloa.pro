@@ -1,0 +1,1 @@
+-keep class com.kure29.neloa.WifiDirectBridge { *; }

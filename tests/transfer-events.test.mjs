@@ -121,6 +121,7 @@ test('accept response does not regress progress received during the command', as
 test('send response does not resurrect an already failed transfer', async () => {
   const app = mountApp();
   app.emit('onPeersChanged', { active: true, peers: [{ id: 'peer', name: 'Peer' }] });
+  await app.render().configureTransportPreference('peer', 'lan');
   app.bridge.startFileTransfer = async () => {
     app.emit('onFileTransferResult', result('failed', 'sent'));
     return 'A';

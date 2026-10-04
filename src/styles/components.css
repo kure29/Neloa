@@ -742,6 +742,21 @@
   color: var(--relay);
 }
 
+.peer-route.route-unselected {
+  background: var(--paper-3);
+  color: var(--ink-2);
+}
+
+.peer-route.route-peer {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+}
+
+.peer-route.route-bluetooth {
+  background: color-mix(in srgb, #356ee8 12%, transparent);
+  color: color-mix(in srgb, #356ee8 82%, var(--ink-1));
+}
+
 .peer-row-copy small {
   margin-top: 2px;
   color: var(--ink-3);
@@ -784,7 +799,7 @@
 }
 
 .peer-transport-control select {
-  width: 76px;
+  width: 116px;
   height: 100%;
   padding: 0 26px 0 var(--s2);
   border: 0;

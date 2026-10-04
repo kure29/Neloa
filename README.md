@@ -28,9 +28,11 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 
 ### 连接方式
 
-- 每台设备都可选择「自动」「局域网」或「中继」。
-- 自动模式在存在局域网地址时使用 QUIC 直连，否则使用已配置的中继；连接失败时不会静默切换路径。
+- 每台设备都必须明确选择连接方式，选择会按设备保存。0.1.13 稳定版提供「局域网」和「中继」。
+- Neloa 不会推荐、自动判断或在失败后静默切换路径；需要换路时由你手动选择。
 - 首次配对也可以通过中继完成，但仍必须在两端核对六位验证码并分别确认。
+- 当前源码还为附近的 Android 设备提供「点对点 Wi-Fi」；它不要求两端接入同一个局域网，仍复用 QUIC 与 Noise XX。该能力尚未包含在 0.1.13 Release 中。
+- 当前源码还为附近的 macOS/iOS 设备提供「蓝牙」发现与传输。它使用带顺序检查和背压的 BLE GATT 字节流，应用数据仍由 Noise XX 端到端加密；该能力同样尚未包含在 0.1.13 Release 中。
 
 ### 下载与安装
 
@@ -43,7 +45,7 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 | Android 真机 | `Neloa_0.1.13_arm64.apk` | 使用项目固定密钥签名 |
 | iOS | `Neloa_0.1.13_unsigned.ipa` | 未签名，必须自行重签 |
 
-> macOS/iOS 首次启动请允许“本地网络”权限。Neloa 用 Bonjour/mDNS 发现设备，并使用 UDP 48631 建立 QUIC 直连。
+> macOS/iOS 首次启动请允许“本地网络”权限。当前源码还会请求蓝牙权限，用于发现附近的 Apple 设备并建立用户明确选择的 BLE 连接。
 
 ### 30 秒开始传输
 
@@ -62,7 +64,8 @@ Neloa 是一个面向个人多设备的本地优先传输工具。它不需要�
 | --- | --- |
 | 使用文档 | [docs/guide/](docs/guide/index.md) |
 | 架构与威胁模型 | [docs/reference/architecture.md](docs/reference/architecture.md) |
-| 自建中继部署与线协议 | [relay/README.md](relay/README.md) |
+| Rust / Docker 中继部署与线协议 | [relay/README.md](relay/README.md) |
+| Cloudflare Workers 中继 | [relay-worker/README.md](relay-worker/README.md) |
 | 移动端构建与真机验收 | [docs/build/mobile.md](docs/build/mobile.md) |
 | Windows 安装程序 | [docs/build/windows.md](docs/build/windows.md) |
 
@@ -80,9 +83,9 @@ npm run docs:dev      # 本地预览文档
 
 ## English
 
-Neloa is a local-first file and plain-text clipboard transfer app for your own devices. It needs no account and uploads no files to a cloud drive. Each peer can use automatic routing, LAN QUIC, or your self-hosted WebSocket relay. Noise XX protects pairing and application data end to end on either path.
+Neloa is a local-first file and plain-text clipboard transfer app for your own devices. It needs no account and uploads no files to a cloud drive. You explicitly select the route for each peer. Noise XX protects pairing and application data end to end on every route.
 
-Automatic routing uses LAN QUIC whenever a local address is available and otherwise uses the relay. Initial pairing can also use the relay; both devices must still compare and confirm the same six-digit code.
+Neloa never recommends, automatically selects, or silently changes the route. Initial pairing can use the relay; both devices must still compare and confirm the same six-digit code. The current source tree also supports explicit Android-to-Android Wi-Fi Direct and BLE discovery/transport between macOS and iOS devices. Both reuse the same authenticated Noise XX application protocol and are not included in the 0.1.13 release artifacts.
 
 Download macOS, Windows, Android, and unsigned iOS packages from the [latest GitHub Release](https://github.com/kure29/Neloa/releases/latest). Desktop packages are not commercially signed, and the iOS IPA must be re-signed with your own Apple certificate and provisioning profile. The full [English documentation](https://kure29.github.io/Neloa/en/) covers installation, pairing, transfers, relay deployment, and troubleshooting.
 

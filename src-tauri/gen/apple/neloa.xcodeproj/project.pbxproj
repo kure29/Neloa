@@ -13,6 +13,7 @@
 		4A28E44A8DDC2875122F09D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1CA08295938C84F7EA4FD9F /* Assets.xcassets */; };
 		65CA935547393B2858D9AE73 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 07C819A164B527A6018E1BE0 /* WebKit.framework */; };
 		8446FD0E150E194E634733D2 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1696E5EE891C6FCF600227EC /* Security.framework */; };
+		A75DD8B33D65EB127D43676F /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0C5B7D16EF7EBCA61B266CC /* CoreBluetooth.framework */; };
 		BE0D781A49C9D639384E1FB9 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2619D72A7774449F42CBD0DF /* main.mm */; };
 		D5CDE1EC0CA977B99324C1CD /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 790F40D6657A73D8CE1FC5C8 /* UIKit.framework */; };
 		DD833F31C245B619446FF25D /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DDF64747019E54DD310EF0A7 /* Metal.framework */; };
@@ -28,18 +29,24 @@
 		08775FF8654A096383765D2D /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		08B19EBC408C0DBC5C4DCBCA /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		094C049DD9DE44D08DC4F961 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		0B5F14BCCE64721121AAAABF /* bluetooth.rs */ = {isa = PBXFileReference; path = bluetooth.rs; sourceTree = "<group>"; };
 		1696E5EE891C6FCF600227EC /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		25B42F4B54B7CE9813F7E42D /* neloa_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = neloa_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2619D72A7774449F42CBD0DF /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		30BB9AAAD46A0313609D6C5D /* trust.rs */ = {isa = PBXFileReference; path = trust.rs; sourceTree = "<group>"; };
 		5C60048FD41933377B17FFD1 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		5CBAD8BE36AC177E30250A5C /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		663CE9A6CFC32EA330F4C882 /* relay_settings.rs */ = {isa = PBXFileReference; path = relay_settings.rs; sourceTree = "<group>"; };
 		688876C87D839AAEED1A3BB8 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		6B917B4A2C920B409C699120 /* relay_client.rs */ = {isa = PBXFileReference; path = relay_client.rs; sourceTree = "<group>"; };
 		6E57D247AD9336DDCFCCA5F0 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		790F40D6657A73D8CE1FC5C8 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		7AFAFA530B190E3A1625AFFC /* packet_stream.rs */ = {isa = PBXFileReference; path = packet_stream.rs; sourceTree = "<group>"; };
 		897A1DDD73EDB1FB80F643D7 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		A0C5B7D16EF7EBCA61B266CC /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = System/Library/Frameworks/CoreBluetooth.framework; sourceTree = SDKROOT; };
 		A38537066C0730DF354DFA74 /* network.rs */ = {isa = PBXFileReference; path = network.rs; sourceTree = "<group>"; };
 		A65E757DA1F1BA84D90FBF93 /* BonjourBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BonjourBridge.h; sourceTree = "<group>"; };
+		B60012A6DE562585BB0F2EC6 /* peer_to_peer.rs */ = {isa = PBXFileReference; path = peer_to_peer.rs; sourceTree = "<group>"; };
 		BF9A2CDF19D84A651A2BAD0F /* clipboard.rs */ = {isa = PBXFileReference; path = clipboard.rs; sourceTree = "<group>"; };
 		CA53C8CA80A34E3FBD46B85A /* BonjourDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourDiscovery.swift; sourceTree = "<group>"; };
 		DDD4D467DA8D7AD167369104 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
@@ -50,6 +57,7 @@
 		F2FAE633EC7F359F308FB4E5 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		F6D7AEDB0BA966F0CE02BDF4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FAAAF760C1EAD57971C40CD2 /* model.rs */ = {isa = PBXFileReference; path = model.rs; sourceTree = "<group>"; };
+		FC70945EBC82140F84E5AF72 /* device_settings.rs */ = {isa = PBXFileReference; path = device_settings.rs; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +66,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				42CE085737BEDD5DDEF5CABA /* libapp.a in Frameworks */,
+				A75DD8B33D65EB127D43676F /* CoreBluetooth.framework in Frameworks */,
 				E1673B9525E993C6459E39BB /* CoreGraphics.framework in Frameworks */,
 				DD833F31C245B619446FF25D /* Metal.framework in Frameworks */,
 				ECA0C0B8C9AB671D3C3DEE07 /* MetalKit.framework in Frameworks */,
@@ -75,6 +84,7 @@
 		1F77879505EF6ED91C49D962 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A0C5B7D16EF7EBCA61B266CC /* CoreBluetooth.framework */,
 				F2FAE633EC7F359F308FB4E5 /* CoreGraphics.framework */,
 				08B19EBC408C0DBC5C4DCBCA /* libapp.a */,
 				DDF64747019E54DD310EF0A7 /* Metal.framework */,
@@ -157,12 +167,18 @@
 		E81410EAAF8A3F5C33546E24 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				0B5F14BCCE64721121AAAABF /* bluetooth.rs */,
 				BF9A2CDF19D84A651A2BAD0F /* clipboard.rs */,
+				FC70945EBC82140F84E5AF72 /* device_settings.rs */,
 				DF12B892245B29E9C7A95D31 /* identity.rs */,
 				094C049DD9DE44D08DC4F961 /* lib.rs */,
 				897A1DDD73EDB1FB80F643D7 /* main.rs */,
 				FAAAF760C1EAD57971C40CD2 /* model.rs */,
 				A38537066C0730DF354DFA74 /* network.rs */,
+				7AFAFA530B190E3A1625AFFC /* packet_stream.rs */,
+				B60012A6DE562585BB0F2EC6 /* peer_to_peer.rs */,
+				6B917B4A2C920B409C699120 /* relay_client.rs */,
+				663CE9A6CFC32EA330F4C882 /* relay_settings.rs */,
 				30BB9AAAD46A0313609D6C5D /* trust.rs */,
 			);
 			name = src;

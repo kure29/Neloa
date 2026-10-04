@@ -1,0 +1,17 @@
+{
+  "name": "neloa-relay-worker",
+  "private": true,
+  "version": "0.1.13",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test test/*.test.mjs",
+    "test:integration": "node test/smoke.mjs",
+    "check": "wrangler deploy --dry-run --outdir .wrangler-dist",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.134.0",
+    "ws": "^8.21.0"
+  }
+}

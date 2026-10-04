@@ -25,6 +25,7 @@ interface Copy {
     transfer: string;
     clipboard: string;
     relay: string;
+    relayCloudflare: string;
     troubleshooting: string;
     architecture: string;
     relayReference: string;
@@ -53,6 +54,7 @@ const ZH: Copy = {
     transfer: "发送与接收文件",
     clipboard: "剪贴板同步",
     relay: "自建中继",
+    relayCloudflare: "Cloudflare Workers 中继",
     troubleshooting: "故障排查",
     architecture: "架构与安全边界",
     relayReference: "中继服务与线协议",
@@ -81,6 +83,7 @@ const EN: Copy = {
     transfer: "Sending and receiving files",
     clipboard: "Clipboard sync",
     relay: "Self-hosted relay",
+    relayCloudflare: "Cloudflare Workers relay",
     troubleshooting: "Troubleshooting",
     architecture: "Architecture and security",
     relayReference: "Relay service and wire protocol",
@@ -131,6 +134,7 @@ function localeTheme(lang: Lang, copy: Copy) {
           { text: copy.items.transfer, link: at("/guide/transfer") },
           { text: copy.items.clipboard, link: at("/guide/clipboard") },
           { text: copy.items.relay, link: at("/guide/relay") },
+          { text: copy.items.relayCloudflare, link: at("/guide/relay-cloudflare") },
           { text: copy.items.troubleshooting, link: at("/guide/troubleshooting") },
         ],
       },
