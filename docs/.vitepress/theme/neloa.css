@@ -2,41 +2,41 @@
  * Neloa 说明书主题。
  *
  * 这里的每一个颜色都对应 `src/styles/tokens.css` 里的一个 token，命名也保持一致，
- * 目的是让文档站和应用看起来是同一个东西：暖色纸面、炭黑承担主要动作、
- * 铜色是唯一的强调色（链接、选中、焦点），紫色只留给中继，绿色只表示就绪。
+ * 目的是让文档站和应用看起来是同一个东西：分组浅灰底、白色卡片、
+ * 系统蓝承担动作与选中，紫色只留给中继，绿色只表示就绪。
  */
 
 :root {
   /* 面 */
-  --nl-paper-0: #f5f3ef;
+  --nl-paper-0: #f2f2f7;
   --nl-paper-1: #ffffff;
-  --nl-paper-2: #f1eee9;
-  --nl-paper-3: #e8e4dd;
-  --nl-line: #e6e1d9;
-  --nl-line-strong: #d3ccc1;
+  --nl-paper-2: #f2f2f7;
+  --nl-paper-3: #e5e5ea;
+  --nl-line: #e5e5ea;
+  --nl-line-strong: #d1d1d6;
 
   /* 墨 */
-  --nl-ink: #1a1714;
-  --nl-ink-2: #55504a;
-  --nl-ink-3: #6e675f;
+  --nl-ink: #1c1c1e;
+  --nl-ink-2: #48484a;
+  --nl-ink-3: #6c6c70;
 
-  /* 动作与强调 */
-  --nl-primary: #1a1714;
-  --nl-primary-strong: #34302b;
-  --nl-on-primary: #fbfaf8;
-  --nl-accent: #a8502a;
-  --nl-accent-strong: #8f4322;
-  --nl-accent-soft: #f8ece4;
+  /* 动作与选中 */
+  --nl-primary: #0068da;
+  --nl-primary-strong: #0058b8;
+  --nl-on-primary: #ffffff;
+  --nl-accent: #0068da;
+  --nl-accent-strong: #0058b8;
+  --nl-accent-soft: #e8f1fd;
 
   /* 语义色 */
-  --nl-relay: #6a4a9e;
-  --nl-relay-soft: #f1ecf8;
-  --nl-ok: #2a7348;
-  --nl-ok-soft: #e9f4ec;
-  --nl-warn: #93560a;
-  --nl-warn-soft: #fbf1df;
-  --nl-danger: #b3261e;
-  --nl-danger-soft: #fcecea;
+  --nl-relay: #8944ab;
+  --nl-relay-soft: #f5ecfa;
+  --nl-ok: #1c7a33;
+  --nl-ok-soft: #e8f6ec;
+  --nl-warn: #b25000;
+  --nl-warn-soft: #fff2e5;
+  --nl-danger: #d70015;
+  --nl-danger-soft: #ffebed;
 
   /* 形 */
   --nl-r-card: 12px;
@@ -50,32 +50,32 @@
 }
 
 .dark {
-  --nl-paper-0: #121110;
-  --nl-paper-1: #1b1917;
-  --nl-paper-2: #24211e;
-  --nl-paper-3: #2e2a26;
-  --nl-line: #2c2925;
-  --nl-line-strong: #423d37;
+  --nl-paper-0: #000000;
+  --nl-paper-1: #1c1c1e;
+  --nl-paper-2: #2c2c2e;
+  --nl-paper-3: #3a3a3c;
+  --nl-line: #38383a;
+  --nl-line-strong: #48484a;
 
-  --nl-ink: #f4f1ec;
-  --nl-ink-2: #c8c1b7;
-  --nl-ink-3: #9b9389;
+  --nl-ink: #ffffff;
+  --nl-ink-2: #d1d1d6;
+  --nl-ink-3: #98989f;
 
-  --nl-primary: #f4f1ec;
-  --nl-primary-strong: #ffffff;
-  --nl-on-primary: #1a1714;
-  --nl-accent: #e3926a;
-  --nl-accent-strong: #eda784;
-  --nl-accent-soft: #33231b;
+  --nl-primary: #0071e3;
+  --nl-primary-strong: #0a84ff;
+  --nl-on-primary: #ffffff;
+  --nl-accent: #409cff;
+  --nl-accent-strong: #64b0ff;
+  --nl-accent-soft: #0d2847;
 
-  --nl-relay: #bfa8ec;
-  --nl-relay-soft: #2a2236;
-  --nl-ok: #7fd1a0;
-  --nl-ok-soft: #17291e;
-  --nl-warn: #e9b665;
-  --nl-warn-soft: #30250f;
-  --nl-danger: #f29b8f;
-  --nl-danger-soft: #361c19;
+  --nl-relay: #da8fff;
+  --nl-relay-soft: #2e1838;
+  --nl-ok: #30d158;
+  --nl-ok-soft: #0f2e19;
+  --nl-warn: #ffb340;
+  --nl-warn-soft: #33240a;
+  --nl-danger: #ff6961;
+  --nl-danger-soft: #3a1416;
 }
 
 /* ---------- VitePress 变量映射 ---------- */

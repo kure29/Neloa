@@ -1,72 +1,67 @@
 /*
- * Neloa design tokens — "charcoal & copper".
+ * Neloa design tokens — "system blue".
  *
- * The palette comes from the app icon: a warm charcoal mark, warm paper, and
- * one copper signal dot. The window is warm paper; cards are lifted white
- * sheets on it. Primary actions are charcoal (inverted to paper in dark mode).
- * Copper is the single accent and marks what is selected, focused or moving:
- * the chosen device, focus rings, transfer progress, discovery. Green, amber
- * and red keep their status meaning; purple is reserved for the relay. No
- * gradients, no glows.
+ * Close to the native Apple look the app shares a screen with: a grouped grey
+ * window, lifted white cards, and one system blue for actions, selection,
+ * focus and progress. Green, orange and red keep their status meaning and use
+ * Apple's accessible variants; purple is reserved for the relay. No gradients,
+ * no glows.
  *
  * Every colour exists as one variable name with a light and a dark value, so
  * component rules never branch on the colour scheme.
  *
  * Contrast (WCAG AA body text needs 4.5:1), light on --paper-0 / --paper-1:
- *   ink 16.1 / 17.9, ink-2 7.2 / 8.0, ink-3 5.0 / 5.6, accent 4.9 / 5.5
+ *   ink 15.3 / 17.0, ink-2 8.2 / 9.1, ink-3 4.7 / 5.2, accent 4.7 / 5.3
  * dark on --paper-0 / --paper-1:
- *   ink 16.7 / 15.6, ink-2 10.6 / 9.8, ink-3 6.2 / 5.8, accent 7.7 / 7.2
- * --on-primary against --primary: light 17.1, dark 15.8.
- * --on-accent against --accent: light 5.5, dark 7.3.
+ *   ink 21.0 / 17.0, ink-2 13.8 / 11.2, ink-3 7.3 / 5.9, accent 7.4 / 6.0
+ * --on-primary against --primary: light 5.3, dark 4.7.
  */
 
 :root {
-  /* Surfaces: the window, a lifted card, a recessed well, a pressed well. */
-  --paper-0: #f5f3ef;
+  /* Surfaces: the grouped window, a lifted card, a recessed well, a pressed well. */
+  --paper-0: #f2f2f7;
   --paper-1: #ffffff;
-  --paper-2: #f1eee9;
-  --paper-3: #e8e4dd;
+  --paper-2: #f2f2f7;
+  --paper-3: #e5e5ea;
 
-  --line: #e6e1d9;
-  --line-strong: #d3ccc1;
+  --line: #e5e5ea;
+  --line-strong: #d1d1d6;
 
   /* Text, primary to tertiary. */
-  --ink: #1a1714;
-  --ink-2: #55504a;
-  --ink-3: #6e675f;
+  --ink: #1c1c1e;
+  --ink-2: #48484a;
+  --ink-3: #6c6c70;
 
   /* Actions. */
-  --primary: #1a1714;
-  --primary-strong: #34302b;
-  --on-primary: #fbfaf8;
+  --primary: #0068da;
+  --primary-strong: #0058b8;
+  --on-primary: #ffffff;
 
-  /* The one accent: selection, focus, progress. */
-  --accent: #a8502a;
-  --accent-strong: #8f4322;
+  /* Selection, focus and progress share the action blue. */
+  --accent: #0068da;
+  --accent-strong: #0058b8;
   --on-accent: #ffffff;
-  --accent-soft: #f8ece4;
-  --accent-line: #e6c3ae;
+  --accent-soft: #e8f1fd;
+  --accent-line: #a9c8f0;
 
-  --relay: #6a4a9e;
-  --relay-soft: #f1ecf8;
+  --relay: #8944ab;
+  --relay-soft: #f5ecfa;
 
-  /* Compatibility aliases for older component rules. */
+  /* Compatibility alias for older component rules. */
   --primary-soft: var(--accent-soft);
-  --copper: var(--accent);
-  --copper-soft: var(--accent-soft);
 
-  --ok: #2a7348;
-  --ok-soft: #e9f4ec;
-  --warn: #93560a;
-  --warn-soft: #fbf1df;
-  --danger: #b3261e;
-  --danger-soft: #fcecea;
+  --ok: #1c7a33;
+  --ok-soft: #e8f6ec;
+  --warn: #b25000;
+  --warn-soft: #fff2e5;
+  --danger: #d70015;
+  --danger-soft: #ffebed;
 
   /* Platform marks colour only the glyph; the tile itself stays neutral. */
-  --platform-apple: #1a1714;
+  --platform-apple: #1c1c1e;
   --platform-windows: #0067b8;
   --platform-android: #2a7a45;
-  --platform-linux: #1a1714;
+  --platform-linux: #1c1c1e;
   --platform-debian: #a80030;
   --platform-ubuntu: #c2410c;
   --platform-fedora: #294172;
@@ -76,10 +71,10 @@
   --platform-linuxmint: #4f7f2b;
   --platform-redhat: #c01a20;
 
-  --elev-1: 0 1px 2px rgba(26, 23, 20, 0.05), 0 1px 1px rgba(26, 23, 20, 0.03);
-  --elev-2: 0 10px 28px rgba(26, 23, 20, 0.1), 0 2px 6px rgba(26, 23, 20, 0.05);
-  --elev-3: 0 28px 70px rgba(26, 23, 20, 0.22), 0 4px 12px rgba(26, 23, 20, 0.08);
-  --scrim: rgba(26, 23, 20, 0.32);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.04);
+  --elev-2: 0 10px 28px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+  --elev-3: 0 28px 70px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
+  --scrim: rgba(0, 0, 0, 0.3);
 
   /* Type. Three weights only: 400, 500, 600. */
   --text-micro: 12px;
@@ -125,42 +120,42 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper-0: #121110;
-    --paper-1: #1b1917;
-    --paper-2: #24211e;
-    --paper-3: #2e2a26;
+    --paper-0: #000000;
+    --paper-1: #1c1c1e;
+    --paper-2: #2c2c2e;
+    --paper-3: #3a3a3c;
 
-    --line: #2c2925;
-    --line-strong: #423d37;
+    --line: #38383a;
+    --line-strong: #48484a;
 
-    --ink: #f4f1ec;
-    --ink-2: #c8c1b7;
-    --ink-3: #9b9389;
+    --ink: #ffffff;
+    --ink-2: #d1d1d6;
+    --ink-3: #98989f;
 
-    --primary: #f4f1ec;
-    --primary-strong: #ffffff;
-    --on-primary: #1a1714;
+    --primary: #0071e3;
+    --primary-strong: #0a84ff;
+    --on-primary: #ffffff;
 
-    --accent: #e3926a;
-    --accent-strong: #eda784;
-    --on-accent: #1a1714;
-    --accent-soft: #33231b;
-    --accent-line: #6b4330;
+    --accent: #409cff;
+    --accent-strong: #64b0ff;
+    --on-accent: #001a33;
+    --accent-soft: #0d2847;
+    --accent-line: #1f4f85;
 
-    --relay: #bfa8ec;
-    --relay-soft: #2a2236;
+    --relay: #da8fff;
+    --relay-soft: #2e1838;
 
-    --ok: #7fd1a0;
-    --ok-soft: #17291e;
-    --warn: #e9b665;
-    --warn-soft: #30250f;
-    --danger: #f29b8f;
-    --danger-soft: #361c19;
+    --ok: #30d158;
+    --ok-soft: #0f2e19;
+    --warn: #ffb340;
+    --warn-soft: #33240a;
+    --danger: #ff6961;
+    --danger-soft: #3a1416;
 
-    --platform-apple: #f4f1ec;
+    --platform-apple: #ffffff;
     --platform-windows: #6cc0ff;
     --platform-android: #7fd19c;
-    --platform-linux: #f4f1ec;
+    --platform-linux: #ffffff;
     --platform-debian: #ff7aa2;
     --platform-ubuntu: #ff9a6c;
     --platform-fedora: #8ab4f8;
