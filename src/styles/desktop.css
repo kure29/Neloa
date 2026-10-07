@@ -103,10 +103,13 @@
 
 /* ---------- tabs ---------- */
 
+/* A segmented control: the selected segment is a raised surface, the way
+   both macOS and Windows draw one, with colour kept for actions. */
 .tabs {
   display: flex;
   gap: 2px;
-  padding: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: var(--paper-2);
 }
@@ -129,9 +132,15 @@
 }
 
 .tab.active {
-  background: var(--primary-soft);
-  color: var(--primary);
-  box-shadow: var(--elev-1);
+  background: var(--paper-1);
+  color: var(--ink);
+  box-shadow: var(--elev-1), 0 0 0 1px var(--line);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab.active {
+    background: var(--paper-3);
+  }
 }
 
 /* ---------- device chip ---------- */
@@ -228,6 +237,18 @@
   .shell-desktop .peer-row:hover {
     border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
   }
+}
+
+/* Notices drop from under the title bar so they never cover the send dock's
+   primary action, which is usually the next thing to click. */
+.shell-desktop .toast {
+  top: calc(44px + var(--s3));
+  bottom: auto;
+  transform: translate(-50%, -8px);
+}
+
+.shell-desktop .toast.visible {
+  transform: translate(-50%, 0);
 }
 
 /* ---------- tight windows (the 720×520 minimum) ---------- */

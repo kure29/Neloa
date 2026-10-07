@@ -64,6 +64,20 @@
   padding: var(--s5) var(--s6) var(--s8);
 }
 
+/* Each view mounts fresh on a tab switch; a short settle makes the change
+   legible without delaying input. Reduced motion collapses it in base.css. */
+.page,
+.radar-view {
+  animation: view-in var(--dur) var(--ease);
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
 .page-error {
   padding: var(--s3) var(--s4);
   border-radius: var(--r-card);
@@ -424,25 +438,27 @@
   align-items: center;
   gap: var(--s2);
   padding: var(--s8) var(--s5);
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--r-card);
+  background: var(--paper-2);
   text-align: center;
 }
 
 .empty-state-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: var(--s1);
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--s2);
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--paper-2);
+  background: var(--paper-1);
   color: var(--ink-3);
 }
 
 .empty-state strong {
   font-size: var(--text-body);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .empty-state p {
@@ -617,18 +633,50 @@
   font-size: var(--text-small);
 }
 
-.device-count {
-  display: grid;
-  place-items: center;
+/* Discovery is a continuous process, so its state reads as a live signal
+   rather than a number the subtitle already states. */
+.discovery-state {
+  display: inline-flex;
+  align-items: center;
   flex: none;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 var(--s2);
+  gap: var(--s2);
+  height: 26px;
+  padding: 0 var(--s3);
+  border: 1px solid color-mix(in srgb, var(--tone) 22%, var(--line));
   border-radius: var(--r-pill);
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: var(--text-small);
-  font-variant-numeric: tabular-nums;
+  background: var(--tone-soft);
+  color: var(--tone);
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+.discovery-state-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.discovery-state.live .discovery-state-dot::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  border-radius: 50%;
+  background: currentColor;
+  animation: signal-ping 1.8s var(--ease) infinite;
+}
+
+@keyframes signal-ping {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(2.8);
+  }
 }
 
 .peer-list {
@@ -754,7 +802,7 @@
 
 .peer-route.route-bluetooth {
   background: color-mix(in srgb, #356ee8 12%, transparent);
-  color: color-mix(in srgb, #356ee8 82%, var(--ink-1));
+  color: color-mix(in srgb, #356ee8 82%, var(--ink));
 }
 
 .peer-row-copy small {
@@ -810,6 +858,14 @@
   cursor: pointer;
   font-size: var(--text-small);
   font-weight: 500;
+}
+
+/* An unpaired device cannot pair until a route is chosen, so the picker —
+   not the pair button — carries the attention until then. */
+.peer-transport-control.needs-choice {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .peer-transport-control select:disabled {
@@ -875,6 +931,22 @@
     border-color: var(--warn);
     background: color-mix(in srgb, var(--warn) 12%, var(--paper-1));
   }
+
+  .peer-pair.awaiting-route:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    background: var(--paper-2);
+  }
+}
+
+.peer-pair.awaiting-route {
+  border-color: var(--line);
+  background: var(--paper-1);
+  color: var(--ink-2);
+}
+
+.peer-pair.awaiting-route:active:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--paper-2);
 }
 
 .device-empty {
@@ -886,21 +958,54 @@
   gap: var(--s2);
   min-height: 220px;
   padding: var(--s6);
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--r-card);
+  background: var(--paper-2);
   color: var(--ink-2);
   text-align: center;
 }
 
 .device-empty-icon {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: var(--s1);
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--s3);
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--paper-2);
+  background: var(--paper-1);
   color: var(--ink-2);
+}
+
+.device-empty-icon.live {
+  color: var(--primary);
+}
+
+.device-empty-icon.live::before,
+.device-empty-icon.live::after {
+  position: absolute;
+  inset: -1px;
+  content: "";
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-radius: 50%;
+  animation: radar-ring 2.4s var(--ease) infinite;
+}
+
+.device-empty-icon.live::after {
+  animation-delay: 1.2s;
+}
+
+@keyframes radar-ring {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
 }
 
 .device-empty strong {
@@ -927,42 +1032,74 @@
   box-shadow: var(--elev-1);
 }
 
-.device-guidance {
+/* Before a device is chosen the dock explains the three steps instead of
+   showing a disabled primary button. Files can still be queued first. */
+.dock-guidance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+  padding: var(--s1) var(--s1) var(--s1) var(--s2);
+}
+
+.dock-steps {
   display: flex;
   align-items: center;
-  gap: var(--s3);
-  min-height: 68px;
-  padding: var(--s3) var(--s4);
-  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
-  border-radius: var(--r-card);
-  background: var(--primary-soft);
-  color: var(--primary);
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: var(--text-small);
+  list-style: none;
 }
 
-.device-guidance-icon {
+.dock-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.dock-steps li + li::before {
+  width: 18px;
+  height: 1px;
+  margin-right: var(--s1);
+  content: "";
+  background: var(--line-strong);
+}
+
+.dock-steps li.current {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.dock-step-index {
   display: grid;
   place-items: center;
-  flex: none;
-  width: 34px;
-  height: 34px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
   border-radius: 50%;
-  background: var(--paper-1);
-}
-
-.device-guidance-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.device-guidance-copy strong {
-  font-size: var(--text-body);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.device-guidance-copy small {
-  color: color-mix(in srgb, var(--primary) 72%, var(--ink));
-  font-size: var(--text-small);
+.dock-steps li.current .dock-step-index {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.dock-guidance-copy {
+  grid-column: 1;
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
+.dock-add-files {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .send-dock.single-action {
@@ -1191,15 +1328,28 @@
 }
 
 .device-name-config {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s3);
-  padding: var(--s3) var(--s4);
+  padding: var(--s3) var(--s4) var(--s4);
 }
 
 .device-name-field {
   max-width: 34rem;
+}
+
+/* The action sits beside the input it acts on, at the input's height, rather
+   than centred against the label and hint as well. */
+.setting-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.setting-input-row input {
+  flex: 1;
+}
+
+.setting-input-row .btn {
+  flex: none;
+  height: var(--control-h);
 }
 
 .relay-config {
@@ -1225,7 +1375,8 @@
   gap: var(--s1);
 }
 
-.setting-field > span {
+.setting-field > span,
+.setting-field > label {
   color: var(--ink-2);
   font-size: var(--text-small);
   font-weight: 500;
