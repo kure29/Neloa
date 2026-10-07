@@ -108,7 +108,7 @@ code,
 }
 
 :focus-visible {
-  outline: 2px solid var(--copper);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -117,7 +117,7 @@ code,
 }
 
 ::selection {
-  background: var(--copper-soft);
+  background: var(--accent-soft);
   color: var(--ink);
 }
 

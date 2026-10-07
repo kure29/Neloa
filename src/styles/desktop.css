@@ -56,19 +56,28 @@
 }
 
 .brand {
-  font-size: var(--text-small);
+  font-size: var(--text-body);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
 }
 
-.app-mark {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--r-control);
-  background: var(--primary);
-  color: var(--on-primary);
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.brand-mark {
+  flex: none;
+  border-radius: 24%;
+}
+
+/* The charcoal mark would disappear into a near-black title bar. */
+@media (prefers-color-scheme: dark) {
+  .brand-mark {
+    box-shadow: 0 0 0 1px var(--line-strong);
+  }
 }
 
 .traffic-lights {
@@ -230,12 +239,12 @@
 }
 
 .shell-desktop .peer-row.selected {
-  border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
+  border-color: var(--accent-line);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .shell-desktop .peer-row:hover {
-    border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+    border-color: var(--line-strong);
   }
 }
 

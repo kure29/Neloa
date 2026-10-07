@@ -2,26 +2,11 @@ import type { MouseEvent } from "react";
 
 import { formatBytes, peerIsCompatible, platformLabel } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
-import { Badge, Button, DeviceAvatar, IconButton, cx } from "../ui/kit";
+import { Badge, Button, DeviceAvatar, IconButton, PageHeader, cx } from "../ui/kit";
 import { Icon } from "../ui/icons";
 
 const PEER_TO_PEER_CAPABILITY = "transport-peer-to-peer-wifi";
 const BLUETOOTH_CAPABILITY = "transport-bluetooth";
-
-function routePresentation(preference: ReturnType<NeloaState["transportPreferenceFor"]>) {
-  switch (preference) {
-    case "lan":
-      return { label: "局域网", className: "route-lan" };
-    case "peerToPeer":
-      return { label: "点对点 Wi-Fi", className: "route-peer" };
-    case "bluetooth":
-      return { label: "蓝牙", className: "route-bluetooth" };
-    case "relay":
-      return { label: "中继", className: "route-relay" };
-    default:
-      return { label: "未选择", className: "route-unselected" };
-  }
-}
 
 function transportSelectId(peerId: string) {
   return `transport-${peerId}`;
@@ -54,7 +39,7 @@ export function RadarView({ app }: { app: NeloaState }) {
     if (!app.selectedPeerId) return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.closest(".peer-row, .device-browser-heading, button, a, input, select")) return;
+    if (target.closest(".peer-row, .page-header, button, a, input, select")) return;
     app.setSelectedPeerId(null);
   };
 
@@ -65,27 +50,26 @@ export function RadarView({ app }: { app: NeloaState }) {
         aria-labelledby="available-devices-title"
         onClick={clearPeerFromBlankArea}
       >
-        <div className="device-browser-heading">
-          <div>
-            <h2 id="available-devices-title">可用设备</h2>
-            <p>
-              {peers.length > 0
-                ? `${peers.length} 台设备在线${trustedPeersOnline > 0 ? "，选择已配对设备开始传输" : ""}`
-                : app.discovery.error
-                  ? "设备发现暂不可用"
-                  : app.discovery.active
-                    ? "正在查找附近和中继设备"
-                    : "正在启动设备发现"}
-            </p>
-          </div>
-          <span
-            className={cx("discovery-state", `tone-${discoveryTone}`, discoveryLive && "live")}
-            aria-hidden="true"
-          >
-            <span className="discovery-state-dot" />
-            {discoveryLabel}
-          </span>
-        </div>
+        <PageHeader
+          id="available-devices-title"
+          title="可用设备"
+          subtitle={peers.length > 0
+            ? `${peers.length} 台设备在线${trustedPeersOnline > 0 ? "，选择已配对设备开始传输" : ""}`
+            : app.discovery.error
+              ? "设备发现暂不可用"
+              : app.discovery.active
+                ? "正在查找附近和中继设备"
+                : "正在启动设备发现"}
+          aside={(
+            <span
+              className={cx("discovery-state", `tone-${discoveryTone}`, discoveryLive && "live")}
+              aria-hidden="true"
+            >
+              <span className="discovery-state-dot" />
+              {discoveryLabel}
+            </span>
+          )}
+        />
 
         {peers.length > 0 ? (
           <div className="peer-list">
@@ -98,7 +82,6 @@ export function RadarView({ app }: { app: NeloaState }) {
               const displayName = alias || peer.name;
               const pairBusy = app.busyAction === "pair" && peer.id === app.selectedPeerId;
               const transportPreference = app.transportPreferenceFor(peer.id);
-              const route = routePresentation(transportPreference);
               const peerToPeerAvailable = peer.capabilities.includes(PEER_TO_PEER_CAPABILITY)
                 && peer.peerToPeerAvailable;
               const bluetoothAvailable = peer.capabilities.includes(BLUETOOTH_CAPABILITY)
@@ -134,11 +117,6 @@ export function RadarView({ app }: { app: NeloaState }) {
                     <span className="peer-row-copy">
                       <span className="peer-row-name">
                         <strong className="truncate" title={displayName}>{displayName}</strong>
-                        {trusted && compatible && (
-                          <span className={cx("peer-route", route.className)}>
-                            {route.label}
-                          </span>
-                        )}
                       </span>
                       <small className={cx(!compatible && "warn")}>
                         {alias && <>{peer.name} · </>}

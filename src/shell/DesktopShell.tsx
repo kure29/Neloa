@@ -3,7 +3,7 @@ import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { onWindowMaximizedChange, performWindowAction, startWindowDragging } from "../bridge";
 import type { NeloaState } from "../lib/useNeloa";
 import { Icon } from "../ui/icons";
-import { IconButton, StatusDot, cx } from "../ui/kit";
+import { BrandMark, IconButton, StatusDot, cx } from "../ui/kit";
 import { Overlays } from "../ui/overlays";
 import { CurrentView, TABS } from "../views";
 
@@ -95,12 +95,11 @@ export function DesktopShell({ app }: { app: NeloaState }) {
                 onClick={() => void performWindowAction("maximize")}
               />
             </div>
-          ) : (
-            <span className="app-mark" aria-hidden="true">
-              <Icon name="radio" size={15} />
-            </span>
-          )}
-          <strong className="brand">Neloa</strong>
+          ) : null}
+          <span className="brand-lockup">
+            <BrandMark size={20} />
+            <strong className="brand">Neloa</strong>
+          </span>
         </div>
 
         <nav className="tabs" aria-label="主导航">

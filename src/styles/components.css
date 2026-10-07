@@ -59,9 +59,36 @@
   display: flex;
   flex-direction: column;
   gap: var(--s3);
-  max-width: 760px;
+  width: 100%;
+  max-width: var(--content-w);
   margin: 0 auto;
-  padding: var(--s5) var(--s6) var(--s8);
+  padding: var(--s6) var(--s6) var(--s8);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s1) 0 var(--s2);
+}
+
+.page-header-copy {
+  min-width: 0;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.page-header p {
+  margin-top: var(--s1);
+  color: var(--ink-3);
+  font-size: var(--text-small);
 }
 
 /* Each view mounts fresh on a tab switch; a short settle makes the change
@@ -328,18 +355,21 @@
 
 /* ---------- structure ---------- */
 
+/* Section titles label groups of cards; they stay a step below the page
+   title so a settings page reads as one page, not five. */
 .section-title {
   display: flex;
   align-items: center;
-  gap: var(--s3);
-  padding: var(--s4) var(--s1) var(--s1);
+  gap: var(--s2);
+  padding: var(--s5) var(--s1) 0;
 }
 
 .section-title h2 {
   flex: none;
-  font-size: var(--text-subhead);
+  color: var(--ink-2);
+  font-size: var(--text-small);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
 }
 
 .section-meta {
@@ -474,87 +504,65 @@
   display: grid;
   place-items: center;
   flex: none;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: 30%;
   background: var(--paper-2);
   color: var(--ink-2);
 }
 
+/* Only the glyph carries the platform colour, so a row of mixed devices
+   reads as one calm list rather than a row of coloured tiles. */
 .device-avatar.platform-macos,
 .device-avatar.platform-ios {
-  border-color: var(--line-strong);
-  background: var(--paper-1);
-  color: var(--ink);
+  color: var(--platform-apple);
 }
 
 .device-avatar.platform-windows {
-  border-color: color-mix(in srgb, var(--platform-windows) 24%, var(--line));
-  background: var(--platform-windows-soft);
   color: var(--platform-windows);
 }
 
 .device-avatar.platform-android {
-  border-color: color-mix(in srgb, var(--platform-android) 24%, var(--line));
-  background: var(--platform-android-soft);
   color: var(--platform-android);
 }
 
 .device-avatar.platform-linux {
-  border-color: color-mix(in srgb, var(--platform-linux) 24%, var(--line));
-  background: var(--platform-linux-soft);
   color: var(--platform-linux);
 }
 
 .device-avatar.platform-debian {
-  border-color: color-mix(in srgb, var(--platform-debian) 24%, var(--line));
-  background: var(--platform-debian-soft);
   color: var(--platform-debian);
 }
 
 .device-avatar.platform-ubuntu {
-  border-color: color-mix(in srgb, var(--platform-ubuntu) 24%, var(--line));
-  background: var(--platform-ubuntu-soft);
   color: var(--platform-ubuntu);
 }
 
 .device-avatar.platform-fedora {
-  border-color: color-mix(in srgb, var(--platform-fedora) 24%, var(--line));
-  background: var(--platform-fedora-soft);
   color: var(--platform-fedora);
 }
 
 .device-avatar.platform-arch {
-  border-color: color-mix(in srgb, var(--platform-arch) 24%, var(--line));
-  background: var(--platform-arch-soft);
   color: var(--platform-arch);
 }
 
 .device-avatar.platform-manjaro {
-  border-color: color-mix(in srgb, var(--platform-manjaro) 24%, var(--line));
-  background: var(--platform-manjaro-soft);
   color: var(--platform-manjaro);
 }
 
 .device-avatar.platform-opensuse {
-  border-color: color-mix(in srgb, var(--platform-opensuse) 24%, var(--line));
-  background: var(--platform-opensuse-soft);
   color: var(--platform-opensuse);
 }
 
 .device-avatar.platform-linuxmint {
-  border-color: color-mix(in srgb, var(--platform-linuxmint) 24%, var(--line));
-  background: var(--platform-linuxmint-soft);
   color: var(--platform-linuxmint);
 }
 
 .device-avatar.platform-redhat {
-  border-color: color-mix(in srgb, var(--platform-redhat) 24%, var(--line));
-  background: var(--platform-redhat-soft);
   color: var(--platform-redhat);
 }
 
 .device-avatar.trusted {
-  border-color: var(--primary);
+  border-color: var(--accent-line);
 }
 
 .device-avatar.incompatible {
@@ -567,7 +575,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1.5px solid var(--paper-0);
+  border: 2px solid var(--paper-1);
 }
 
 .device-online {
@@ -583,8 +591,8 @@
   bottom: -4px;
   width: 16px;
   height: 16px;
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .device-incompatible {
@@ -602,8 +610,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--s4);
+  width: 100%;
+  max-width: var(--content-w);
   min-height: 100%;
-  padding: var(--s4) var(--s6) var(--s6);
+  margin: 0 auto;
+  padding: var(--s6) var(--s6) var(--s6);
 }
 
 .device-browser {
@@ -612,25 +623,6 @@
   gap: var(--s3);
   flex: 1;
   min-height: 300px;
-}
-
-.device-browser-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s4);
-  padding: var(--s3) 0 var(--s1);
-}
-
-.device-browser-heading h2 {
-  font-size: var(--text-title);
-  font-weight: 600;
-}
-
-.device-browser-heading p {
-  margin-top: 2px;
-  color: var(--ink-3);
-  font-size: var(--text-small);
 }
 
 /* Discovery is a continuous process, so its state reads as a live signal
@@ -724,12 +716,12 @@
 }
 
 .peer-row-main:active:not(:disabled) {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   transform: scale(0.995);
 }
 
 .peer-row.selected {
-  background: var(--primary-soft);
+  background: var(--accent-soft);
 }
 
 .peer-row.incompatible {
@@ -742,7 +734,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .peer-row-main:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary) 6%, transparent);
+    background: var(--paper-2);
   }
 }
 
@@ -767,42 +759,6 @@
 
 .peer-row-name strong {
   min-width: 0;
-}
-
-.peer-route {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  height: 20px;
-  padding: 0 var(--s2);
-  border-radius: var(--r-pill);
-  font-size: var(--text-micro);
-  font-weight: 500;
-}
-
-.peer-route.route-lan {
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.peer-route.route-relay {
-  background: var(--relay-soft);
-  color: var(--relay);
-}
-
-.peer-route.route-unselected {
-  background: var(--paper-3);
-  color: var(--ink-2);
-}
-
-.peer-route.route-peer {
-  background: color-mix(in srgb, var(--ok) 12%, transparent);
-  color: var(--ok);
-}
-
-.peer-route.route-bluetooth {
-  background: color-mix(in srgb, #356ee8 12%, transparent);
-  color: color-mix(in srgb, #356ee8 82%, var(--ink));
 }
 
 .peer-row-copy small {
@@ -832,17 +788,17 @@
   align-items: center;
   flex: none;
   height: 34px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r-control);
-  background: var(--paper-0);
+  background: var(--paper-1);
   color: var(--ink-2);
   transition: border-color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
 }
 
 .peer-transport-control:focus-within {
-  border-color: var(--primary);
-  outline: 2px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent);
   outline-offset: 1px;
 }
 
@@ -863,9 +819,8 @@
 /* An unpaired device cannot pair until a route is chosen, so the picker —
    not the pair button — carries the attention until then. */
 .peer-transport-control.needs-choice {
-  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
-  background: var(--primary-soft);
-  color: var(--primary);
+  border-color: var(--accent-line);
+  color: var(--accent);
 }
 
 .peer-transport-control select:disabled {
@@ -894,18 +849,18 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .peer-selected-mark:active:not(:disabled) {
-  background: var(--primary-strong);
+  background: var(--accent-strong);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .peer-selected-mark:hover:not(:disabled) {
-    background: var(--primary-strong);
-    color: var(--on-primary);
+    background: var(--accent-strong);
+    color: var(--on-accent);
   }
 }
 
@@ -916,20 +871,20 @@
 
 .peer-pair {
   min-width: 60px;
-  border-color: color-mix(in srgb, var(--warn) 28%, var(--line));
-  background: var(--warn-soft);
-  color: var(--warn);
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
 }
 
 .peer-pair:active:not(:disabled) {
-  border-color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 14%, var(--paper-1));
+  border-color: var(--primary-strong);
+  background: var(--primary-strong);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .peer-pair:hover:not(:disabled) {
-    border-color: var(--warn);
-    background: color-mix(in srgb, var(--warn) 12%, var(--paper-1));
+    border-color: var(--primary-strong);
+    background: var(--primary-strong);
   }
 
   .peer-pair.awaiting-route:hover:not(:disabled) {
@@ -979,7 +934,7 @@
 }
 
 .device-empty-icon.live {
-  color: var(--primary);
+  color: var(--accent);
 }
 
 .device-empty-icon.live::before,
@@ -987,7 +942,7 @@
   position: absolute;
   inset: -1px;
   content: "";
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border: 1px solid var(--accent-line);
   border-radius: 50%;
   animation: radar-ring 2.4s var(--ease) infinite;
 }
@@ -1086,9 +1041,9 @@
 }
 
 .dock-steps li.current .dock-step-index {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--on-primary);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .dock-guidance-copy {
@@ -1139,22 +1094,22 @@
 }
 
 .file-picker:active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  color: var(--primary);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .file-picker:hover {
-    border-color: var(--primary);
-    color: var(--primary);
+    border-color: var(--accent);
+    color: var(--accent);
   }
 }
 
 .file-picker.has-file {
   border-style: solid;
   border-color: var(--line-strong);
-  background: var(--primary-soft);
+  background: var(--paper-2);
   color: var(--ink);
 }
 
@@ -1246,8 +1201,8 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: var(--paper-2);
+  color: var(--ink-2);
 }
 
 .record-direction.received,
@@ -1390,7 +1345,7 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--r-control);
   outline: none;
-  background: var(--paper-0);
+  background: var(--paper-1);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: var(--text-body);
@@ -1402,8 +1357,8 @@
 }
 
 .setting-field input:focus-visible {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .setting-field small {
@@ -1828,7 +1783,7 @@ small.tone-warn {
 
 .alias-reset {
   align-self: flex-start;
-  color: var(--primary);
+  color: var(--accent);
 }
 
 .sheet-grip {
@@ -1886,7 +1841,7 @@ small.tone-warn {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--primary);
+  background: var(--accent);
   transform-origin: left center;
   transition: transform var(--dur) var(--ease);
 }
@@ -1907,7 +1862,7 @@ small.tone-warn {
   z-index: 250;
   display: grid;
   place-items: center;
-  border: 1px dashed var(--copper);
+  border: 1.5px dashed var(--accent);
   border-radius: var(--frame-radius);
   background: color-mix(in srgb, var(--paper-0) 94%, transparent);
   pointer-events: none;
@@ -1942,8 +1897,8 @@ small.tone-warn {
   height: 52px;
   margin-bottom: var(--s2);
   border-radius: 50%;
-  background: var(--copper-soft);
-  color: var(--copper);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 @keyframes file-drop-in {

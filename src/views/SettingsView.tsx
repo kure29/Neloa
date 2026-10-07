@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   DeviceAvatar,
+  PageHeader,
   SectionTitle,
   Sheet,
   StatusDot,
@@ -207,6 +208,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
 
   return (
     <div className="page">
+      <PageHeader title="设置" subtitle="本机名称、剪贴板、连接与已信任的设备" />
       <SectionTitle title="本机" />
       <Card>
         <form

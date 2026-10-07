@@ -96,6 +96,67 @@ export function SectionTitle({
   );
 }
 
+/**
+ * The heading every view opens with, so the three tabs share one title size,
+ * one subtitle line and one place for a view-level action.
+ */
+export function PageHeader({
+  id,
+  title,
+  subtitle,
+  aside,
+}: {
+  id?: string;
+  title: string;
+  subtitle?: ReactNode;
+  aside?: ReactNode;
+}) {
+  return (
+    <header className="page-header">
+      <div className="page-header-copy">
+        <h1 id={id}>{title}</h1>
+        {subtitle !== undefined && <p>{subtitle}</p>}
+      </div>
+      {aside}
+    </header>
+  );
+}
+
+/** The app icon, drawn inline so it follows the window's scale and theme. */
+export function BrandMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      className="brand-mark"
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect width="512" height="512" rx="120" fill="#1A1714" />
+      <circle cx="256" cy="256" r="152" fill="none" stroke="#FBFAF8" strokeOpacity=".16" strokeWidth="14" />
+      <circle cx="256" cy="256" r="94" fill="none" stroke="#FBFAF8" strokeOpacity=".3" strokeWidth="14" />
+      <path
+        d="M174 340V172l164 168V172"
+        fill="none"
+        stroke="#FBFAF8"
+        strokeWidth="44"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="372"
+        cy="140"
+        r="30"
+        fill="#C8643A"
+        stroke="#1A1714"
+        strokeWidth="16"
+        paintOrder="stroke"
+      />
+    </svg>
+  );
+}
+
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("card", className)}>{children}</div>;
 }

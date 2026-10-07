@@ -2,7 +2,7 @@ import { TRANSFER_STATUS_LABELS, formatRecordTime } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
 import type { TransferRecord } from "../types";
 import { Icon } from "../ui/icons";
-import { Badge, Button, EmptyState, IconButton, SectionTitle, cx } from "../ui/kit";
+import { Badge, Button, EmptyState, IconButton, PageHeader, cx } from "../ui/kit";
 
 function statusTone(record: TransferRecord) {
   if (record.kind !== "file" || !record.status) return "ok" as const;
@@ -14,10 +14,12 @@ function statusTone(record: TransferRecord) {
 export function HistoryView({ app }: { app: NeloaState }) {
   return (
     <div className="page">
-      <SectionTitle
+      <PageHeader
         title="传输记录"
-        meta={app.history.length > 0 ? `${app.history.length} 条` : undefined}
-        action={app.history.length > 0 ? (
+        subtitle={app.history.length > 0
+          ? `共 ${app.history.length} 条，只保存在这台设备`
+          : "记录只保存在这台设备"}
+        aside={app.history.length > 0 ? (
           <Button variant="ghost" size="sm" onClick={app.clearHistory}>
             <Icon name="trash" size={14} />
             清空

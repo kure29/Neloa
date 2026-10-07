@@ -67,7 +67,7 @@
 }
 
 .tabbar-item.active {
-  color: var(--primary);
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -121,12 +121,9 @@
   height: 44px;
 }
 
-.shell-mobile .device-browser-heading {
-  padding-top: var(--s2);
-}
 
 .shell-mobile .section-title {
-  padding: var(--s4) 0 var(--s1);
+  padding: var(--s5) var(--s1) 0;
 }
 
 /* Keep compact visuals while giving every settings action a full touch target. */
