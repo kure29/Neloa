@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="120" fill="#1C1C1E"/>
-  <rect x="1.5" y="1.5" width="509" height="509" rx="118.5" fill="none" stroke="#FFFFFF" stroke-opacity=".08" stroke-width="3"/>
-  <circle cx="256" cy="256" r="152" fill="none" stroke="#FFFFFF" stroke-opacity=".16" stroke-width="14"/>
-  <circle cx="256" cy="256" r="94" fill="none" stroke="#FFFFFF" stroke-opacity=".3" stroke-width="14"/>
-  <path d="M174 340V172l164 168V172" fill="none" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- The blue signal sits on the outer ring; a tile-coloured halo keeps it
-       separate from the N at small sizes. -->
-  <circle cx="372" cy="140" r="30" fill="#0A84FF" stroke="#1C1C1E" stroke-width="16" paint-order="stroke"/>
+  <rect width="512" height="512" rx="120" fill="#FFFFFF"/>
+  <rect x="1" y="1" width="510" height="510" rx="119" fill="none" stroke="#000000" stroke-opacity=".08" stroke-width="2"/>
+  <!-- Two devices and the space they share: the lens is where a transfer lives. -->
+  <circle cx="196" cy="256" r="112" fill="#0A7CFF"/>
+  <circle cx="316" cy="256" r="112" fill="#8EC3FF"/>
+  <path d="M256 161.4A112 112 0 0 1 256 350.6A112 112 0 0 1 256 161.4z" fill="#0050C8"/>
 </svg>

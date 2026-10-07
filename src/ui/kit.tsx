@@ -133,26 +133,10 @@ export function BrandMark({ size = 20 }: { size?: number }) {
       aria-hidden="true"
       focusable="false"
     >
-      <rect width="512" height="512" rx="120" fill="#1C1C1E" />
-      <circle cx="256" cy="256" r="152" fill="none" stroke="#FFFFFF" strokeOpacity=".16" strokeWidth="14" />
-      <circle cx="256" cy="256" r="94" fill="none" stroke="#FFFFFF" strokeOpacity=".3" strokeWidth="14" />
-      <path
-        d="M174 340V172l164 168V172"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth="44"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx="372"
-        cy="140"
-        r="30"
-        fill="#0A84FF"
-        stroke="#1C1C1E"
-        strokeWidth="16"
-        paintOrder="stroke"
-      />
+      <rect width="512" height="512" rx="120" fill="#FFFFFF" />
+      <circle cx="196" cy="256" r="112" fill="#0A7CFF" />
+      <circle cx="316" cy="256" r="112" fill="#8EC3FF" />
+      <path d="M256 161.4A112 112 0 0 1 256 350.6A112 112 0 0 1 256 161.4z" fill="#0050C8" />
     </svg>
   );
 }

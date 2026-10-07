@@ -68,16 +68,11 @@
   min-width: 0;
 }
 
+/* The white tile needs an edge to separate it from the grey title bar. */
 .brand-mark {
   flex: none;
   border-radius: 24%;
-}
-
-/* The charcoal mark would disappear into a near-black title bar. */
-@media (prefers-color-scheme: dark) {
-  .brand-mark {
-    box-shadow: 0 0 0 1px var(--line-strong);
-  }
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .traffic-lights {
