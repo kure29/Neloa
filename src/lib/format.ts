@@ -27,16 +27,6 @@ export function formatTime(timestamp: number): string {
     .format(new Date(timestamp));
 }
 
-export function formatRecordTime(timestamp: number): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
-}
-
 export function peerIsCompatible(peer: PeerDevice): boolean {
   return peer.minProtocolVersion > 0
     && peer.minProtocolVersion <= peer.protocolVersion

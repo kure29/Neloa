@@ -2,39 +2,44 @@
  * Neloa 说明书主题。
  *
  * 这里的每一个颜色都对应 `src/styles/tokens.css` 里的一个 token，命名也保持一致，
- * 目的是让文档站和应用看起来是同一个东西：白色工作台面、蓝色承担动作语义、
- * 紫色只留给中继、绿色只表示就绪。
+ * 目的是让文档站和应用看起来是同一个东西：分组浅灰底、白色卡片、
+ * 系统蓝承担动作与选中，紫色只留给中继，绿色只表示就绪。
  */
 
 :root {
   /* 面 */
-  --nl-paper-0: #ffffff;
+  --nl-paper-0: #f2f2f7;
   --nl-paper-1: #ffffff;
-  --nl-paper-2: #f7f9fc;
-  --nl-paper-3: #eef2f7;
-  --nl-line: #e4e7ec;
-  --nl-line-strong: #cbd5e1;
+  --nl-paper-2: #f2f2f7;
+  --nl-paper-3: #e5e5ea;
+  --nl-line: #e5e5ea;
+  --nl-line-strong: #d1d1d6;
 
   /* 墨 */
-  --nl-ink: #111827;
-  --nl-ink-2: #475569;
-  --nl-ink-3: #64748b;
+  --nl-ink: #1c1c1e;
+  --nl-ink-2: #48484a;
+  --nl-ink-3: #6c6c70;
+
+  /* 动作与选中 */
+  --nl-primary: #0068da;
+  --nl-primary-strong: #0058b8;
+  --nl-on-primary: #ffffff;
+  --nl-accent: #0068da;
+  --nl-accent-strong: #0058b8;
+  --nl-accent-soft: #e8f1fd;
 
   /* 语义色 */
-  --nl-primary: #2563eb;
-  --nl-primary-strong: #1d4ed8;
-  --nl-primary-soft: #eff6ff;
-  --nl-relay: #6d28d9;
-  --nl-relay-soft: #f3e8ff;
-  --nl-ok: #15803d;
-  --nl-ok-soft: #ecfdf3;
-  --nl-warn: #a16207;
-  --nl-warn-soft: #fff7e6;
-  --nl-danger: #b42318;
-  --nl-danger-soft: #fff1f0;
+  --nl-relay: #8944ab;
+  --nl-relay-soft: #f5ecfa;
+  --nl-ok: #1c7a33;
+  --nl-ok-soft: #e8f6ec;
+  --nl-warn: #b25000;
+  --nl-warn-soft: #fff2e5;
+  --nl-danger: #d70015;
+  --nl-danger-soft: #ffebed;
 
   /* 形 */
-  --nl-r-card: 10px;
+  --nl-r-card: 12px;
   --nl-r-control: 8px;
   --nl-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --nl-dur: 200ms;
@@ -45,28 +50,32 @@
 }
 
 .dark {
-  --nl-paper-0: #0d111b;
-  --nl-paper-1: #131a28;
-  --nl-paper-2: #192233;
-  --nl-paper-3: #243044;
-  --nl-line: #263247;
-  --nl-line-strong: #3b4a63;
+  --nl-paper-0: #000000;
+  --nl-paper-1: #1c1c1e;
+  --nl-paper-2: #2c2c2e;
+  --nl-paper-3: #3a3a3c;
+  --nl-line: #38383a;
+  --nl-line-strong: #48484a;
 
-  --nl-ink: #f8fafc;
-  --nl-ink-2: #cbd5e1;
-  --nl-ink-3: #94a3b8;
+  --nl-ink: #ffffff;
+  --nl-ink-2: #d1d1d6;
+  --nl-ink-3: #98989f;
 
-  --nl-primary: #60a5fa;
-  --nl-primary-strong: #93c5fd;
-  --nl-primary-soft: #172b4f;
-  --nl-relay: #c4b5fd;
-  --nl-relay-soft: #2b2147;
-  --nl-ok: #6ee7a0;
-  --nl-ok-soft: #153323;
-  --nl-warn: #fbbf59;
-  --nl-warn-soft: #362811;
-  --nl-danger: #fda29b;
-  --nl-danger-soft: #3a1c21;
+  --nl-primary: #0071e3;
+  --nl-primary-strong: #0a84ff;
+  --nl-on-primary: #ffffff;
+  --nl-accent: #409cff;
+  --nl-accent-strong: #64b0ff;
+  --nl-accent-soft: #0d2847;
+
+  --nl-relay: #da8fff;
+  --nl-relay-soft: #2e1838;
+  --nl-ok: #30d158;
+  --nl-ok-soft: #0f2e19;
+  --nl-warn: #ffb340;
+  --nl-warn-soft: #33240a;
+  --nl-danger: #ff6961;
+  --nl-danger-soft: #3a1416;
 }
 
 /* ---------- VitePress 变量映射 ---------- */
@@ -88,10 +97,10 @@
   --vp-c-text-2: var(--nl-ink-2);
   --vp-c-text-3: var(--nl-ink-3);
 
-  --vp-c-brand-1: var(--nl-primary);
-  --vp-c-brand-2: var(--nl-primary-strong);
-  --vp-c-brand-3: var(--nl-primary);
-  --vp-c-brand-soft: var(--nl-primary-soft);
+  --vp-c-brand-1: var(--nl-accent);
+  --vp-c-brand-2: var(--nl-accent-strong);
+  --vp-c-brand-3: var(--nl-accent);
+  --vp-c-brand-soft: var(--nl-accent-soft);
 
   /* 侧栏与导航的选中态，对齐应用里的 .tab.active */
   --vp-c-default-1: transparent;
@@ -99,10 +108,10 @@
   --vp-c-default-3: var(--nl-paper-3);
   --vp-c-default-soft: var(--nl-paper-2);
 
-  --vp-c-tip-1: var(--nl-primary);
-  --vp-c-tip-2: var(--nl-primary-strong);
-  --vp-c-tip-3: var(--nl-primary);
-  --vp-c-tip-soft: var(--nl-primary-soft);
+  --vp-c-tip-1: var(--nl-accent);
+  --vp-c-tip-2: var(--nl-accent-strong);
+  --vp-c-tip-3: var(--nl-accent);
+  --vp-c-tip-soft: var(--nl-accent-soft);
 
   --vp-c-warning-1: var(--nl-warn);
   --vp-c-warning-2: var(--nl-warn);
@@ -115,10 +124,13 @@
   --vp-c-danger-soft: var(--nl-danger-soft);
 
   --vp-code-block-bg: var(--nl-paper-2);
-  --vp-code-line-highlight-color: var(--nl-primary-soft);
+  --vp-code-line-highlight-color: var(--nl-accent-soft);
   --vp-code-copy-code-bg: var(--nl-paper-1);
   --vp-code-copy-code-hover-bg: var(--nl-paper-2);
 
+  --vp-button-brand-text: var(--nl-on-primary);
+  --vp-button-brand-hover-text: var(--nl-on-primary);
+  --vp-button-brand-active-text: var(--nl-on-primary);
   --vp-button-brand-bg: var(--nl-primary);
   --vp-button-brand-hover-bg: var(--nl-primary-strong);
   --vp-button-brand-active-bg: var(--nl-primary-strong);
@@ -126,9 +138,9 @@
   --vp-button-alt-bg: var(--nl-paper-1);
   --vp-button-alt-border: var(--nl-line-strong);
   --vp-button-alt-hover-bg: var(--nl-paper-2);
-  --vp-button-alt-hover-border: var(--nl-primary);
+  --vp-button-alt-hover-border: var(--nl-line-strong);
 
-  /* 圆角与应用对齐：卡片 10px、控件 8px */
+  /* 圆角与应用对齐：卡片 12px、控件 8px */
   --vp-border-radius: var(--nl-r-card);
 
   /* 首页主标题不做渐变文字：强调靠字重和字号，不靠颜色滑梯 */
@@ -164,8 +176,8 @@
 }
 
 .VPFeature .icon {
-  background: var(--nl-primary-soft);
-  color: var(--nl-primary);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
   border-radius: var(--nl-r-control);
 }
 
@@ -177,16 +189,16 @@
 /* ---------- 浏览器自带的那些面 ---------- */
 
 ::selection {
-  background: var(--nl-primary-soft);
+  background: var(--nl-accent-soft);
   color: var(--nl-ink);
 }
 
 .vp-doc {
-  caret-color: var(--nl-primary);
+  caret-color: var(--nl-accent);
 }
 
 :focus-visible {
-  outline: 2px solid var(--nl-primary);
+  outline: 2px solid var(--nl-accent);
   outline-offset: 2px;
   border-radius: var(--nl-r-control);
 }
@@ -297,7 +309,7 @@
 /* ---------- 侧栏选中态 ---------- */
 
 .VPSidebarItem.is-active > .item > .link > .text {
-  color: var(--nl-primary);
+  color: var(--nl-accent);
   font-weight: 500;
 }
 

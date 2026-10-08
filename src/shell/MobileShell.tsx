@@ -10,6 +10,16 @@ import { CurrentView, TABS } from "../views";
  * window controls, because there is no window.
  */
 export function MobileShell({ app }: { app: NeloaState }) {
+  // The device page already counts online peers, so the header describes this
+  // device's own reachability instead of repeating that number.
+  const presence = app.discovery.error
+    ? "发现服务异常"
+    : !app.discovery.active
+      ? "正在启动"
+      : app.relay.connected
+        ? "可被附近设备发现 · 中继已连接"
+        : "可被附近设备发现";
+
   return (
     <div className={cx("app", "shell-mobile", `platform-${app.platform}`)}>
       <a className="skip-link" href="#main">
@@ -21,7 +31,7 @@ export function MobileShell({ app }: { app: NeloaState }) {
           <strong className="truncate">{app.deviceName}</strong>
           <span className="truncate">
             <StatusDot tone={app.discovery.error ? "danger" : app.discovery.active ? "ok" : "warn"} />
-            {app.statusLabel}
+            {presence}
           </span>
         </div>
         {app.view === "radar" && (

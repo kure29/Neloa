@@ -96,6 +96,51 @@ export function SectionTitle({
   );
 }
 
+/**
+ * The heading every view opens with, so the three tabs share one title size,
+ * one subtitle line and one place for a view-level action.
+ */
+export function PageHeader({
+  id,
+  title,
+  subtitle,
+  aside,
+}: {
+  id?: string;
+  title: string;
+  subtitle?: ReactNode;
+  aside?: ReactNode;
+}) {
+  return (
+    <header className="page-header">
+      <div className="page-header-copy">
+        <h1 id={id}>{title}</h1>
+        {subtitle !== undefined && <p>{subtitle}</p>}
+      </div>
+      {aside}
+    </header>
+  );
+}
+
+/** The app icon, drawn inline so it follows the window's scale and theme. */
+export function BrandMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      className="brand-mark"
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect width="512" height="512" rx="120" fill="#FFFFFF" />
+      <circle cx="196" cy="256" r="112" fill="#0A7CFF" />
+      <circle cx="316" cy="256" r="112" fill="#8EC3FF" />
+      <path d="M256 161.4A112 112 0 0 1 256 350.6A112 112 0 0 1 256 161.4z" fill="#0050C8" />
+    </svg>
+  );
+}
+
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("card", className)}>{children}</div>;
 }

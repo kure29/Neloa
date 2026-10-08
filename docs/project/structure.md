@@ -20,13 +20,13 @@ docs/                        本文档站（VitePress）
 src/
   bridge.ts        typed Tauri commands/events，以及浏览器预览模拟
   lib/useNeloa.ts  全部应用状态与动作；两个外壳共用
-  ui/              图标、基础组件、浮层
-  views/           RadarView | HistoryView | SettingsView —— 与外壳无关
-  shell/           DesktopShell（标题栏） | MobileShell（标签栏、安全区）
+  ui/              图标、基础组件、浮层、连接方式选择器
+  views/           DevicePane（桌面设备详情）| RadarView（手机设备页）| HistoryView | SettingsView
+  shell/           DesktopShell（全高侧边栏：设备列表与导航） | MobileShell（标签栏、安全区）
   styles/          tokens | base | components | desktop | mobile
 ```
 
-`views/` 与 `ui/` 里没有平台分支，唯一的例外是通过 `useShell()` 让弹层在桌面端显示为居中对话框、在移动端显示为底部面板。外壳由前端根据 `?platform=`、指针类型、视口宽度和 user agent 选择；Rust 后端报告 `macos`、`windows`、`linux`、`ios` 或 `android`，协议行为与外壳无关。
+设备页在两种外壳下结构不同：桌面端由侧边栏列出设备、`DevicePane` 显示所选设备，手机端使用单栏的 `RadarView`；`views/index.tsx` 按外壳选择。传输记录与设置两端共用。除此之外，`views/` 与 `ui/` 里没有平台分支，弹层通过 `useShell()` 在桌面端显示为居中对话框、在移动端显示为底部面板。外壳由前端根据 `?platform=`、指针类型、视口宽度和 user agent 选择；Rust 后端报告 `macos`、`windows`、`linux`、`ios` 或 `android`，协议行为与外壳无关。
 
 界面颜色只来自 `src/styles/tokens.css` 里的一套自定义属性，每个变量都有一个亮色值和一个暗色值，因此组件规则从不判断配色方案。本文档站也沿用这同一套 token。
 

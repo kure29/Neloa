@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   DeviceAvatar,
+  PageHeader,
   SectionTitle,
   Sheet,
   StatusDot,
@@ -207,6 +208,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
 
   return (
     <div className="page">
+      <PageHeader title="设置" subtitle="本机名称、剪贴板、连接与已信任的设备" />
       <SectionTitle title="本机" />
       <Card>
         <form
@@ -214,43 +216,46 @@ export function SettingsView({ app }: { app: NeloaState }) {
           aria-busy={app.busyAction === "deviceName"}
           onSubmit={(event) => void submitDeviceName(event)}
         >
-          <label className="setting-field device-name-field">
-            <span>设备名称</span>
-            <input
-              value={deviceName}
-              autoComplete="off"
-              maxLength={32}
-              placeholder="例如：我的 iPhone"
-              required
-              aria-describedby="device-name-hint"
-              aria-invalid={Boolean(deviceNameError)}
-              onChange={(event) => {
-                setDeviceName(event.target.value);
-                setDeviceNameError("");
-                setDeviceNameSaved(false);
-              }}
-            />
+          <div className="setting-field device-name-field">
+            <label htmlFor="device-name-input">设备名称</label>
+            <div className="setting-input-row">
+              <input
+                id="device-name-input"
+                value={deviceName}
+                autoComplete="off"
+                maxLength={32}
+                placeholder="例如：我的 iPhone"
+                required
+                aria-describedby="device-name-hint"
+                aria-invalid={Boolean(deviceNameError)}
+                onChange={(event) => {
+                  setDeviceName(event.target.value);
+                  setDeviceNameError("");
+                  setDeviceNameSaved(false);
+                }}
+              />
+              <Button
+                type="submit"
+                size="sm"
+                className={cx(deviceNameSaved && "btn-confirmed")}
+                disabled={
+                  app.busyAction === "deviceName"
+                  || !app.local
+                  || deviceName.trim() === app.local.name
+                }
+              >
+                {app.busyAction === "deviceName" ? (
+                  <><Icon className="spin" name="scan" size={14} />保存中…</>
+                ) : deviceNameSaved ? (
+                  <><Icon name="check" size={14} />已保存</>
+                ) : "保存名称"}
+              </Button>
+            </div>
             <small id="device-name-hint">其他设备会看到这个名称，最多 32 个字符。</small>
             {deviceNameError && (
               <small className="setting-field-error" role="alert">{deviceNameError}</small>
             )}
-          </label>
-          <Button
-            type="submit"
-            size="sm"
-            className={cx(deviceNameSaved && "btn-confirmed")}
-            disabled={
-              app.busyAction === "deviceName"
-              || !app.local
-              || deviceName.trim() === app.local.name
-            }
-          >
-            {app.busyAction === "deviceName" ? (
-              <><Icon className="spin" name="scan" size={14} />保存中…</>
-            ) : deviceNameSaved ? (
-              <><Icon name="check" size={14} />已保存</>
-            ) : "保存名称"}
-          </Button>
+          </div>
         </form>
       </Card>
 
@@ -377,7 +382,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
               </p>
             )}
 
-            {relayEditing || relayDirty ? (
+            {relayDirty || (relayEnabled && relayEditing) ? (
               <div className="relay-actions">
                 <span>关闭中继不会影响局域网直连。</span>
                 <div className="relay-action-buttons">
@@ -403,7 +408,7 @@ export function SettingsView({ app }: { app: NeloaState }) {
                   </Button>
                 </div>
               </div>
-            ) : (
+            ) : relayEnabled && (
               <button
                 type="button"
                 className="relay-summary-action"

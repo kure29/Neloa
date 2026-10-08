@@ -1,9 +1,11 @@
 /*
- * Desktop-only chrome.
+ * Desktop-only chrome: the full-height sidebar, the main column and the
+ * window controls.
  *
- * This is the entire macOS / Windows difference: the system font stack, the
- * outer frame radius, and which window controls are drawn. Everything inside
- * the window comes from components.css and is identical on both.
+ * The macOS / Windows difference is the system font stack, the outer frame
+ * radius, and which window controls are drawn (traffic lights in the sidebar,
+ * or caption buttons top-right with the app name top-left). Everything else
+ * is identical on both.
  */
 
 .platform-macos,
@@ -13,11 +15,12 @@
 
 .platform-windows {
   --frame-radius: 8px;
-  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei",
-    system-ui, sans-serif;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei UI",
+    "Microsoft YaHei", sans-serif;
 }
 
 .shell-desktop {
+  flex-direction: row;
   border-radius: var(--frame-radius);
   background: var(--paper-0);
   overflow: hidden;
@@ -27,48 +30,45 @@
   border-radius: 0;
 }
 
-/* ---------- title bar ---------- */
+/* ---------- sidebar ---------- */
 
-.titlebar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
+.sidebar {
+  display: flex;
   flex: none;
-  height: 44px;
-  padding: 0 var(--s3);
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  width: 264px;
+  min-height: 0;
+  border-right: 1px solid var(--line);
   background: var(--paper-0);
 }
 
-.titlebar-left {
+/* Drag handle and window controls (macOS) or app name (Windows). */
+.sidebar-top {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: var(--s3);
-  min-width: 0;
+  height: 44px;
+  padding: 0 var(--s4);
 }
 
-.titlebar-right {
+.brand {
+  font-size: var(--text-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-lockup {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--s2);
   min-width: 0;
 }
 
-.brand {
-  font-size: var(--text-small);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.app-mark {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--r-control);
-  background: var(--primary);
-  color: var(--on-primary);
+/* The white tile needs an edge to separate it from the grey title bar. */
+.brand-mark {
+  flex: none;
+  border-radius: 24%;
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .traffic-lights {
@@ -101,67 +101,12 @@
   background: #28c840;
 }
 
-/* ---------- tabs ---------- */
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--r-pill);
-  background: var(--paper-2);
-}
-
-.tab {
-  height: 26px;
-  padding: 0 var(--s4);
-  border: 0;
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--ink-2);
-  font-size: var(--text-small);
-  font-weight: 500;
-  white-space: nowrap;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.tab:hover {
-  color: var(--ink);
-}
-
-.tab.active {
-  background: var(--primary-soft);
-  color: var(--primary);
-  box-shadow: var(--elev-1);
-}
-
-/* ---------- device chip ---------- */
-
-.device-chip {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  min-width: 0;
-  max-width: 200px;
-  height: 24px;
-  padding: 0 var(--s3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  color: var(--ink-2);
-  font-size: var(--text-micro);
-}
-
-.titlebar-right .icon-btn {
-  width: 30px;
-  height: 30px;
-}
-
 /* ---------- Windows caption buttons ---------- */
 
 .window-controls {
   display: flex;
   align-self: stretch;
-  margin-right: calc(var(--s3) * -1);
-  margin-left: var(--s2);
+  margin-left: auto;
 }
 
 .window-controls button {
@@ -189,58 +134,625 @@
   color: #ffffff;
 }
 
-/* ---------- device card grid ---------- */
+.sidebar-devices {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
 
-.shell-desktop .peer-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));
-  grid-auto-rows: 1fr;
+.sidebar-devices-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s3) var(--s1) var(--s4);
+}
+
+.sidebar-devices-head h2 {
+  flex: 1;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.sidebar-refresh {
+  width: 28px;
+  height: 28px;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--s3);
+}
+
+.sidebar-group {
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s1);
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 var(--s2);
+  list-style: none;
+}
+
+.sidebar-empty {
+  padding: var(--s3) var(--s4);
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s2);
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
   gap: var(--s3);
-  overflow: visible;
+  height: 34px;
+  padding: 0 var(--s3);
   border: 0;
-  border-radius: 0;
+  border-radius: 8px;
   background: transparent;
-  box-shadow: none;
+  color: var(--ink);
+  font-size: var(--text-body);
+  text-align: left;
 }
 
-.shell-desktop .peer-row,
-.shell-desktop .peer-row + .peer-row {
-  min-height: 84px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
+.sidebar-nav-item svg {
+  color: var(--ink-2);
 }
 
-.shell-desktop .peer-row {
-  transition: border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
+.sidebar-nav-item.selected {
+  background: var(--primary);
+  color: var(--on-primary);
 }
 
-.shell-desktop .peer-row:active {
-  transform: scale(0.995);
+.sidebar-nav-item.selected svg {
+  color: var(--on-primary);
 }
 
-.shell-desktop .peer-row.selected {
-  border-color: color-mix(in srgb, var(--primary) 34%, var(--line));
+.sidebar-nav-badge {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-nav-item.selected .sidebar-nav-badge {
+  background: var(--on-primary);
+  color: var(--primary);
+}
+
+.sidebar-me {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s3);
+  margin: 0 var(--s2) var(--s2);
+  padding: var(--s2) var(--s3);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  text-align: left;
+}
+
+.sidebar-me-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-micro);
+}
+
+.sidebar-me-copy strong {
+  color: var(--ink);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.sidebar-nav-item:active:not(.selected),
+.sidebar-me:active {
+  background: var(--paper-3);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .shell-desktop .peer-row:hover {
-    border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
+  .sidebar-nav-item:hover:not(.selected),
+  .sidebar-me:hover {
+    background: var(--paper-3);
   }
+}
+
+/* ---------- main column ---------- */
+
+.desktop-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Drag handle above the content, and the Windows caption buttons. */
+.main-top {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: 36px;
+}
+
+.shell-desktop .page {
+  padding-top: var(--s2);
+}
+
+/* A row is a list item holding the select button and, for new devices, a
+   separate pair button — buttons cannot nest. */
+.drow {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding-right: var(--s2);
+  border-radius: 10px;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.drow-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+  padding: var(--s2);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.drow:active {
+  background: var(--paper-3);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .drow:hover {
+    background: var(--paper-3);
+  }
+}
+
+.drow.selected,
+.drow.selected:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.drow.selected .drow-sub {
+  color: color-mix(in srgb, var(--on-primary) 80%, transparent);
+}
+
+.drow.selected .device-avatar {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--on-primary) 20%, transparent);
+  color: var(--on-primary);
+}
+
+.drow.selected .device-avatar i {
+  border-color: var(--primary);
+}
+
+.drow.incompatible .drow-main {
+  color: var(--ink-3);
+}
+
+.drow-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drow-copy strong {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.drow-sub {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
+.drow-sub.warn {
+  color: var(--warn);
+}
+
+.drow-pair {
+  flex: none;
+  height: 26px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--paper-1);
+  color: var(--ink);
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+.drow-pair:disabled {
+  color: var(--ink-3);
+  cursor: wait;
+}
+
+.split-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  width: 100%;
+  max-width: var(--content-w);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: var(--s2) var(--s6) var(--s6);
+  animation: view-in var(--dur) var(--ease);
+}
+
+.split-detail > * {
+  flex: none;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.detail-title p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: var(--text-small);
+  white-space: pre-wrap;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.detail-actions .peer-transport-control select {
+  width: 128px;
+}
+
+.drop-target {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 16px;
+  background: var(--paper-1);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.drop-target.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.drop-target-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.drop-target-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drop-target-copy strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.drop-target-copy span {
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.send-queue {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--paper-1);
+  box-shadow: var(--elev-1);
+}
+
+.send-queue ul {
+  max-height: 188px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.send-queue li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 46px;
+  padding: 0 var(--s2) 0 var(--s4);
+  color: var(--ink);
+}
+
+.send-queue li + li {
+  border-top: 1px solid var(--line);
+}
+
+.send-queue li > svg {
+  color: var(--ink-3);
+}
+
+.send-queue li small {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.send-queue li .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.send-queue footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.send-queue footer > span {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
+.pair-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.card.pair-card > * + * {
+  border-top: 0;
+}
+
+.pair-card-body {
+  display: flex;
+  gap: var(--s3);
+}
+
+.pair-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pair-card-body strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pair-card-body p {
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: var(--text-small);
+}
+
+.pair-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding-left: 52px;
+}
+
+.pair-card-actions .peer-transport-control {
+  height: var(--control-h);
+}
+
+.pair-card-actions .peer-transport-control select {
+  width: 160px;
+}
+
+.pair-card-hint {
+  margin-top: calc(var(--s2) * -1);
+  padding-left: 52px;
+  color: var(--accent);
+  font-size: var(--text-micro);
+}
+
+.detail-note {
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-card);
+  background: var(--tone-soft);
+  color: var(--tone);
+}
+
+.detail-note p {
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: var(--text-small);
+}
+
+.detail-label {
+  margin: var(--s1) 2px calc(var(--s2) * -1);
+  color: var(--ink-2);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.detail-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: calc(var(--s2) * -1);
+}
+
+.detail-label-row .detail-label {
+  margin-bottom: 0;
+}
+
+.detail-empty {
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.detail-transfers {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--paper-1);
+  box-shadow: var(--elev-1);
+  list-style: none;
+}
+
+.detail-transfers li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+}
+
+.detail-transfers li + li {
+  border-top: 1px solid var(--line);
+}
+
+.detail-transfer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.detail-transfer-head .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.detail-empty-state {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 300px;
+  text-align: center;
+}
+
+.detail-empty-state strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.detail-empty-state p {
+  max-width: 420px;
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.detail-empty-state .dock-steps {
+  margin: var(--s3) 0;
+}
+
+/* Live transfers to devices other than the selected one float bottom-right;
+   the selected device's transfers are shown inline. */
+.shell-desktop .transfer-tray {
+  right: var(--s5);
+  bottom: var(--s5);
+}
+
+/* While the tray occupies the bottom-right corner, notices centre on the
+   space to its left instead of sliding underneath it. */
+.shell-desktop:has(.transfer-tray) .toast {
+  left: calc(50% - 178px);
 }
 
 /* ---------- tight windows (the 720×520 minimum) ---------- */
 
-/* Keep live transfers above the device browser instead of covering the send dock. */
-.shell-desktop .transfer-tray {
-  top: calc(44px + var(--s6));
-  bottom: auto;
-}
 
 @media (max-width: 880px) {
-  .shell-desktop .radar-view {
-    padding: var(--s3) var(--s4) var(--s4);
+  .sidebar {
+    width: 232px;
+  }
+
+  .split-detail {
+    padding: var(--s2) var(--s4) var(--s5);
+  }
+
+  .pair-card-actions,
+  .pair-card-hint {
+    padding-left: 0;
   }
 
   .shell-desktop .page {
@@ -249,35 +761,6 @@
 
   .shell-desktop .transfer-tray {
     right: var(--s4);
-    bottom: auto;
     width: 280px;
-  }
-
-  .shell-desktop .tab {
-    padding: 0 var(--s3);
-  }
-}
-
-@media (max-width: 780px) {
-  .shell-desktop .device-chip {
-    justify-content: center;
-    width: 24px;
-    padding: 0;
-    border-color: transparent;
-  }
-
-  .shell-desktop .device-chip .truncate {
-    display: none;
-  }
-}
-
-/* Keep the full queue and primary action visible at the supported 720×520 minimum. */
-@media (max-height: 600px) {
-  .shell-desktop .send-dock {
-    row-gap: 0;
-  }
-
-  .shell-desktop .dock-hint {
-    display: none;
   }
 }

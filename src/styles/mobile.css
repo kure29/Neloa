@@ -67,7 +67,7 @@
 }
 
 .tabbar-item.active {
-  color: var(--primary);
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -121,12 +121,9 @@
   height: 44px;
 }
 
-.shell-mobile .device-browser-heading {
-  padding-top: var(--s2);
-}
 
 .shell-mobile .section-title {
-  padding: var(--s4) 0 var(--s1);
+  padding: var(--s5) var(--s1) 0;
 }
 
 /* Keep compact visuals while giving every settings action a full touch target. */
@@ -190,9 +187,6 @@
   grid-template-columns: 1fr;
 }
 
-.shell-mobile .device-name-config {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
 
 .shell-mobile .setting-field input {
   font-size: 16px;
@@ -216,6 +210,10 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   width: 100%;
+}
+
+.shell-mobile .relay-action-buttons > :only-child {
+  grid-column: 1 / -1;
 }
 
 .shell-mobile .connection-health-summary {
@@ -252,6 +250,17 @@
 
 .shell-mobile .send-dock {
   grid-template-columns: 1fr;
+}
+
+.shell-mobile .dock-guidance {
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--s1);
+}
+
+.shell-mobile .dock-add-files {
+  grid-column: 1;
+  grid-row: auto;
+  width: 100%;
 }
 
 .shell-mobile .dock-send {
@@ -313,4 +322,8 @@
   from {
     transform: translateY(16px);
   }
+}
+
+.shell-mobile .setting-input-row .btn {
+  height: var(--control-h);
 }
