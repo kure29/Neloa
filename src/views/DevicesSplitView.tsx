@@ -3,12 +3,12 @@ import { useEffect } from "react";
 import {
   TRANSFER_STATUS_LABELS,
   formatBytes,
-  formatRecordTime,
   peerIsCompatible,
   platformLabel,
   transferPercent,
   transferStageLabel,
 } from "../lib/format";
+import { formatRecordMoment } from "../lib/historyGroups";
 import type { NeloaState } from "../lib/useNeloa";
 import type { FileTransferProgress, PeerDevice, TransferRecord } from "../types";
 import { Icon } from "../ui/icons";
@@ -306,7 +306,7 @@ function PeerDetail({
                   </span>
                   <div className="record-body">
                     <strong className="truncate">{record.name}</strong>
-                    <span className="truncate">{formatRecordTime(record.atMs)} · {record.detail}</span>
+                    <span className="truncate">{formatRecordMoment(record.atMs)} · {record.detail}</span>
                   </div>
                   <Badge tone={recordTone(record)}>
                     {record.kind === "file" && record.status ? TRANSFER_STATUS_LABELS[record.status] : "已加密"}

@@ -697,6 +697,12 @@
   bottom: var(--s5);
 }
 
+/* While the tray occupies the bottom-right corner, notices centre on the
+   space to its left instead of sliding underneath it. */
+.shell-desktop:has(.transfer-tray) .toast {
+  left: calc(50% - 178px);
+}
+
 /* ---------- tight windows (the 720×520 minimum) ---------- */
 
 
