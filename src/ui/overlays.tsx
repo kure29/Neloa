@@ -108,8 +108,11 @@ export function FileOfferSheet({ app }: { app: NeloaState }) {
  */
 export function TransferTray({ app }: { app: NeloaState }) {
   const shell = useShell();
-  if (app.transfers.length === 0) return null;
-  const visible = app.transfers.slice(0, shell === "mobile" ? 2 : 3);
+  // The desktop device page shows the selected device's transfers inline.
+  const inlinePeerId = shell === "desktop" && app.view === "radar" ? app.selectedPeerId : null;
+  const transfers = app.transfers.filter((transfer) => transfer.peerId !== inlinePeerId);
+  if (transfers.length === 0) return null;
+  const visible = transfers.slice(0, shell === "mobile" ? 2 : 3);
 
   return (
     <aside className="transfer-tray" aria-label="进行中的文件传输">

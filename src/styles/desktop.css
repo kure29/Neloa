@@ -202,70 +202,516 @@
   color: #ffffff;
 }
 
-/* ---------- device card grid ---------- */
+/* ---------- two-pane device page ---------- */
 
-.shell-desktop .peer-list {
+.split {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  animation: view-in var(--dur) var(--ease);
+}
+
+.split-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+}
+
+.split-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--s3);
-  overflow: visible;
+  padding: var(--s5) var(--s4) var(--s2);
+}
+
+.split-list-head h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.split-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--s3);
+}
+
+.split-group {
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s1);
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.split-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 var(--s2);
+  list-style: none;
+}
+
+.split-list-empty {
+  padding: var(--s4);
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+/* A row is a list item holding the select button and, for new devices, a
+   separate pair button — buttons cannot nest. */
+.drow {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding-right: var(--s2);
+  border-radius: 10px;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.drow-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+  padding: var(--s2);
   border: 0;
-  border-radius: 0;
+  border-radius: inherit;
   background: transparent;
-  box-shadow: none;
+  color: inherit;
+  text-align: left;
 }
 
-.shell-desktop .peer-row,
-.shell-desktop .peer-row + .peer-row {
-  min-height: 84px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-}
-
-.shell-desktop .peer-row {
-  transition: border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
-}
-
-.shell-desktop .peer-row:active {
-  transform: scale(0.995);
-}
-
-.shell-desktop .peer-row.selected {
-  border-color: var(--accent-line);
+.drow:active {
+  background: var(--paper-3);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .shell-desktop .peer-row:hover {
-    border-color: var(--line-strong);
+  .drow:hover {
+    background: var(--paper-3);
   }
 }
 
-/* Notices drop from under the title bar so they never cover the send dock's
-   primary action, which is usually the next thing to click. */
-.shell-desktop .toast {
-  top: calc(44px + var(--s3));
-  bottom: auto;
-  transform: translate(-50%, -8px);
+.drow.selected,
+.drow.selected:hover {
+  background: var(--primary);
+  color: var(--on-primary);
 }
 
-.shell-desktop .toast.visible {
-  transform: translate(-50%, 0);
+.drow.selected .drow-sub {
+  color: color-mix(in srgb, var(--on-primary) 80%, transparent);
+}
+
+.drow.selected .device-avatar {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--on-primary) 20%, transparent);
+  color: var(--on-primary);
+}
+
+.drow.selected .device-avatar i {
+  border-color: var(--primary);
+}
+
+.drow.incompatible .drow-main {
+  color: var(--ink-3);
+}
+
+.drow-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drow-copy strong {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.drow-sub {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
+.drow-sub.warn {
+  color: var(--warn);
+}
+
+.drow-pair {
+  flex: none;
+  height: 26px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--paper-1);
+  color: var(--ink);
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+.drow-pair:disabled {
+  color: var(--ink-3);
+  cursor: wait;
+}
+
+.split-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
+.split-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s5) var(--s6) var(--s6);
+}
+
+.split-detail > * {
+  flex: none;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.detail-title p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: var(--text-small);
+  white-space: pre-wrap;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.detail-actions .peer-transport-control select {
+  width: 128px;
+}
+
+.drop-target {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 16px;
+  background: var(--paper-1);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.drop-target.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.drop-target-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.drop-target-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drop-target-copy strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.drop-target-copy span {
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.send-queue {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--paper-1);
+  box-shadow: var(--elev-1);
+}
+
+.send-queue ul {
+  max-height: 188px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.send-queue li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 46px;
+  padding: 0 var(--s2) 0 var(--s4);
+  color: var(--ink);
+}
+
+.send-queue li + li {
+  border-top: 1px solid var(--line);
+}
+
+.send-queue li > svg {
+  color: var(--ink-3);
+}
+
+.send-queue li small {
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.send-queue li .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.send-queue footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.send-queue footer > span {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-micro);
+}
+
+.pair-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.card.pair-card > * + * {
+  border-top: 0;
+}
+
+.pair-card-body {
+  display: flex;
+  gap: var(--s3);
+}
+
+.pair-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pair-card-body strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pair-card-body p {
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: var(--text-small);
+}
+
+.pair-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding-left: 52px;
+}
+
+.pair-card-actions .peer-transport-control {
+  height: var(--control-h);
+}
+
+.pair-card-actions .peer-transport-control select {
+  width: 160px;
+}
+
+.pair-card-hint {
+  margin-top: calc(var(--s2) * -1);
+  padding-left: 52px;
+  color: var(--accent);
+  font-size: var(--text-micro);
+}
+
+.detail-note {
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-card);
+  background: var(--tone-soft);
+  color: var(--tone);
+}
+
+.detail-note p {
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: var(--text-small);
+}
+
+.detail-label {
+  margin: var(--s1) 2px calc(var(--s2) * -1);
+  color: var(--ink-2);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.detail-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: calc(var(--s2) * -1);
+}
+
+.detail-label-row .detail-label {
+  margin-bottom: 0;
+}
+
+.detail-empty {
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.detail-transfers {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--paper-1);
+  box-shadow: var(--elev-1);
+  list-style: none;
+}
+
+.detail-transfers li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+}
+
+.detail-transfers li + li {
+  border-top: 1px solid var(--line);
+}
+
+.detail-transfer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.detail-transfer-head .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.detail-empty-state {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 300px;
+  text-align: center;
+}
+
+.detail-empty-state strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.detail-empty-state p {
+  max-width: 420px;
+  color: var(--ink-3);
+  font-size: var(--text-small);
+}
+
+.detail-empty-state .dock-steps {
+  margin: var(--s3) 0;
+}
+
+/* Live transfers to devices other than the selected one float bottom-right;
+   the selected device's transfers are shown inline. */
+.shell-desktop .transfer-tray {
+  right: var(--s5);
+  bottom: var(--s5);
 }
 
 /* ---------- tight windows (the 720×520 minimum) ---------- */
 
-/* Keep live transfers above the device browser instead of covering the send dock. */
-.shell-desktop .transfer-tray {
-  top: calc(44px + var(--s6));
-  bottom: auto;
-}
 
 @media (max-width: 880px) {
-  .shell-desktop .radar-view {
-    padding: var(--s3) var(--s4) var(--s4);
+  .split {
+    grid-template-columns: 252px minmax(0, 1fr);
+  }
+
+  .split-detail {
+    padding: var(--s4) var(--s4) var(--s5);
+  }
+
+  .pair-card-actions,
+  .pair-card-hint {
+    padding-left: 0;
   }
 
   .shell-desktop .page {
@@ -274,7 +720,6 @@
 
   .shell-desktop .transfer-tray {
     right: var(--s4);
-    bottom: auto;
     width: 280px;
   }
 
@@ -292,17 +737,6 @@
   }
 
   .shell-desktop .device-chip .truncate {
-    display: none;
-  }
-}
-
-/* Keep the full queue and primary action visible at the supported 720×520 minimum. */
-@media (max-height: 600px) {
-  .shell-desktop .send-dock {
-    row-gap: 0;
-  }
-
-  .shell-desktop .dock-hint {
     display: none;
   }
 }

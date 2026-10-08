@@ -4,9 +4,7 @@ import { formatBytes, peerIsCompatible, platformLabel } from "../lib/format";
 import type { NeloaState } from "../lib/useNeloa";
 import { Badge, Button, DeviceAvatar, IconButton, PageHeader, cx } from "../ui/kit";
 import { Icon } from "../ui/icons";
-
-const PEER_TO_PEER_CAPABILITY = "transport-peer-to-peer-wifi";
-const BLUETOOTH_CAPABILITY = "transport-bluetooth";
+import { TransportSelect } from "../ui/transport";
 
 function transportSelectId(peerId: string) {
   return `transport-${peerId}`;
@@ -82,10 +80,6 @@ export function RadarView({ app }: { app: NeloaState }) {
               const displayName = alias || peer.name;
               const pairBusy = app.busyAction === "pair" && peer.id === app.selectedPeerId;
               const transportPreference = app.transportPreferenceFor(peer.id);
-              const peerToPeerAvailable = peer.capabilities.includes(PEER_TO_PEER_CAPABILITY)
-                && peer.peerToPeerAvailable;
-              const bluetoothAvailable = peer.capabilities.includes(BLUETOOTH_CAPABILITY)
-                && peer.bluetoothAvailable;
 
               return (
                 <div
@@ -132,40 +126,12 @@ export function RadarView({ app }: { app: NeloaState }) {
                       <Badge tone="warn">需更新</Badge>
                     ) : (
                       <>
-                        <label
-                          className={cx(
-                            "peer-transport-control",
-                            transportPreference === "ask" && "needs-choice",
-                          )}
-                          title="选择这台设备的连接方式"
-                        >
-                          <span className="sr-only">{displayName} 的连接方式</span>
-                          <select
-                            id={transportSelectId(peer.id)}
-                            value={transportPreference}
-                            aria-label={`${displayName} 的连接方式`}
-                            disabled={app.busyAction !== null}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => {
-                              event.stopPropagation();
-                              void app.configureTransportPreference(
-                                peer.id,
-                                event.target.value as Parameters<typeof app.configureTransportPreference>[1],
-                              );
-                            }}
-                          >
-                            <option value="ask" disabled>选择连接方式</option>
-                            <option value="lan" disabled={peer.addresses.length === 0}>局域网</option>
-                            <option value="peerToPeer" disabled={!peerToPeerAvailable}>
-                              {peerToPeerAvailable ? "点对点 Wi-Fi" : "点对点 Wi-Fi（不可用）"}
-                            </option>
-                            <option value="bluetooth" disabled={!bluetoothAvailable}>
-                              {bluetoothAvailable ? "蓝牙" : "蓝牙（不可用）"}
-                            </option>
-                            <option value="relay" disabled={!peer.relayAvailable}>中继</option>
-                          </select>
-                          <Icon name="chevron" size={13} />
-                        </label>
+                        <TransportSelect
+                          app={app}
+                          peer={peer}
+                          displayName={displayName}
+                          id={transportSelectId(peer.id)}
+                        />
                         {trusted ? (
                           active && (
                             <IconButton
