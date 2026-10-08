@@ -13,7 +13,7 @@
 
 .platform-windows {
   --frame-radius: 8px;
-  --font-ui: "Neloa CJK", "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei UI",
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei UI",
     "Microsoft YaHei", sans-serif;
 }
 
