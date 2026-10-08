@@ -7,6 +7,7 @@ import { DesktopShell } from "./shell/DesktopShell";
 import { MobileShell } from "./shell/MobileShell";
 import { ShellProvider } from "./ui/kit";
 
+import "./styles/fonts.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/components.css";

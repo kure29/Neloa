@@ -13,8 +13,8 @@
 
 .platform-windows {
   --frame-radius: 8px;
-  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei",
-    system-ui, sans-serif;
+  --font-ui: "Neloa CJK", "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei UI",
+    "Microsoft YaHei", sans-serif;
 }
 
 .shell-desktop {
@@ -231,7 +231,6 @@
   margin: 0;
   font-size: 17px;
   font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .split-scroll {
@@ -401,7 +400,6 @@
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  letter-spacing: -0.015em;
 }
 
 .detail-title p {

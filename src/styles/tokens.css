@@ -84,8 +84,10 @@
   --text-title: 22px;
   --text-display: 34px;
 
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
-    "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  /* "Neloa CJK" only covers CJK code points (see fonts.css), so Latin text
+     falls through to the platform UI font that follows it. */
+  --font-ui: "Neloa CJK", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+    "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Consolas, monospace;
 
   /* Spacing. */
