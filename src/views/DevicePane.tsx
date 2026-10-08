@@ -12,15 +12,8 @@ import { formatRecordMoment } from "../lib/historyGroups";
 import type { NeloaState } from "../lib/useNeloa";
 import type { FileTransferProgress, PeerDevice, TransferRecord } from "../types";
 import { Icon } from "../ui/icons";
-import { Badge, Button, DeviceAvatar, IconButton, StatusDot, cx } from "../ui/kit";
+import { Badge, Button, DeviceAvatar, IconButton, cx } from "../ui/kit";
 import { TRANSPORT_LABELS, TransportSelect } from "../ui/transport";
-
-/**
- * The desktop device page: a device list on the left and everything about the
- * chosen device on the right — its route, the drop target, the send queue, its
- * live transfers and its recent history — so choosing a device and sending to
- * it happen in one place. Phones keep the single-column RadarView.
- */
 
 const detailSelectId = (peerId: string) => `transport-detail-${peerId}`;
 
@@ -33,40 +26,30 @@ function recordTone(record: TransferRecord) {
   return record.status === "failed" ? "danger" as const : "warn" as const;
 }
 
-export function DevicesSplitView({ app }: { app: NeloaState }) {
+/** Selects an unpaired device and pairs it, or points at the route picker first. */
+function startPairingFlow(app: NeloaState, peerId: string) {
+  app.setView("radar");
+  app.setSelectedPeerId(peerId);
+  if (app.transportPreferenceFor(peerId) === "ask") {
+    requestAnimationFrame(() => document.getElementById(detailSelectId(peerId))?.focus());
+    return;
+  }
+  void app.pairPeer(peerId);
+}
+
+/** The sidebar's device section: discovery state and the grouped device rows. */
+export function DeviceList({ app }: { app: NeloaState }) {
   const peers = app.discovery.peers;
   const trustedPeers = peers.filter((peer) => app.trustedIds.has(peer.id));
   const newPeers = peers.filter((peer) => !app.trustedIds.has(peer.id));
   const discoveryLive = app.discovery.active && !app.discovery.error;
   const discoveryTone = app.discovery.error ? "danger" : discoveryLive ? "ok" : "neutral";
   const discoveryLabel = app.discovery.error ? "发现异常" : discoveryLive ? "搜索中" : "启动中";
-  const { setSelectedPeerId } = app;
-
-  useEffect(() => {
-    const deselect = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || document.querySelector('[aria-modal="true"]')) return;
-      const target = event.target;
-      if (target instanceof Element && target.closest("input, textarea, select")) return;
-      setSelectedPeerId(null);
-    };
-    window.addEventListener("keydown", deselect);
-    return () => window.removeEventListener("keydown", deselect);
-  }, [setSelectedPeerId]);
-
-  /** Selects an unpaired device and pairs it, or points at the route picker first. */
-  const startPairing = (peerId: string) => {
-    setSelectedPeerId(peerId);
-    if (app.transportPreferenceFor(peerId) === "ask") {
-      requestAnimationFrame(() => document.getElementById(detailSelectId(peerId))?.focus());
-      return;
-    }
-    void app.pairPeer(peerId);
-  };
 
   const renderRow = (peer: PeerDevice) => {
     const trusted = app.trustedIds.has(peer.id);
     const compatible = peerIsCompatible(peer);
-    const selected = peer.id === app.selectedPeerId;
+    const selected = app.view === "radar" && peer.id === app.selectedPeerId;
     const displayName = peerDisplayName(app, peer);
     const transfer = app.transfers.find((item) => item.peerId === peer.id);
     const subtitle = !compatible
@@ -82,13 +65,16 @@ export function DevicesSplitView({ app }: { app: NeloaState }) {
         <button
           type="button"
           className="drow-main"
-          aria-current={selected ? "true" : undefined}
+          aria-current={selected ? "page" : undefined}
           aria-label={`${displayName}，${platformLabel(peer.platform)}，${subtitle}`}
-          onClick={() => setSelectedPeerId(peer.id)}
+          onClick={() => {
+            app.setView("radar");
+            app.setSelectedPeerId(peer.id);
+          }}
         >
           <DeviceAvatar
             platform={peer.platform}
-            size={36}
+            size={34}
             online
             trusted={trusted}
             incompatible={!compatible}
@@ -103,7 +89,7 @@ export function DevicesSplitView({ app }: { app: NeloaState }) {
             type="button"
             className="drow-pair"
             disabled={app.busyAction === "pair"}
-            onClick={() => startPairing(peer.id)}
+            onClick={() => startPairingFlow(app, peer.id)}
           >
             配对
           </button>
@@ -113,67 +99,85 @@ export function DevicesSplitView({ app }: { app: NeloaState }) {
   };
 
   return (
-    <div className="split">
-      <aside className="split-list" aria-labelledby="devices-title">
-        <header className="split-list-head">
-          <h1 id="devices-title">设备</h1>
-          <span
-            className={cx("discovery-state", `tone-${discoveryTone}`, discoveryLive && "live")}
-            aria-hidden="true"
-          >
-            <span className="discovery-state-dot" />
-            {discoveryLabel}
-          </span>
-        </header>
+    <section className="sidebar-devices" aria-labelledby="devices-title">
+      <header className="sidebar-devices-head">
+        <h2 id="devices-title">设备</h2>
+        <span
+          className={cx("discovery-state", `tone-${discoveryTone}`, discoveryLive && "live")}
+          aria-hidden="true"
+        >
+          <span className="discovery-state-dot" />
+          {discoveryLabel}
+        </span>
+        <IconButton
+          className="sidebar-refresh"
+          icon="scan"
+          label="重新查找设备"
+          onClick={() => void app.refreshDiscovery(true)}
+        />
+      </header>
 
-        <div className="split-scroll">
-          {peers.length === 0 ? (
-            <p className="split-list-empty">
-              {app.discovery.error
-                ? "设备发现暂不可用"
-                : "还没有发现其他设备。请在另一台设备上打开 Neloa。"}
-            </p>
-          ) : (
-            <>
-              {trustedPeers.length > 0 && (
-                <>
-                  <h2 className="split-group">已配对</h2>
-                  <ul className="split-rows">{trustedPeers.map(renderRow)}</ul>
-                </>
-              )}
-              {newPeers.length > 0 && (
-                <>
-                  <h2 className="split-group">附近的新设备</h2>
-                  <ul className="split-rows">{newPeers.map(renderRow)}</ul>
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        <footer className="split-foot">
-          <StatusDot tone={discoveryTone} />
-          <span className="truncate">
+      <div className="sidebar-scroll">
+        {peers.length === 0 ? (
+          <p className="sidebar-empty">
             {app.discovery.error
-              ? app.discovery.error
-              : `${peers.length} 台在线 · ${app.relay.connected ? "中继已连接" : "本机可被附近设备发现"}`}
-          </span>
-        </footer>
-      </aside>
-
-      <section className="split-detail" aria-label="设备详情">
-        {app.selectedPeer ? (
-          <PeerDetail
-            key={app.selectedPeer.id}
-            app={app}
-            peer={app.selectedPeer}
-            onPair={() => startPairing(app.selectedPeer!.id)}
-          />
+              ? "设备发现暂不可用"
+              : "还没有发现其他设备。请在另一台设备上打开 Neloa。"}
+          </p>
         ) : (
-          <NoSelection app={app} />
+          <>
+            {trustedPeers.length > 0 && (
+              <>
+                <h3 className="sidebar-group">已配对</h3>
+                <ul className="sidebar-rows">{trustedPeers.map(renderRow)}</ul>
+              </>
+            )}
+            {newPeers.length > 0 && (
+              <>
+                <h3 className="sidebar-group">附近的新设备</h3>
+                <ul className="sidebar-rows">{newPeers.map(renderRow)}</ul>
+              </>
+            )}
+          </>
         )}
-      </section>
-    </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The desktop device page: everything about the device chosen in the sidebar
+ * — its route, the drop target, the send queue, its live transfers and its
+ * recent history — so choosing a device and sending to it happen in one place.
+ * Phones keep the single-column RadarView.
+ */
+export function DevicePane({ app }: { app: NeloaState }) {
+  const { setSelectedPeerId } = app;
+
+  useEffect(() => {
+    const deselect = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || document.querySelector('[aria-modal="true"]')) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select")) return;
+      setSelectedPeerId(null);
+    };
+    window.addEventListener("keydown", deselect);
+    return () => window.removeEventListener("keydown", deselect);
+  }, [setSelectedPeerId]);
+
+  return (
+    <section className="split-detail" aria-label="设备详情">
+      {app.selectedPeer ? (
+        <PeerDetail
+          key={app.selectedPeer.id}
+          app={app}
+          peer={app.selectedPeer}
+          onPair={() => startPairingFlow(app, app.selectedPeer!.id)}
+        />
+      ) : (
+        <NoSelection app={app} />
+      )}
+    </section>
   );
 }
 
