@@ -35,6 +35,43 @@
   font-size: var(--text-small);
 }
 
+/* On a device's screen the header is a navigation bar: back, title, balance. */
+.mobile-back {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  min-width: 72px;
+  height: 44px;
+  margin-left: calc(var(--s2) * -1);
+  padding: 0 var(--s2) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--text-body);
+}
+
+.mobile-back svg {
+  transform: rotate(180deg);
+}
+
+.mobile-back:active {
+  opacity: 0.5;
+}
+
+.mobile-header-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-subhead);
+  font-weight: 600;
+  text-align: center;
+}
+
+.mobile-header-spacer {
+  flex: none;
+  width: 72px;
+}
+
 /* ---------- tab bar ---------- */
 
 .tabbar {
@@ -78,45 +115,182 @@
   padding: var(--s2) var(--s4) var(--s7);
 }
 
-.shell-mobile .radar-view {
-  padding: var(--s3) var(--s4) var(--s4);
+/* ---------- device list ---------- */
+
+/* The list is the page here, so its heading takes the page-title size and the
+   header's own refresh button replaces the list's. */
+.mobile-devices {
+  padding: var(--s3) var(--s4) var(--s7);
+  animation: view-in var(--dur) var(--ease);
 }
 
-.shell-mobile .device-browser {
-  min-height: 260px;
+.shell-mobile .sidebar-devices-head {
+  padding: var(--s2) var(--s1) var(--s1);
 }
 
-.shell-mobile .peer-row {
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 68px;
-  padding: var(--s1);
+.shell-mobile .sidebar-devices-head h2 {
+  color: var(--ink);
+  font-size: var(--text-title);
 }
 
-.shell-mobile .peer-row-main {
-  min-height: 60px;
-  padding: var(--s2);
+.shell-mobile .sidebar-refresh {
+  display: none;
 }
 
-.shell-mobile .peer-more {
+.shell-mobile .sidebar-scroll {
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.shell-mobile .sidebar-group {
+  padding: var(--s4) var(--s1) var(--s2);
+}
+
+/* Inset grouped list: one white card per group, rows split by hairlines. */
+.shell-mobile .sidebar-rows {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--paper-1);
+  box-shadow: var(--elev-1);
+}
+
+.shell-mobile .drow {
+  border-radius: 0;
+  padding-right: var(--s3);
+}
+
+.shell-mobile .drow + .drow {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.shell-mobile .drow-main {
+  min-height: 64px;
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+}
+
+.shell-mobile .drow-copy strong {
+  font-size: var(--text-body);
+}
+
+.shell-mobile .drow-sub {
+  font-size: var(--text-small);
+}
+
+.drow-chevron {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.shell-mobile .drow-pair {
+  height: 34px;
+  padding: 0 var(--s4);
+  font-size: var(--text-small);
+}
+
+.shell-mobile .device-empty {
+  margin-top: var(--s2);
+}
+
+/* ---------- device screen ---------- */
+
+.shell-mobile .split-detail {
+  gap: var(--s3);
+  padding: var(--s3) var(--s4) var(--s7);
+}
+
+.shell-mobile .detail-head {
+  flex-wrap: wrap;
+}
+
+.shell-mobile .detail-title h2 {
+  font-size: 22px;
+}
+
+/* The header's back button replaces the pane's close button. */
+.shell-mobile .detail-close {
+  display: none;
+}
+
+.shell-mobile .detail-actions,
+.shell-mobile .detail-actions .peer-transport-control {
+  flex: 1 0 100%;
+}
+
+.shell-mobile .detail-actions .peer-transport-control {
+  height: var(--control-h);
+}
+
+.shell-mobile .detail-actions .peer-transport-control select {
+  width: 100%;
+}
+
+.pick-target {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--paper-1);
+  box-shadow: var(--elev-1);
+  color: var(--ink);
+  text-align: left;
+}
+
+.pick-target > svg {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.pick-target:active:not(:disabled) {
+  background: var(--paper-2);
+}
+
+.shell-mobile .pair-card-body {
+  gap: var(--s3);
+}
+
+.shell-mobile .pair-card-actions {
+  flex-direction: column;
+  align-items: stretch;
+  padding-left: 0;
+}
+
+.shell-mobile .pair-card-actions .peer-transport-control select {
+  width: 100%;
+}
+
+.shell-mobile .pair-card-hint {
+  padding-left: 0;
+}
+
+.shell-mobile .send-queue li {
+  min-height: 52px;
+}
+
+.shell-mobile .send-queue li .icon-btn {
   width: 44px;
   height: 44px;
 }
 
-.shell-mobile .peer-transport-control {
+.shell-mobile .send-queue footer {
+  flex-wrap: wrap;
+}
+
+.shell-mobile .send-queue footer > span {
+  flex-basis: 100%;
+}
+
+.shell-mobile .send-queue footer .btn-primary {
   flex: 1;
-  height: 44px;
 }
 
-.shell-mobile .peer-transport-control select {
-  width: 100%;
-}
-
-.shell-mobile .peer-row-actions {
-  width: 100%;
-  padding: 0 var(--s2) var(--s2);
-}
-
-.shell-mobile .peer-selected-mark {
+.shell-mobile .detail-transfer-head .icon-btn {
   width: 44px;
   height: 44px;
 }
@@ -246,38 +420,6 @@
 
 .shell-mobile .diagnostic-support .btn {
   width: 100%;
-}
-
-.shell-mobile .send-dock {
-  grid-template-columns: 1fr;
-}
-
-.shell-mobile .dock-guidance {
-  grid-template-columns: minmax(0, 1fr);
-  padding: var(--s1);
-}
-
-.shell-mobile .dock-add-files {
-  grid-column: 1;
-  grid-row: auto;
-  width: 100%;
-}
-
-.shell-mobile .dock-send {
-  width: 100%;
-}
-
-.shell-mobile .selected-file-list {
-  max-height: 132px;
-}
-
-.shell-mobile .selected-file-list li {
-  min-height: 44px;
-}
-
-.shell-mobile .selected-file-remove {
-  width: 44px;
-  height: 44px;
 }
 
 .shell-mobile .file-drop-overlay {

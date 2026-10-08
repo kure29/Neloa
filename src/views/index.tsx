@@ -2,7 +2,7 @@ import type { NeloaState, ViewName } from "../lib/useNeloa";
 import type { IconName } from "../ui/icons";
 import { DevicePane } from "./DevicePane";
 import { HistoryView } from "./HistoryView";
-import { RadarView } from "./RadarView";
+import { MobileDevicesView } from "./MobileDevicesView";
 import { SettingsView } from "./SettingsView";
 
 export interface Tab {
@@ -23,5 +23,5 @@ export const TABS: Tab[] = [
 export function CurrentView({ app }: { app: NeloaState }) {
   if (app.view === "history") return <HistoryView app={app} />;
   if (app.view === "settings") return <SettingsView app={app} />;
-  return app.shell === "desktop" ? <DevicePane app={app} /> : <RadarView app={app} />;
+  return app.shell === "desktop" ? <DevicePane app={app} /> : <MobileDevicesView app={app} />;
 }

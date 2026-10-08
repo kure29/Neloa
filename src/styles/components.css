@@ -92,8 +92,7 @@
 
 /* Each view mounts fresh on a tab switch; a short settle makes the change
    legible without delaying input. Reduced motion collapses it in base.css. */
-.page,
-.radar-view {
+.page {
   animation: view-in var(--dur) var(--ease);
 }
 
@@ -603,27 +602,6 @@
   color: var(--paper-0);
 }
 
-/* ---------- devices ---------- */
-
-.radar-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s4);
-  width: 100%;
-  max-width: var(--content-w);
-  min-height: 100%;
-  margin: 0 auto;
-  padding: var(--s6) var(--s6) var(--s6);
-}
-
-.device-browser {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-  flex: 1;
-  min-height: 300px;
-}
-
 /* Discovery is a continuous process, so its state reads as a live signal
    rather than a number the subtitle already states. */
 .discovery-state {
@@ -668,117 +646,6 @@
     opacity: 0;
     transform: scale(2.8);
   }
-}
-
-.peer-list {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  background: var(--paper-1);
-  box-shadow: var(--elev-1);
-}
-
-.peer-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s2);
-  width: 100%;
-  min-height: 72px;
-  padding: var(--s2);
-  background: var(--paper-1);
-  color: var(--ink);
-  text-align: left;
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.peer-row + .peer-row {
-  border-top: 1px solid var(--line);
-}
-
-.peer-row-main {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--s3);
-  min-width: 0;
-  min-height: 56px;
-  padding: var(--s1) var(--s2);
-  border: 0;
-  border-radius: var(--r-control);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
-}
-
-.peer-row-main:active:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  transform: scale(0.995);
-}
-
-.peer-row.selected {
-  background: var(--accent-soft);
-}
-
-.peer-row.incompatible {
-  color: var(--ink-3);
-}
-
-.peer-row-main:disabled {
-  cursor: not-allowed;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .peer-row-main:hover:not(:disabled) {
-    background: var(--paper-2);
-  }
-}
-
-.peer-row-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.peer-row-copy strong {
-  overflow-wrap: anywhere;
-  font-size: var(--text-body);
-  font-weight: 600;
-}
-
-.peer-row-name {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  min-width: 0;
-}
-
-.peer-row-name strong {
-  min-width: 0;
-}
-
-.peer-row-copy small {
-  margin-top: 2px;
-  color: var(--ink-3);
-  font-size: var(--text-small);
-}
-
-.peer-row-copy small.ok {
-  color: var(--ok);
-}
-
-.peer-row-copy small.warn {
-  color: var(--warn);
-}
-
-.peer-row-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s1);
-  padding-right: var(--s1);
 }
 
 .peer-transport-control {
@@ -839,68 +706,6 @@
     border-color: var(--line-strong);
     background: var(--paper-2);
   }
-}
-
-.peer-selected-mark {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.peer-selected-mark:active:not(:disabled) {
-  background: var(--accent-strong);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .peer-selected-mark:hover:not(:disabled) {
-    background: var(--accent-strong);
-    color: var(--on-accent);
-  }
-}
-
-.peer-more {
-  width: 34px;
-  height: 34px;
-}
-
-.peer-pair {
-  min-width: 60px;
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--on-primary);
-}
-
-.peer-pair:active:not(:disabled) {
-  border-color: var(--primary-strong);
-  background: var(--primary-strong);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .peer-pair:hover:not(:disabled) {
-    border-color: var(--primary-strong);
-    background: var(--primary-strong);
-  }
-
-  .peer-pair.awaiting-route:hover:not(:disabled) {
-    border-color: var(--line-strong);
-    background: var(--paper-2);
-  }
-}
-
-.peer-pair.awaiting-route {
-  border-color: var(--line);
-  background: var(--paper-1);
-  color: var(--ink-2);
-}
-
-.peer-pair.awaiting-route:active:not(:disabled) {
-  border-color: var(--line-strong);
-  background: var(--paper-2);
 }
 
 .device-empty {
@@ -973,29 +778,6 @@
   font-size: var(--text-small);
 }
 
-/* ---------- send dock ---------- */
-
-.send-dock {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--s2) var(--s3);
-  padding: var(--s3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  background: var(--paper-1);
-  box-shadow: var(--elev-1);
-}
-
-/* Before a device is chosen the dock explains the three steps instead of
-   showing a disabled primary button. Files can still be queued first. */
-.dock-guidance {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s2) var(--s4);
-  padding: var(--s1) var(--s1) var(--s1) var(--s2);
-}
-
 .dock-steps {
   display: flex;
   align-items: center;
@@ -1043,126 +825,6 @@
   border-color: var(--accent);
   background: var(--accent);
   color: var(--on-accent);
-}
-
-.dock-guidance-copy {
-  grid-column: 1;
-  color: var(--ink-3);
-  font-size: var(--text-micro);
-}
-
-.dock-add-files {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-
-.send-dock.single-action {
-  grid-template-columns: 1fr;
-}
-
-.send-dock.single-action .dock-send {
-  width: 100%;
-}
-
-.dock-selection {
-  min-width: 0;
-}
-
-.dock-file {
-  display: flex;
-  align-items: center;
-  gap: var(--s1);
-  min-width: 0;
-}
-
-.file-picker {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex: 1;
-  min-width: 0;
-  height: var(--control-h);
-  padding: 0 var(--s3);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--r-control);
-  background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-body);
-  text-align: left;
-  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.file-picker:active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .file-picker:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-}
-
-.file-picker.has-file {
-  border-style: solid;
-  border-color: var(--line-strong);
-  background: var(--paper-2);
-  color: var(--ink);
-}
-
-.file-picker svg {
-  flex: none;
-}
-
-.file-picker:disabled {
-  cursor: not-allowed;
-}
-
-.selected-file-list {
-  max-height: 104px;
-  margin: var(--s2) 0 0;
-  padding: var(--s1) 0;
-  overflow-y: auto;
-  border-radius: var(--r-control);
-  background: var(--paper-2);
-  list-style: none;
-}
-
-.selected-file-list li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--s2);
-  min-height: 32px;
-  padding: 0 var(--s1) 0 var(--s3);
-  color: var(--ink-2);
-  font-size: var(--text-small);
-}
-
-.selected-file-list small {
-  color: var(--ink-3);
-  font-size: var(--text-micro);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.selected-file-remove {
-  width: 28px;
-  height: 28px;
-}
-
-.dock-send {
-  align-self: start;
-  min-width: 120px;
-}
-
-.dock-hint {
-  grid-column: 1 / -1;
-  padding: 0 var(--s1);
-  color: var(--tone);
-  font-size: var(--text-micro);
 }
 
 /* ---------- history ---------- */

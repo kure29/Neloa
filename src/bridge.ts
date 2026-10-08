@@ -1,3 +1,4 @@
+import { onBackButtonPress } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview, type DragDropEvent } from "@tauri-apps/api/webview";
@@ -525,6 +526,17 @@ export async function onWindowMaximizedChange(
   const publish = async () => callback(await appWindow.isMaximized());
   await publish();
   return appWindow.onResized(() => void publish());
+}
+
+/**
+ * Android's hardware back button. While a listener is registered it replaces
+ * the system default (leaving the app), so callers register only while they
+ * have something to go back from.
+ */
+export async function onAndroidBack(callback: () => void): Promise<UnlistenFn> {
+  if (!isDesktopRuntime) return () => {};
+  const listener = await onBackButtonPress(() => callback());
+  return () => void listener.unregister();
 }
 
 export async function startFileTransfer(peerId: string, path: string): Promise<string> {

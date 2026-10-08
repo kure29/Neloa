@@ -47,13 +47,13 @@ Neloa 是本地优先的。每个客户端在没有账号、没有互联网连�
 src/
   bridge.ts        typed Tauri commands/events，以及浏览器预览模拟
   lib/useNeloa.ts  全部应用状态与动作；两个外壳共用
-  ui/              图标、基础组件、浮层
-  views/           RadarView | HistoryView | SettingsView —— 与外壳无关
-  shell/           DesktopShell（标题栏） | MobileShell（标签栏、安全区）
+  ui/              图标、基础组件、浮层、连接方式选择器
+  views/           DevicePane（设备列表与详情）| MobileDevicesView（手机设备页）| HistoryView | SettingsView
+  shell/           DesktopShell（全高侧边栏：设备列表与导航） | MobileShell（导航栏、标签栏、安全区）
   styles/          tokens | base | components | desktop | mobile
 ```
 
-除了通过 `useShell()` 在居中对话框与底部面板之间切换之外，`views/` 和 `ui/` 里没有平台或外壳分支。外壳由前端根据 `?platform=`、指针类型、视口宽度和 user agent 选择。Rust 后端报告 `macos`、`windows`、`linux`、`ios` 或 `android`，协议行为与外壳无关。
+设备页按外壳选择布局（桌面侧边栏加详情，手机列表加独立详情页），内容是同一套组件；弹层通过 `useShell()` 在居中对话框与底部面板之间切换。除此之外，`views/` 和 `ui/` 里没有平台或外壳分支。外壳由前端根据 `?platform=`、指针类型、视口宽度和 user agent 选择。Rust 后端报告 `macos`、`windows`、`linux`、`ios` 或 `android`，协议行为与外壳无关。
 
 ## 安全边界
 

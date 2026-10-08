@@ -45,13 +45,13 @@ Advertising declares `protocolVersion=1`, `minProtocolVersion=1`, and the base c
 src/
   bridge.ts        typed Tauri commands/events, plus the browser preview simulation
   lib/useNeloa.ts  all application state and actions; both shells consume it
-  ui/              icons, kit primitives, overlays
-  views/           RadarView | HistoryView | SettingsView — shell-agnostic
-  shell/           DesktopShell (title bar) | MobileShell (tab bar, safe areas)
+  ui/              icons, kit primitives, overlays, the route picker
+  views/           DevicePane (device list and detail) | MobileDevicesView (phone device page) | HistoryView | SettingsView
+  shell/           DesktopShell (full-height sidebar: devices and navigation) | MobileShell (navigation bar, tab bar, safe areas)
   styles/          tokens | base | components | desktop | mobile
 ```
 
-`views/` and `ui/` contain no platform or shell branches except through `useShell()`, which only switches a modal between a centred dialog and a bottom sheet. The shell is chosen in the frontend from `?platform=`, pointer type, viewport width, and user agent. The Rust backend reports `macos`, `windows`, `linux`, `ios`, or `android`; protocol behavior remains shell-independent.
+The device page picks its layout by shell (a sidebar plus detail on desktop, a list plus a pushed detail screen on phones) from the same components, and `useShell()` switches a modal between a centred dialog and a bottom sheet. Beyond that, `views/` and `ui/` contain no platform or shell branches. The shell is chosen in the frontend from `?platform=`, pointer type, viewport width, and user agent. The Rust backend reports `macos`, `windows`, `linux`, `ios`, or `android`; protocol behavior remains shell-independent.
 
 ## Security boundary
 

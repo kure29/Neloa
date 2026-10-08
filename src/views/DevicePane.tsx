@@ -17,7 +17,7 @@ import { TRANSPORT_LABELS, TransportSelect } from "../ui/transport";
 
 const detailSelectId = (peerId: string) => `transport-detail-${peerId}`;
 
-function peerDisplayName(app: NeloaState, peer: PeerDevice) {
+export function peerDisplayName(app: NeloaState, peer: PeerDevice) {
   return app.trustedDevicesById.get(peer.id)?.alias?.trim() || peer.name;
 }
 
@@ -27,7 +27,7 @@ function recordTone(record: TransferRecord) {
 }
 
 /** Selects an unpaired device and pairs it, or points at the route picker first. */
-function startPairingFlow(app: NeloaState, peerId: string) {
+export function startPairingFlow(app: NeloaState, peerId: string) {
   app.setView("radar");
   app.setSelectedPeerId(peerId);
   if (app.transportPreferenceFor(peerId) === "ask") {
@@ -37,7 +37,10 @@ function startPairingFlow(app: NeloaState, peerId: string) {
   void app.pairPeer(peerId);
 }
 
-/** The sidebar's device section: discovery state and the grouped device rows. */
+/**
+ * The grouped device rows with their discovery state: the desktop sidebar's
+ * device section, and the phone's device list screen.
+ */
 export function DeviceList({ app }: { app: NeloaState }) {
   const peers = app.discovery.peers;
   const trustedPeers = peers.filter((peer) => app.trustedIds.has(peer.id));
@@ -74,7 +77,7 @@ export function DeviceList({ app }: { app: NeloaState }) {
         >
           <DeviceAvatar
             platform={peer.platform}
-            size={34}
+            size={app.shell === "mobile" ? 40 : 34}
             online
             trusted={trusted}
             incompatible={!compatible}
@@ -83,6 +86,9 @@ export function DeviceList({ app }: { app: NeloaState }) {
             <strong className="truncate" title={displayName}>{displayName}</strong>
             <span className={cx("drow-sub truncate", !compatible && "warn")}>{subtitle}</span>
           </span>
+          {app.shell === "mobile" && (trusted || !compatible) && (
+            <Icon className="drow-chevron" name="chevron" size={16} />
+          )}
         </button>
         {!trusted && compatible && !selected && (
           <button
@@ -118,7 +124,18 @@ export function DeviceList({ app }: { app: NeloaState }) {
       </header>
 
       <div className="sidebar-scroll">
-        {peers.length === 0 ? (
+        {peers.length === 0 && app.shell === "mobile" ? (
+          <div className="device-empty">
+            <span className={cx("device-empty-icon", discoveryLive && "live")} aria-hidden="true">
+              <Icon name={app.discovery.error ? "alert" : "radio"} size={20} />
+            </span>
+            <strong>{app.discovery.error ? "无法发现设备" : "正在查找设备"}</strong>
+            <span>
+              {app.discovery.error
+                ?? "请在另一台设备上打开 Neloa；跨网络时请确认中继已连接。"}
+            </span>
+          </div>
+        ) : peers.length === 0 ? (
           <p className="sidebar-empty">
             {app.discovery.error
               ? "设备发现暂不可用"
@@ -149,7 +166,7 @@ export function DeviceList({ app }: { app: NeloaState }) {
  * The desktop device page: everything about the device chosen in the sidebar
  * — its route, the drop target, the send queue, its live transfers and its
  * recent history — so choosing a device and sending to it happen in one place.
- * Phones keep the single-column RadarView.
+ * Phones show the same PeerDetail as a pushed screen (MobileDevicesView).
  */
 export function DevicePane({ app }: { app: NeloaState }) {
   const { setSelectedPeerId } = app;
@@ -181,7 +198,7 @@ export function DevicePane({ app }: { app: NeloaState }) {
   );
 }
 
-function PeerDetail({
+export function PeerDetail({
   app,
   peer,
   onPair,
@@ -232,7 +249,12 @@ function PeerDetail({
               id={detailSelectId(peer.id)}
             />
           )}
-          <IconButton icon="close" label="取消选择这台设备" onClick={() => app.setSelectedPeerId(null)} />
+          <IconButton
+            className="detail-close"
+            icon="close"
+            label="取消选择这台设备"
+            onClick={() => app.setSelectedPeerId(null)}
+          />
         </div>
       </header>
 
@@ -326,6 +348,24 @@ function PeerDetail({
 }
 
 function DropTarget({ app, routeMissing }: { app: NeloaState; routeMissing: boolean }) {
+  // Phones cannot drag files in, so the whole card is the picker there.
+  if (app.shell === "mobile") {
+    return (
+      <button
+        type="button"
+        className="pick-target"
+        disabled={app.busyAction === "file"}
+        onClick={() => void app.pickFiles()}
+      >
+        <span className="drop-target-icon" aria-hidden="true"><Icon name="plus" size={20} /></span>
+        <span className="drop-target-copy">
+          <strong>选择要发送的文件</strong>
+          <span>{routeMissing ? "发送前请先在上方选择连接方式" : "文件会先进入待发送列表，确认后再发送"}</span>
+        </span>
+        <Icon name="chevron" size={16} />
+      </button>
+    );
+  }
   return (
     <div className={cx("drop-target", app.fileDrop.active && "active")}>
       <span className="drop-target-icon" aria-hidden="true"><Icon name="download" size={20} /></span>
